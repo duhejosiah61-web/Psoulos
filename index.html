@@ -1,0 +1,1462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>SoulOS [Final Build]</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app" class="vintage-container" v-cloak>
+    <!-- 装饰螺丝 -->
+    <div class="screw top-left"></div><div class="screw top-right"></div>
+    <div class="screw bottom-left"></div><div class="screw bottom-right"></div>
+
+    <!-- 主屏幕/仪表盘 -->
+    <div class="home-screen-layout" v-if="isHomeScreenVisible">
+        <!-- 1. 主显示屏 -->
+        <div class="display-screen-module">
+            <div class="screen-inner main-crt">
+                 <div class="screen-content" v-show="activePage === 1">
+                     <div class="character-display">
+                          <div class="crt-label top-left">// BONDING BAY</div>
+                          <img src="https://via.placeholder.com/200x300/4a6643/000000?text=AI+CHAR" alt="AI Character" class="character-placeholder">
+                          <div class="crt-label bottom-right">STATUS: {{ aiStatus }}</div>
+                     </div>
+                 </div>
+                 <!-- P2 Widgets -->
+                 <div class="screen-content column-layout" v-show="activePage === 2">
+                     <div class="pixel-widget full-width time-container"><div class="widget-header"><span>TIMEHUB</span><span>// 24°C</span></div><div class="big-time">{{ currentTime }}</div><div class="date-label">{{ currentDate }}</div></div>
+                     <div class="widget-row"><div class="pixel-widget half-width"><div class="widget-header">STATUS</div><div class="icon-value-row"><i class="fas fa-heartbeat deco-icon accent-red"></i><div class="pixel-value">SYNC</div></div><div class="widget-sub">98.6%</div></div><div class="pixel-widget half-width"><div class="widget-header">MILESTONE</div><div class="icon-value-row"><i class="fas fa-calendar-day deco-icon"></i><div class="pixel-value">128</div></div><div class="widget-sub">DAYS TOGETHER</div></div></div>
+                 </div>
+                 <!-- P3 Widgets -->
+                 <div class="screen-content column-layout" v-show="activePage === 3">
+                    <div class="pixel-widget full-width player-container"><div class="widget-header"><span>VINYL PLAYER</span><i class="fas fa-compact-disc blink-icon"></i></div><div class="scrolling-text">NOW PLAYING: MIDNIGHT LOUNGE</div><div class="pixel-progress-bar"><div class="bar-fill" style="width: 45%"></div></div></div>
+                    <div class="widget-row"><div class="pixel-widget half-width"><div class="widget-header">SLEEP STAT</div><div class="icon-value-row"><i class="fas fa-bed deco-icon"></i><div class="pixel-value">7<span class="unit">H</span>30</div></div><div class="widget-sub">LAST NIGHT</div></div><div class="pixel-widget half-width"><div class="widget-header">BUDGET</div><div class="icon-value-row"><i class="fas fa-money-bill-wave deco-icon accent-red"></i><div class="pixel-value">-¥840</div></div><div class="widget-sub">THIS MONTH</div></div></div>
+                 </div>
+            </div>
+        </div>
+
+        <!-- 2. 控制面板 -->
+        <div class="module-panel control-panel">
+            <div class="fader-container" ref="faderContainer"><div class="fader-track"></div><div class="fader-handle" :style="{ left: faderLeft + '%' }" @mousedown="startDrag" @touchstart.prevent="startDrag"><div class="grip-line"></div><div class="grip-line"></div><div class="grip-line"></div></div><div class="fader-labels"><span :class="{active: activePage === 1}">BAY</span><span :class="{active: activePage === 2}">DECK</span><span :class="{active: activePage === 3}">RACK</span></div></div>
+            <div class="app-grid">
+                <!-- P2 Apps -->
+                <div v-show="activePage === 2" class="app-page-grid">
+                    <div class="knob-wrapper" @click="openApp('SoulLink')"><div class="knob-body"><i class="fas fa-comments"></i></div><span>SoulLink</span></div>
+                    <div class="knob-wrapper" @click="openApp('Peek')"><div class="knob-body"><i class="fas fa-eye"></i></div><span>Peek</span></div>
+                    <div class="knob-wrapper" @click="openApp('Gallery')"><div class="knob-body"><i class="fas fa-photo-video"></i></div><span>Gallery</span></div>
+                    <div class="knob-wrapper" @click="openApp('Diary')"><div class="knob-body"><i class="fas fa-book-open"></i></div><span>Diary</span></div>
+                    <div class="knob-wrapper" @click="openApp('Pulse')"><div class="knob-body"><i class="fas fa-rss-square" style="color:#ff8a65"></i></div><span>Pulse</span></div>
+                    <div class="knob-wrapper" @click="openApp('Void')"><div class="knob-body"><i class="fa-brands fa-twitter" style="color:#64b5f6"></i></div><span>Void</span></div>
+                    <div class="knob-wrapper" @click="openApp('Vibe')"><div class="knob-body"><i class="fas fa-camera-retro" style="color:#e57373"></i></div><span>Vibe</span></div>
+                    <div class="knob-wrapper" @click="openApp('Muse')"><div class="knob-body"><i class="fas fa-film" style="color:#a5d6a7"></i></div><span>Muse</span></div>
+                    <div class="knob-wrapper" @click="openApp('Period')"><div class="knob-body"><i class="fas fa-tint" style="color:#f06292"></i></div><span>Period</span></div>
+                    <div class="knob-wrapper" @click="openApp('Wallet')"><div class="knob-body"><i class="fas fa-wallet" style="color:#ffd54f"></i></div><span>Wallet</span></div>
+                    <div class="knob-wrapper" @click="openApp('Nest')"><div class="knob-body"><i class="fas fa-home"></i></div><span>Nest</span></div>
+                    <div class="knob-wrapper" @click="openApp('Mall')"><div class="knob-body"><i class="fas fa-shopping-bag"></i></div><span>Mall</span></div>
+                </div>
+                <!-- P3 Apps -->
+                <div v-show="activePage === 3" class="app-page-grid">
+                    <div class="knob-wrapper accent-knob" @click="openApp('Chamber')"><div class="knob-body"><i class="fas fa-hourglass-half"></i></div><span>Chamber</span></div>
+                    <div class="knob-wrapper" @click="openApp('Music')"><div class="knob-body"><i class="fas fa-music"></i></div><span>Music</span></div>
+                    <div class="knob-wrapper" @click="openApp('Arcade')"><div class="knob-body"><i class="fas fa-gamepad"></i></div><span>Arcade</span></div>
+                    <div class="knob-wrapper" @click="openApp('Browser')"><div class="knob-body"><i class="fas fa-globe"></i></div><span>Browser</span></div>
+                    <div class="knob-wrapper disabled"><div class="knob-body"></div></div><div class="knob-wrapper disabled"><div class="knob-body"></div></div>
+                    <div class="knob-wrapper disabled"><div class="knob-body"></div></div><div class="knob-wrapper disabled"><div class="knob-body"></div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. 副屏 -->
+        <div class="module-panel aux-panel">
+            <div class="mini-screen-container"><div class="label-text">HEARTBEAT</div><div class="mini-crt"><div class="wave-wrapper"><svg viewBox="0 0 200 60" class="waveform"><path d="M0,50 L10,50 L15,20 L20,50 L30,50 L35,10 L40,50 L50,50 L55,30 L60,50 L100,50 M100,50 L110,50 L115,20 L120,50 L130,50 L135,10 L140,50 L150,50 L155,30 L160,50 L200,50" fill="none" stroke="#c8e6c9" stroke-width="2" /></svg></div><div class="grid-overlay"></div></div></div>
+            <div class="toggles-container"><div class="toggle-group"><div class="toggle-label">PWR</div><div class="toggle-switch checked"></div></div><div class="toggle-group"><div class="toggle-label">NET</div><div class="toggle-switch checked"></div></div><div class="toggle-group"><div class="toggle-label">AUX</div><div class="toggle-switch"></div></div></div>
+        </div>
+        
+        <!-- 4. Dock -->
+        <footer class="dock-panel">
+            <div class="dock-btn-round" @click="openApp('Theme')"><i class="fas fa-palette"></i></div><div class="dock-btn-round" @click="openApp('Workshop')"><i class="fas fa-hammer"></i></div><div class="dock-btn-round" @click="openApp('Console')"><i class="fas fa-terminal"></i></div><div class="dock-btn-round" @click="openApp('System')"><i class="fas fa-book"></i></div>
+        </footer>
+    </div>
+    
+    <!-- 全屏 App 视图（仅用于 Console / Workshop） -->
+    <div class="fullscreen-app-view" v-if="openedApp === 'Console' || openedApp === 'Workshop'">
+        <div class="app-window soullink-app" data-app-name="SoulLink" v-if="openedApp === 'SoulLink'">
+            <button class="app-close-button" @click="closeApp"><i class="fas fa-times"></i></button>
+        
+            <!-- 1. 聊天窗口头部 -->
+            <header class="chat-header">
+                <div class="contact-avatar"></div>
+                <div class="contact-details">
+                    <div class="contact-name">AI_CONTACT_01</div>
+                    <div class="contact-status" :class="{typing: isAiTyping}">
+                        {{ isAiTyping ? 'Receiving Signal...' : 'LINE_STABLE' }}
+                    </div>
+                </div>
+                <div class="header-icons">
+                    <i class="fas fa-video" @click="triggerChatAction('video')"></i>
+                </div>
+            </header>
+        
+            <!-- 2. 消息列表 -->
+            <div class="message-list-container" ref="messageList">
+                <div v-for="(msg, index) in chatHistory" :key="index" class="message-wrapper" :class="'role-' + msg.role">
+                    <div class="message-bubble">
+                        <!-- 渲染普通文本消息 -->
+                        <div v-if="typeof msg.content === 'string'">{{ msg.content }}</div>
+                        
+                        <!-- 渲染特殊消息卡片 -->
+                        <div v-else class="special-card-wrapper">
+                            <!-- 转账 -->
+                            <div v-if="msg.content.type === 'transfer'" class="special-card transfer">
+                                <div class="card-title">CREDITS_TRANSFER</div>
+                                <div class="transfer-amount">¥ {{ msg.content.data.amount }}</div>
+                                <div class="card-status" :class="msg.content.data.status.toLowerCase()">[{{ msg.content.data.status }}]</div>
+                            </div>
+                            <!-- 外卖 -->
+                            <div v-if="msg.content.type === 'waimai'" class="special-card waimai">
+                                <div class="card-title">{{ msg.content.data.store }}</div>
+                                <div class="waimai-order">{{ msg.content.data.order }}</div>
+                                <div class="card-status blink">STATUS: {{ msg.content.data.status }}</div>
+                            </div>
+                            <!-- 位置 -->
+                            <div v-if="msg.content.type === 'location'" class="special-card location">
+                                <i class="fas fa-map-marker-alt"></i>
+                                <div class="location-info">
+                                    <div class="card-title">{{ msg.content.data.name }}</div>
+                                    <div class="location-coords">{{ msg.content.data.coords }}</div>
+                                </div>
+                            </div>
+                            <!-- 投票 -->
+                            <div v-if="msg.content.type === 'poll'" class="special-card poll">
+                                <div class="poll-question">{{ msg.content.data.question }}</div>
+                                <div class="poll-options">
+                                    <div v-for="(opt, oIdx) in msg.content.data.options" class="poll-option" @click="castVote(msg, oIdx)">
+                                        <div class="poll-text">{{ opt.text }}</div>
+                                        <div class="poll-bar" :style="{ width: ( (opt.votes / (msg.content.data.options.reduce((acc, cur) => acc + cur.votes, 0) || 1)) * 100) + '%' }"></div>
+                                        <div class="poll-count">{{ opt.votes }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- 分享 -->
+                            <div v-if="msg.content.type === 'share'" class="special-card share">
+                                <i class="fas fa-link"></i>
+                                <div class="share-info">
+                                    <div class="card-title">{{ msg.content.data.title }}</div>
+                                    <a :href="msg.content.data.url" target="_blank" class="share-url">查看链接 &gt;</a>
+                                </div>
+                            </div>
+                        </div>
+        
+                        <div class="message-timestamp">{{ msg.time }}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 3. 输入及功能区 -->
+            <footer class="chat-input-area">
+                <textarea v-model="userInput" placeholder="Type message..." @keyup.enter.prevent="sendMessage"></textarea>
+                <button class="send-button" @click="sendMessage"><i class="fas fa-arrow-up"></i></button>
+                <div class="chat-action-grid">
+                    <button @click="triggerChatAction('transfer')"><i class="fas fa-coins"></i></button>
+                    <button @click="triggerChatAction('waimai')"><i class="fas fa-utensils"></i></button>
+                    <button @click="triggerChatAction('location')"><i class="fas fa-globe-americas"></i></button>
+                    <button @click="triggerChatAction('poll')"><i class="fas fa-poll-h"></i></button>
+                    <button @click="triggerChatAction('share')"><i class="fas fa-share-square"></i></button>
+                </div>
+            </footer>
+        
+            <!-- 4. 视频通话覆盖层 -->
+            <div class="video-call-overlay" v-if="isVideoCalling">
+                <div class="video-noise-layer"></div>
+                <div class="video-crt-glare"></div>
+                <div class="caller-info">INCOMING_TRANSMISSION...</div>
+                <div class="video-feed-placeholder">
+                    <span class="placeholder-text">NO_SIGNAL</span>
+                </div>
+                <button class="hang-up-button" @click="isVideoCalling = false">
+                    <i class="fas fa-phone-slash"></i> TERMINATE_LINK
+                </button>
+            </div>
+        </div>
+        <!-- ================= CONSOLE APP (v26 - Layout Fix) ================= -->
+        <div class="app-window" data-app-name="Console" v-if="openedApp === 'Console'">
+            
+            <!-- NEW: Close button in top-left -->
+            <button class="app-close-button" @click="closeApp" title="Close">
+                <i class="fas fa-times"></i>
+            </button>
+
+            <div class="app-content crt-terminal">
+                <!-- Top: Control Panel -->
+                <div class="console-controls">
+                    <div class="controls-scroll-area">
+                        <!-- Profile Management -->
+                        <div class="control-group">
+                            <label class="group-label">PROFILE SELECT</label>
+                            <div class="profile-manager">
+                                <div class="input-screen"><select class="screen-text" v-model="activeProfileId" @change="onProfileSelect"><option v-for="profile in profiles" :key="profile.id" :value="profile.id">{{ profile.name }}</option></select></div>
+                                <button class="terminal-button icon-only" @click="createNewProfile" title="New Profile">+</button>
+                                <button class="terminal-button icon-only danger" @click="deleteActiveProfile" title="Delete Profile" :disabled="!activeProfile"><i class="fas fa-trash-alt"></i></button>
+                            </div>
+                        </div>
+
+                        <template v-if="activeProfile">
+                            <!-- Configuration -->
+                            <div class="control-group">
+                                <label class="group-label">CONNECTION CONFIG</label>
+                                <div class="input-stack">
+                                    <div class="input-screen"><input type="text" class="screen-text" v-model="activeProfile.name" placeholder="Profile Name"></div>
+                                    <div class="input-screen"><input type="text" class="screen-text" v-model="activeProfile.endpoint" placeholder="API Endpoint"></div>
+                                    <div class="input-screen with-icon">
+                                        <input :type="showApiKey ? 'text' : 'password'" class="screen-text" v-model="activeProfile.key" placeholder="API Secret Key">
+                                        <i class="fas" :class="showApiKey ? 'fa-eye-slash' : 'fa-eye'" @click="showApiKey = !showApiKey"></i>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Parameters & Knob -->
+                            <div class="control-group">
+                                <label class="group-label">MODEL PARAMETERS</label>
+                                <div class="param-grid">
+                                    <div class="model-select-area">
+                                        <div class="input-screen"><select class="screen-text" v-model="activeProfile.model"><option v-if="!availableModels.length" value="">- NOT LOADED -</option><option v-for="model in availableModels" :key="model.id" :value="model.id">{{ model.id }}</option></select></div>
+                                    </div>
+                                    <div class="knob-container">
+                                        <div class="knob" @click="fetchModels" :class="{ 'fetching': fetchingModels }" title="Fetch Models">
+                                            <div class="knob-marker"></div>
+                                        </div>
+                                        <label class="knob-label">FETCH</label>
+                                    </div>
+                                </div>
+                                <div class="slider-container">
+                                    <label class="param-label">TEMPERATURE: {{ activeProfile.temperature }}</label>
+                                    <input type="range" class="crt-slider" min="0" max="1" step="0.1" v-model="activeProfile.temperature">
+                                </div>
+                            </div>
+                        </template>
+                        
+                        <div v-else class="no-profile-placeholder">
+                            <p>NO PROFILE SELECTED</p>
+                            <p>CREATE ONE TO START.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom Log Screen -->
+                <div class="console-log-screen">
+                    <div class="log-content">
+                        <p v-for="log in consoleLogs" :key="log.id" :class="`log-${log.type}`">
+                            <span class="log-timestamp">{{ log.timestamp }} > </span>
+                            <span class="log-message">{{ log.message }}</span>
+                        </p>
+                    </div>
+                </div>
+                
+                <!-- Footer -->
+                <div class="console-footer">
+                    <div class="status-indicator">API STATUS: <span :class="apiStatus">{{ apiStatus }}</span></div>
+                    <button class="terminal-button primary" @click="saveProfiles" :disabled="!activeProfile">SAVE ALL</button>
+                </div>
+
+            </div>
+        </div>
+        <!-- ==========================================================================
+     WORKSHOP APP
+     ========================================================================== -->
+<div class="app-window" data-app-name="Workshop" v-if="openedApp === 'Workshop'">
+    
+    <!-- Close button -->
+    <button class="app-close-button" @click="closeApp" title="Close">
+        <i class="fas fa-times"></i>
+    </button>
+
+    <div class="app-content workshop-layout">
+        <!-- Workshop Navigation Tabs -->
+                <!-- Workshop Navigation Tabs (90s Lever Style) -->
+                <!-- Workshop Navigation Tabs (Modern Retro-Tech Slider Style) -->
+                <!-- Workshop Navigation Tabs (Inset Button Style) -->
+        <div class="workshop-nav">
+            <div class="tab-button" 
+                 :class="{ active: activeWorkshopTab === 'characters' }" 
+                 @click="switchWorkshopTab('characters')">
+                 角色
+            </div>
+            <div class="tab-button" 
+                 :class="{ active: activeWorkshopTab === 'worldbook' }" 
+                 @click="switchWorkshopTab('worldbook')">
+                 世界书
+            </div>
+            <div class="tab-button" 
+                 :class="{ active: activeWorkshopTab === 'presets' }" 
+                 @click="switchWorkshopTab('presets')">
+                 预设
+            </div>
+        </div>
+
+
+
+        <!-- Workshop Content Area -->
+        <div class="workshop-content">
+            
+             <!-- 角色面板 -->
+            <div id="content-characters" class="tab-content" :class="{ 'active': activeWorkshopTab === 'characters' }">
+                <div class="character-grid">
+                    <!-- 1. 添加新角色卡片 -->
+                    <div class="character-card add-new-card" @click="addNewCharacter">
+                        <div class="add-icon">+</div>
+                        <p>添加新角色</p>
+                    </div>
+                    <input type="file" ref="characterImportInput" accept=".png,.json" style="display:none" @change="handleCharacterImport">
+                    <div class="character-card add-new-card" @click="triggerCharacterImport">
+                        <div class="add-icon"><i class="fas fa-file-import"></i></div>
+                        <p>导入角色</p>
+                    </div>
+
+                    <!-- 2. 循环显示所有已创建的角色 -->
+                    <div class="character-card" v-for="character in characters" :key="character.id" @click="openDossier(character)">
+                        <img :src="character.avatarUrl" alt="Avatar" class="character-avatar">
+                        <div class="character-info">
+                            <h4 class="character-name">{{ character.name }}</h4>
+                            <p class="character-summary">{{ character.summary }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- 世界书面板 -->
+            <div id="content-worldbook" class="tab-content" :class="{ 'active': activeWorkshopTab === 'worldbook' }">
+                <div class="workshop-list">
+                     <!-- Add New Worldbook -->
+                    <div class="workshop-list-item add-new-item" @click="addNewWorldbook">
+                        <div class="add-icon-small">+</div>
+                        <p>添加新世界书</p>
+                    </div>
+                    <!-- Worldbook List -->
+                    <div class="workshop-list-item-container" 
+                         v-for="wb in worldbooks" 
+                         :key="wb.id"
+                         :class="{ 'swiped': swipedWorldbookId === wb.id }">
+                        
+                        <!-- Main Content (Slides Left) -->
+                        <div class="workshop-list-item" @click="openWorldbookEditor(wb)">
+                            <div class="item-icon"><i class="fas fa-globe"></i></div>
+                            <div class="item-content">
+                                <div class="item-title">{{ wb.name }}</div>
+                                <div class="item-desc">{{ wb.description }}</div>
+                            </div>
+                            <!-- Slide Trigger -->
+                            <div class="slide-trigger" @click.stop="toggleSwipeWorldbook(wb.id)">
+                                <i class="fas fa-chevron-left"></i>
+                            </div>
+                        </div>
+
+                        <!-- Delete Action (Revealed) -->
+                        <div class="delete-action" @click.stop="deleteWorldbook(wb.id)">
+                            <span>删除</span>
+                            <i class="fas fa-trash-alt"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 预设面板 -->
+            <div id="content-presets" class="tab-content" :class="{ 'active': activeWorkshopTab === 'presets' }">
+                <div class="workshop-list">
+                     <!-- Add New Preset -->
+                    <div class="workshop-list-item add-new-item" @click="addNewPreset">
+                        <div class="add-icon-small">+</div>
+                        <p>添加新预设</p>
+                    </div>
+                    <!-- Preset List -->
+                    <div class="workshop-list-item-container" 
+                         v-for="preset in presets" 
+                         :key="preset.id"
+                         :class="{ 'swiped': swipedPresetId === preset.id }">
+                        
+                         <!-- Main Content (Slides Left) -->
+                        <div class="workshop-list-item" @click="openPresetEditor(preset)">
+                            <div class="item-icon"><i class="fas fa-terminal"></i></div>
+                            <div class="item-content">
+                                <div class="item-title">{{ preset.name }}</div>
+                                <div class="item-desc">{{ preset.content.substring(0, 50) }}...</div>
+                            </div>
+                            <!-- Slide Trigger -->
+                            <div class="slide-trigger" @click.stop="toggleSwipePreset(preset.id)">
+                                <i class="fas fa-chevron-left"></i>
+                            </div>
+                        </div>
+
+                        <!-- Delete Action (Revealed) -->
+                        <div class="delete-action" @click.stop="deleteCurrentPreset(preset.id)">
+                            <span>删除</span>
+                            <i class="fas fa-trash-alt"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+    
+    
+
+        </div>
+    </div>
+</div>
+
+        <!-- ================= Other App Placeholders ================= -->
+        <div class="app-content placeholder-app" v-if="['Peek', 'Gallery', 'Diary', 'Pulse', 'Void', 'Vibe', 'Muse', 'Period', 'Nest', 'Mall', 'Chamber', 'Music', 'Arcade', 'Browser', 'Theme', 'System', 'Wallet'].includes(openedApp)">
+            <i @click="closeApp" class="fas fa-power-off close-button" title="Back to Home"></i>
+            <i :class="getAppIcon(openedApp)" class="app-icon"></i>
+            <h1>{{ openedApp }}</h1>
+            <p>Under Construction</p>
+        </div>
+
+    </div>
+
+    <!-- ==========================================================================
+         SOULLINK APP
+         ========================================================================== -->
+    <div class="app-window soullink-app" data-app-name="SoulLink" v-if="openedApp === 'SoulLink'">
+        
+        <!-- Header -->
+        <div class="soullink-header">
+            <div class="soullink-brand">
+                <i class="fas fa-broadcast-tower"></i> SoulLink
+            </div>
+            <div class="soullink-indicator"></div>
+            <button class="app-close-button" @click="closeApp" style="position:static; margin-left: auto;">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <!-- Main Screen (CRT) -->
+        <div class="soullink-screen-frame">
+            <div class="soullink-view custom-scroll">
+                
+                <!-- 1. CH.LIST (Contacts) -->
+                <div v-if="soulLinkTab === 'ch_list'">
+                    <div class="chlist-section">
+                        <div class="chlist-header">
+                            <div class="chlist-title">单人频道</div>
+                        </div>
+                        <div class="contact-card" v-for="char in characters" :key="char.id" @click="startSoulLinkChat(char.id)">
+                            <div class="contact-avatar" :style="{ backgroundImage: 'url(' + char.avatarUrl + ')' }"></div>
+                            <div class="contact-info">
+                                <div class="contact-name">{{ char.nickname || char.name || '未命名角色' }}</div>
+                                <div class="contact-tag">{{ char.tags && char.tags.length > 0 ? char.tags[0] : 'U.N.K.' }}</div>
+                            </div>
+                            <i class="fas fa-chevron-right" style="color: #004400;"></i>
+                        </div>
+                        <div v-if="characters.length === 0" class="empty-chlist-hint">
+                            SOULLINK 已就绪<br>
+                            但当前没有任何「角色信号」<br><br>
+                            请先打开下方 Dock 的「Workshop」<br>
+                            创建至少一个角色档案后再回来
+                        </div>
+                    </div>
+
+                    <div class="chlist-section">
+                        <div class="chlist-header">
+                            <div class="chlist-title">群聊频道</div>
+                            <button class="chlist-action" @click="openGroupDialog('create')">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                        <div class="contact-card group-contact-card" v-for="group in soulLinkGroups" :key="group.id" @click="openSoulLinkGroupChat(group.id)">
+                            <div class="contact-avatar group-avatar" :style="{ backgroundImage: group.avatar ? 'url(' + group.avatar + ')' : 'none' }">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <div class="contact-info">
+                                <div class="contact-name">{{ group.name || '未命名群聊' }}</div>
+                                <div class="contact-tag">MEMBERS: {{ (group.members || []).length }}</div>
+                            </div>
+                            <i class="fas fa-chevron-right" style="color: #004400;"></i>
+                        </div>
+                        <div v-if="soulLinkGroups.length === 0" class="empty-group-hint">
+                            暂无群聊，点击右上角 + 创建
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. MSG (Chat Interface) -->
+                <div v-if="soulLinkTab === 'msg'" class="chat-screen" @click="closeContextMenu">
+                    <template v-if="soulLinkActiveChat">
+                        <!-- Chat Header (In-Screen) -->
+                        <div class="msg-header-bar">
+                            <div class="header-avatar" 
+                                 :style="{ backgroundImage: 'url(' + getActiveChatAvatar() + ')' }"
+                                 @dblclick="handleHeaderAvatarDblClick"
+                                 title="Double click to 'Pai Yi Pai'">
+                            </div>
+                            <div class="header-info">
+                                <div class="header-name">
+                                    {{ getActiveChatName() }}
+                                    <!-- ✅ 新增：正在输入的闪烁提示 -->
+                                    <span v-if="isAiTyping" class="typing-indicator">
+                                        &lt;typing...&gt;
+                                    </span>
+                                </div>
+                                <div class="header-status">
+                                    <span class="status-dot online"></span> {{ getActiveChatStatus() }}
+                                </div>
+                            </div>
+                            
+                        </div>
+
+                        <!-- Chat History -->
+                        <div class="chat-history custom-scroll" ref="soulLinkChatHistory">
+    <div v-for="msg in activeChatMessages" :key="msg.id" 
+         class="chat-bubble-container" 
+         :class="msg.sender">
+        <div v-if="soulLinkActiveChatType === 'group' && msg.sender !== 'user' && msg.senderName && !msg.isSystem" class="group-sender-name">
+            {{ msg.senderName }}
+        </div>
+        
+        <!-- 普通文本消息 -->
+        <div v-if="!msg.messageType || msg.messageType === 'text'" 
+             class="chat-bubble" 
+             :class="[msg.sender, { 'special-msg': msg.isSpecial, 'system-msg': msg.isSystem }]"
+             @contextmenu.prevent="onMessageContextMenu($event, msg)">
+            {{ msg.text }}
+        </div>
+        
+        <!-- 图片消息 -->
+        <div v-else-if="msg.messageType === 'image'" 
+             class="chat-bubble image-bubble" 
+             :class="msg.sender"
+             @contextmenu.prevent="onMessageContextMenu($event, msg)">
+            <img v-if="msg.imageUrl" :src="msg.imageUrl" alt="Image" class="chat-image">
+            <div v-else class="image-placeholder">
+                <i class="fas fa-image"></i>
+                <span>{{ msg.text }}</span>
+            </div>
+        </div>
+        
+        <!-- 语音消息 -->
+        <div v-else-if="msg.messageType === 'voice'" 
+             class="chat-bubble voice-bubble" 
+             :class="[msg.sender, { expanded: msg.expanded }]"
+             @click="toggleVoiceExpand(msg)"
+             @contextmenu.prevent="onMessageContextMenu($event, msg)">
+            <i class="fas fa-play-circle"></i>
+            <div class="voice-duration">{{ msg.duration || '0:05' }}</div>
+            <div v-if="msg.expanded" class="voice-text">{{ msg.text }}</div>
+        </div>
+        
+        <!-- 转账消息 -->
+        <div v-else-if="msg.messageType === 'transfer'" 
+             class="chat-bubble transfer-bubble" 
+             :class="[msg.sender, msg.transferStatus]"
+             @contextmenu.prevent="onMessageContextMenu($event, msg)">
+            <div class="transfer-header">
+                <i class="fas fa-money-bill-wave"></i>
+                <span>转账</span>
+            </div>
+            <div class="transfer-amount">¥{{ msg.amount }}</div>
+            <div class="transfer-note" v-if="msg.note">{{ msg.note }}</div>
+            <div class="transfer-status">
+                <span v-if="msg.transferStatus === 'pending'">待确认</span>
+                <span v-else-if="msg.transferStatus === 'accepted'" class="status-success">已收款</span>
+                <span v-else-if="msg.transferStatus === 'rejected'" class="status-fail">已退还</span>
+            </div>
+            <!-- 如果是AI收到的转账，显示操作按钮 -->
+            <div v-if="msg.sender === 'user' && msg.transferStatus === 'pending'" class="transfer-actions">
+                <button class="transfer-btn accept" @click.stop="handleTransferAction(msg, 'accept')">
+                    接受
+                </button>
+                <button class="transfer-btn reject" @click.stop="handleTransferAction(msg, 'reject')">
+                    拒绝
+                </button>
+            </div>
+        </div>
+        
+        <!-- 定位消息 -->
+        <div v-else-if="msg.messageType === 'location'" 
+             class="chat-bubble location-bubble" 
+             :class="msg.sender"
+             @contextmenu.prevent="onMessageContextMenu($event, msg)">
+            <div class="location-card">
+                <div class="location-map-area">
+                    <svg viewBox="0 0 230 90">
+                        <path class="svg-trajectory-path" d="M 20 45 Q 115 10 210 45" />
+                        <circle v-if="msg.userLocation" class="svg-pin user-pin" cx="20" cy="45" r="6" />
+                        <circle v-if="msg.aiLocation" class="svg-pin ai-pin" cx="210" cy="45" r="6" />
+                        <g v-for="(point, idx) in getLocationTrajectoryPoints(msg)" :key="idx">
+                            <text class="svg-footprint" :x="point.x" :y="point.y" text-anchor="middle">🐾</text>
+                            <text class="svg-location-label" :x="point.x" :y="point.labelY" text-anchor="middle">{{ point.name }}</text>
+                        </g>
+                    </svg>
+                </div>
+                <div class="location-info">
+                    <p v-if="msg.aiLocation"><span class="name-tag">{{ getLocationLabel('ai') }}:</span> {{ msg.aiLocation }}</p>
+                    <p v-if="msg.userLocation"><span class="name-tag">{{ getLocationLabel('user') }}:</span> {{ msg.userLocation }}</p>
+                    <div class="location-distance">相距 {{ msg.distance }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+                        <!-- Input Console -->
+                        <div class="input-console">
+                            <!-- [+] Attachment -->
+                            <div class="btn-attachment" @click.stop="showAttachmentsMenu = !showAttachmentsMenu">
+                                <i class="fas fa-plus"></i>
+                            </div>
+                            <!-- 增强版附件菜单（带弹窗支持） -->
+                            <div class="attachments-menu" v-if="showAttachmentsMenu" @click.stop>
+                                <div class="attachment-option" @click="openImageDialog">
+                                    <i class="fas fa-image"></i> 图像 (Image)
+                                </div>
+                                <div class="attachment-option" @click="openVoiceDialog">
+                                    <i class="fas fa-microphone"></i> 语音 (Voice)
+                                </div>
+                                <div class="attachment-option" @click="openTransferDialog">
+                                    <i class="fas fa-money-bill-wave"></i> 转账 (Transfer)
+                                </div>
+                                <div class="attachment-option" @click="openLocationDialog">
+                                    <i class="fas fa-map-marker-alt"></i> 定位 (Location)
+                                </div>
+                                <div class="attachment-option" @click="openOfflineModeDialog">
+                                    <i class="fas fa-plane-slash"></i> 线下模式 (Offline)
+                                </div>
+                                <div class="attachment-option" @click="openPetDialog">
+                                    <i class="fas fa-paw"></i> 宠物 (Pet)
+                                </div>
+                            </div>
+
+                            
+                            <!-- Emoji -->
+                            <button class="btn-emoji" @click.stop="showEmojiPanel = !showEmojiPanel">
+    <i class="far fa-smile"></i>
+</button>
+                            
+                            <!-- Input -->
+                            <input type="text" class="console-input" v-model="soulLinkInput" @keyup.enter="sendSoulLinkMessage(true)" placeholder="INPUT DATA...">
+                            
+                            <!-- [LOG] Send (No API) -->
+                            <div class="btn-log" @click="sendSoulLinkMessage(false)" title="LOG (No Reply)">
+                                LOG
+                            </div>
+                            
+                            <!-- [TRANSMIT] Trigger (API) -->
+                            <div class="btn-transmit" @click="sendSoulLinkMessage(true)" title="TRANSMIT">
+                                <i class="fas fa-satellite-dish"></i>
+                            </div>
+                        </div>
+                    </template>
+                    <template v-else>
+                        <div class="empty-chat-state">
+                            <i class="fas fa-comments"></i>
+                            <div>请选择左侧频段（角色）开始对话</div>
+                        </div>
+                    </template>
+                    
+                    <!-- Context Menu -->
+                    <div class="retro-context-menu" v-if="contextMenu.visible" :style="{ top: contextMenu.y + 'px', left: contextMenu.x + 'px' }">
+                        <div class="menu-item" @click="handleContextAction('recall')">撤回 (Recall)</div>
+                        <div class="menu-item" @click="handleContextAction('delete')">删除 (Delete)</div>
+                        <div class="menu-item" @click="handleContextAction('edit')">修改 (Edit)</div>
+                        <div class="menu-item" @click="handleContextAction('star')">收藏 (Star)</div>
+                        <div class="menu-item" @click="handleContextAction('quote')">引用 (Quote)</div>
+                    </div>
+                </div>
+
+                <!-- 3. FEED (Dynamic Stream) -->
+                <div v-if="soulLinkTab === 'feed'" class="feed-screen">
+                     <div class="feed-header">
+                         <span>SIGNAL STREAM</span>
+                         <div class="feed-header-actions">
+                            <button class="retro-btn-small" @click="openFeedPostDialog('create')">NEW POST</button>
+                            <button class="retro-btn-small" @click="requestFeedUpdate">REQ UPDATE</button>
+                         </div>
+                     </div>
+                     <div class="feed-list custom-scroll">
+                         <div v-if="feedPosts.length === 0" class="feed-empty">这里空空如也，快来发布第一条说说吧！</div>
+                         <div class="feed-card" v-for="post in feedPosts" :key="post.id">
+                             <div class="feed-card-header">
+                                 <div class="feed-avatar" :style="{ backgroundImage: 'url(' + getFeedAuthorAvatar(post) + ')' }"></div>
+                                 <div class="feed-meta">
+                                     <div class="feed-name">{{ getFeedAuthorName(post) }}</div>
+                                     <div class="feed-time">{{ formatFeedTimestamp(post.createdAt) }}</div>
+                                 </div>
+                                <div class="feed-card-actions">
+                                    <template v-if="post.authorId === 'user'">
+                                        <button class="retro-btn-mini" @click="openFeedPostDialog('edit', post)">编辑</button>
+                                        <button class="retro-btn-mini" @click="deleteFeedPost(post.id)">删除</button>
+                                        <button class="retro-btn-mini" @click="copyFeedPost(post)">复制</button>
+                                    </template>
+                                    <template v-else>
+                                        <button class="retro-btn-mini" @click="deleteFeedPost(post.id)">删除</button>
+                                    </template>
+                                </div>
+                             </div>
+                             <div v-if="post.publicText" class="feed-public-text">{{ post.publicText }}</div>
+                             <div v-if="post.type === 'shuoshuo'" class="feed-content">{{ post.content }}</div>
+                             <div v-else-if="post.type === 'image_post'" class="feed-media">
+                                 <img v-if="post.imageUrl" :src="post.imageUrl" class="feed-image">
+                             </div>
+                             <div v-else-if="post.type === 'text_image'" class="feed-text-image">
+                                 <div class="feed-image-shell" @click="toggleFeedHiddenText(post.id)">
+                                     <img src="https://i.postimg.cc/KYr2qRCK/1.jpg" class="feed-image">
+                                     <div class="feed-image-mask">点击解锁</div>
+                                 </div>
+                                 <div v-if="feedRevealedTextImages[post.id]" class="feed-hidden-text">{{ post.hiddenContent }}</div>
+                                 <button class="retro-btn-mini" @click="toggleFeedHiddenText(post.id)">
+                                     {{ feedRevealedTextImages[post.id] ? '收起' : '查看隐藏' }}
+                                 </button>
+                             </div>
+                             <div v-else-if="post.type === 'realimag' || post.type === 'naiimag'" class="feed-media">
+                                 <div class="feed-image-grid" :class="'grid-' + (post.imageUrls.length || 1)">
+                                     <img v-for="(url, idx) in post.imageUrls" :key="idx" :src="url" class="feed-grid-image">
+                                 </div>
+                             </div>
+                             <div v-if="post.likes && post.likes.length" class="feed-likes">
+                                 <i class="far fa-heart"></i>
+                                 <span>{{ post.likes.join('、') }} 觉得很赞</span>
+                             </div>
+                             <div class="feed-actions">
+                                 <div class="feed-action" :class="{ active: post.likes && post.likes.includes(userProfile.name) }" @click="toggleFeedLike(post)">
+                                     <i class="far fa-thumbs-up"></i> {{ post.likes.length }}
+                                 </div>
+                                 <div class="feed-action" :class="{ active: post.isFavorited }" @click="toggleFeedFavorite(post)">
+                                     <i class="far fa-star"></i> 收藏
+                                 </div>
+                                 <div class="feed-action" @click="openFeedNpcDialog(post.id)">
+                                     <i class="fas fa-user-friends"></i> 召唤NPC
+                                 </div>
+                                 <div class="feed-action">
+                                     <i class="far fa-comment"></i> {{ getFeedVisibleComments(post).length }}
+                                 </div>
+                             </div>
+                             <div v-if="getFeedVisibleComments(post).length" class="feed-comments">
+                                 <div class="feed-comment" v-for="(comment, cIndex) in getFeedVisibleComments(post)" :key="cIndex">
+                                     <span class="feed-comment-name" @click="startFeedReply(post.id, comment.commenterName)">{{ comment.commenterName }}</span>
+                                     <span v-if="comment.replyTo" class="feed-comment-reply">回复 {{ comment.replyTo }}</span>
+                                     <span class="feed-comment-text">{{ comment.text }}</span>
+                                     <button v-if="comment.commenterName === userProfile.name" class="feed-comment-delete" @click="deleteFeedComment(post, post.comments.indexOf(comment))">×</button>
+                                 </div>
+                             </div>
+                             <div class="feed-comment-input">
+                                 <img :src="userProfile.avatar" class="feed-comment-avatar">
+                                 <div class="feed-comment-field">
+                                     <div v-if="feedCommentReplyTo[post.id]" class="feed-reply-hint">
+                                         回复 {{ feedCommentReplyTo[post.id] }}
+                                         <button class="feed-reply-clear" @click="clearFeedReply(post.id)">×</button>
+                                     </div>
+                                     <input class="feed-comment-textbox" v-model="feedCommentText[post.id]" @keyup.enter="sendFeedComment(post)" placeholder="友善的评论是交流的起点">
+                                 </div>
+                                 <button class="retro-btn-mini" @click="sendFeedComment(post)">发送</button>
+                             </div>
+                         </div>
+                     </div>
+                </div>
+
+                <!-- 4. ID (User Profile) -->
+                <div v-if="soulLinkTab === 'id'" class="id-screen">
+                    <div class="id-card">
+                        <div class="id-header">
+                            <div class="id-logo"><i class="fas fa-fingerprint"></i> ID CARD</div>
+                            <div class="id-code">{{ userProfile.id }}</div>
+                        </div>
+                        <div class="id-body">
+                            <input type="file" ref="userAvatarInput" accept="image/*" style="display: none" @change="handleUserAvatarUpload">
+                            <div class="id-photo-frame id-avatar-uploader" @click="triggerUserAvatarUpload">
+                                <img :src="userProfile.avatar" class="id-photo">
+                                <div class="id-avatar-overlay"><i class="fas fa-camera"></i></div>
+                            </div>
+                            <div class="id-details">
+                                <div class="id-label">NAME</div>
+                                <input class="retro-input id-input" v-model="userProfile.name">
+                                <div class="id-label">BIO</div>
+                                <textarea class="retro-textarea id-textarea" rows="3" v-model="userProfile.bio"></textarea>
+                                <div class="id-label">JOINED</div>
+                                <input class="retro-input id-input" type="date" v-model="userProfile.joined">
+                            </div>
+                        </div>
+                        <div class="id-stats">
+                            <div class="stat-box">
+                                <div class="stat-num">{{ feedStats.signs }}</div>
+                                <div class="stat-label">SIGNS</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-num">{{ feedStats.drys }}</div>
+                                <div class="stat-label">DRYS</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="id-menu-list">
+                        <div class="id-menu-item"><i class="fas fa-bookmark"></i> MY ARCHIVES</div>
+                        <div class="id-menu-item"><i class="fas fa-history"></i> SIGNAL LOGS</div>
+                        <div class="id-menu-item"><i class="fas fa-cog"></i> PROTOCOLS</div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Bottom Controls -->
+        <div class="soullink-controls">
+            <div class="radio-btn" :class="{ active: soulLinkTab === 'ch_list' }" @click="switchSoulLinkTab('ch_list')">
+                CH.LIST
+            </div>
+            <div class="radio-btn" :class="{ active: soulLinkTab === 'msg' }" @click="switchSoulLinkTab('msg')">
+                MSG
+            </div>
+            <div class="radio-btn" :class="{ active: soulLinkTab === 'feed' }" @click="switchSoulLinkTab('feed')">
+                FEED
+            </div>
+            <div class="radio-btn" :class="{ active: soulLinkTab === 'id' }" @click="switchSoulLinkTab('id')">
+                ID
+            </div>
+        </div>
+<!-- ========== 弹窗组件区域 ========== -->
+
+<!-- 动态发布弹窗 -->
+<div class="dialog-overlay" v-if="showFeedPostDialog" @click="closeFeedPostDialog">
+    <div class="retro-dialog" @click.stop>
+        <div class="dialog-header">
+            <i class="fas fa-pen-nib"></i> 动态发布 (SIGNAL POST)
+        </div>
+        <div class="dialog-body">
+            <div class="dialog-section">
+                <div class="dialog-label">发布者</div>
+                <select v-model="feedPostForm.authorId" class="retro-input">
+                    <option v-for="option in feedAuthorOptions" :key="option.id" :value="option.id">{{ option.name }}</option>
+                </select>
+            </div>
+            <div class="dialog-section" v-if="feedPostForm.authorId === 'user'">
+                <div class="dialog-label">动态类型</div>
+                <select v-model="feedPostForm.type" class="retro-input">
+                    <option value="shuoshuo">说说</option>
+                    <option value="image_post">图片动态</option>
+                    <option value="text_image">文字解锁图</option>
+                    <option value="realimag">多图动态</option>
+                    <option value="naiimag">奶图动态</option>
+                </select>
+            </div>
+            <div class="dialog-section" v-if="feedPostForm.authorId !== 'user'">
+                <div class="dialog-label">生成方式</div>
+                <select v-model="feedPostForm.aiSource" class="retro-input">
+                    <option value="daily">随机日常内容</option>
+                    <option value="chat">与聊天内容相关</option>
+                </select>
+                <div class="dialog-hint">将调用当前 API 生成动态内容</div>
+            </div>
+            <div class="dialog-section" v-if="feedPostForm.authorId === 'user' && feedPostForm.type === 'shuoshuo'">
+                <div class="dialog-label">内容</div>
+                <textarea v-model="feedPostForm.content" class="retro-textarea" rows="4" placeholder="输入想说的话..."></textarea>
+            </div>
+            <div class="dialog-section" v-if="feedPostForm.authorId === 'user' && feedPostForm.type !== 'shuoshuo'">
+                <div class="dialog-label">公开文字</div>
+                <textarea v-model="feedPostForm.publicText" class="retro-textarea" rows="3" placeholder="可选：公开文字内容"></textarea>
+            </div>
+            <div class="dialog-section" v-if="feedPostForm.authorId === 'user' && feedPostForm.type === 'image_post'">
+                <div class="dialog-label">图片链接</div>
+                <input v-model="feedPostForm.imageUrl" class="retro-input" placeholder="https://...">
+            </div>
+            <div class="dialog-section" v-if="feedPostForm.authorId === 'user' && (feedPostForm.type === 'image_post' || feedPostForm.type === 'realimag' || feedPostForm.type === 'naiimag')">
+                <div class="dialog-label">多图链接（每行一个）</div>
+                <textarea v-model="feedPostForm.imageUrlsText" class="retro-textarea" rows="4" placeholder="https://...\nhttps://..."></textarea>
+            </div>
+            <div class="dialog-section" v-if="feedPostForm.authorId === 'user' && feedPostForm.type === 'text_image'">
+                <div class="dialog-label">隐藏文字</div>
+                <textarea v-model="feedPostForm.hiddenContent" class="retro-textarea" rows="4" placeholder="点击解锁后显示的内容"></textarea>
+            </div>
+            <div class="dialog-section">
+                <label class="feed-toggle">
+                    <input type="checkbox" v-model="feedPostForm.areCommentsVisible">
+                    <span>允许全部评论可见</span>
+                </label>
+            </div>
+        </div>
+        <div class="dialog-footer">
+            <button class="retro-btn cancel" @click="closeFeedPostDialog">取消</button>
+            <button class="retro-btn confirm" @click="submitFeedPost" :disabled="isFeedPostSubmitting">
+                {{ isFeedPostSubmitting ? '生成中...' : (feedPostDialogMode === 'edit' ? '保存' : '发布') }}
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- NPC召唤弹窗 -->
+<div class="dialog-overlay" v-if="showFeedNpcDialog" @click="closeFeedNpcDialog">
+    <div class="retro-dialog" @click.stop>
+        <div class="dialog-header">
+            <i class="fas fa-user-friends"></i> 召唤NPC (NPC SUMMON)
+        </div>
+        <div class="dialog-body">
+            <div class="dialog-section">
+                <div class="dialog-label">选择NPC范围</div>
+                <select v-model="feedNpcChoice" class="retro-input">
+                    <option value="all">全部NPC</option>
+                    <option v-for="option in feedNpcOptions" :key="option.id" :value="option.id">{{ option.name }}</option>
+                </select>
+            </div>
+            <div class="dialog-hint">将自动生成1-3条NPC评论</div>
+        </div>
+        <div class="dialog-footer">
+            <button class="retro-btn cancel" @click="closeFeedNpcDialog">取消</button>
+            <button class="retro-btn confirm" @click="confirmFeedNpcSummon">召唤</button>
+        </div>
+    </div>
+</div>
+
+<!-- 图像发送弹窗 -->
+<div class="dialog-overlay" v-if="showImageDialog" @click="showImageDialog = false">
+    <div class="retro-dialog" @click.stop>
+        <div class="dialog-header">
+            <i class="fas fa-image"></i> 图像传输 (IMAGE UPLOAD)
+        </div>
+        <div class="dialog-body">
+            <div class="dialog-tabs">
+                <div class="dialog-tab" :class="{ active: imageMode === 'file' }" @click="imageMode = 'file'">
+                    上传文件
+                </div>
+                <div class="dialog-tab" :class="{ active: imageMode === 'text' }" @click="imageMode = 'text'">
+                    文本描述
+                </div>
+            </div>
+            
+            <div v-if="imageMode === 'file'" class="dialog-section">
+                <input type="file" accept="image/*" @change="handleImageUpload" class="file-input" id="imageFileInput">
+                <label for="imageFileInput" class="retro-btn">选择图片文件</label>
+                <div v-if="selectedImage" class="image-preview">
+                    <img :src="selectedImage" alt="Preview">
+                </div>
+            </div>
+            
+            <div v-if="imageMode === 'text'" class="dialog-section">
+                <textarea 
+                    v-model="imageTextDescription" 
+                    class="retro-textarea" 
+                    placeholder="输入图片描述，如：[一张猫咪在晒太阳的照片]"
+                    rows="4"
+                ></textarea>
+            </div>
+        </div>
+        <div class="dialog-footer">
+            <button class="retro-btn cancel" @click="showImageDialog = false">取消</button>
+            <button class="retro-btn confirm" @click="sendImageMessage">发送</button>
+        </div>
+    </div>
+</div>
+
+<!-- 语音发送弹窗 -->
+<div class="dialog-overlay" v-if="showVoiceDialog" @click="showVoiceDialog = false">
+    <div class="retro-dialog" @click.stop>
+        <div class="dialog-header">
+            <i class="fas fa-microphone"></i> 语音传输 (VOICE MSG)
+        </div>
+        <div class="dialog-body">
+            <p class="dialog-hint">输入文字，将生成伪语音条</p>
+            <textarea 
+                v-model="voiceTextInput" 
+                class="retro-textarea" 
+                placeholder="输入语音内容..."
+                rows="4"
+            ></textarea>
+        </div>
+        <div class="dialog-footer">
+            <button class="retro-btn cancel" @click="showVoiceDialog = false">取消</button>
+            <button class="retro-btn confirm" @click="sendVoiceMessage">生成语音条</button>
+        </div>
+    </div>
+</div>
+
+<!-- 转账弹窗 -->
+<div class="dialog-overlay" v-if="showTransferDialog" @click="showTransferDialog = false">
+    <div class="retro-dialog" @click.stop>
+        <div class="dialog-header">
+            <i class="fas fa-money-bill-wave"></i> 转账 (TRANSFER)
+        </div>
+        <div class="dialog-body">
+            <div class="dialog-section">
+                <label class="dialog-label">金额 (Amount)</label>
+                <input 
+                    type="number" 
+                    v-model.number="transferAmount" 
+                    class="retro-input" 
+                    placeholder="输入金额"
+                    min="0"
+                >
+            </div>
+            <div class="dialog-section">
+                <label class="dialog-label">备注 (Note)</label>
+                <input 
+                    type="text" 
+                    v-model="transferNote" 
+                    class="retro-input" 
+                    placeholder="转账备注"
+                >
+            </div>
+        </div>
+        <div class="dialog-footer">
+            <button class="retro-btn cancel" @click="showTransferDialog = false">取消</button>
+            <button class="retro-btn confirm" @click="sendTransferMessage">确认转账</button>
+        </div>
+    </div>
+</div>
+
+<!-- 定位弹窗 -->
+<div class="dialog-overlay" v-if="showLocationDialog" @click="showLocationDialog = false">
+    <div class="retro-dialog location-dialog" @click.stop>
+        <div class="dialog-header">
+            <i class="fas fa-map-marker-alt"></i> 定位 (LOCATION)
+        </div>
+        <div class="dialog-body">
+            <div class="dialog-section">
+                <label class="dialog-label">我的位置</label>
+                <input type="text" v-model="locationUser" class="retro-input" placeholder="如：北区 中继塔">
+            </div>
+            <div class="dialog-section">
+                <label class="dialog-label">Ta的位置</label>
+                <input type="text" v-model="locationTarget" class="retro-input" placeholder="如：南区 指挥站">
+            </div>
+            <div class="dialog-section">
+                <label class="dialog-label">相距</label>
+                <input type="text" v-model="locationDistance" class="retro-input" placeholder="如：2.6km">
+            </div>
+            <div class="dialog-section">
+                <div class="dialog-section-title">
+                    <label class="dialog-label">途经点</label>
+                    <button class="retro-btn mini" @click="addTrajectoryPoint">+</button>
+                </div>
+                <div class="trajectory-list">
+                    <div class="trajectory-item" v-for="(point, index) in locationTrajectoryPoints" :key="index">
+                        <input type="text" v-model="locationTrajectoryPoints[index]" class="retro-input" placeholder="输入途经点">
+                        <button class="retro-btn mini danger" @click="removeTrajectoryPoint(index)">-</button>
+                    </div>
+                    <div v-if="locationTrajectoryPoints.length === 0" class="dialog-hint">
+                        暂无途经点，最多可添加 3 个
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="dialog-footer">
+            <button class="retro-btn cancel" @click="showLocationDialog = false">取消</button>
+            <button class="retro-btn confirm" @click="sendLocationMessage">发送定位</button>
+        </div>
+    </div>
+</div>
+
+<!-- 线下模式弹窗 -->
+<div class="dialog-overlay" v-if="showOfflineModeDialog" @click="showOfflineModeDialog = false">
+    <div class="retro-dialog" @click.stop>
+        <div class="dialog-header">
+            <i class="fas fa-plane-slash"></i> 线下模式 (OFFLINE MODE)
+        </div>
+        <div class="dialog-body">
+            <p class="dialog-hint">选择一个或多个预设场景</p>
+            <div class="preset-list custom-scroll">
+                <div 
+                    v-for="preset in presets" 
+                    :key="preset.id"
+                    class="preset-item"
+                    :class="{ selected: selectedPresets.includes(preset.id) }"
+                    @click="togglePresetSelection(preset.id)"
+                >
+                    <i class="fas fa-check-circle" v-if="selectedPresets.includes(preset.id)"></i>
+                    <i class="far fa-circle" v-else></i>
+                    <span>{{ preset.name }}</span>
+                </div>
+                <div v-if="presets.length === 0" class="empty-preset-hint">
+                    暂无预设，请先在 Workshop 中创建
+                </div>
+            </div>
+        </div>
+        <div class="dialog-footer">
+            <button class="retro-btn cancel" @click="showOfflineModeDialog = false">取消</button>
+            <button class="retro-btn confirm" @click="activateOfflineMode">激活</button>
+        </div>
+    </div>
+</div>
+
+<!-- 群聊弹窗 -->
+<div class="dialog-overlay" v-if="showGroupDialog" @click="closeGroupDialog">
+    <div class="retro-dialog" @click.stop>
+        <div class="dialog-header">
+            <i class="fas fa-users"></i> {{ groupDialogMode === 'manage' ? '管理群聊' : '新建群聊' }}
+        </div>
+        <div class="dialog-body">
+            <div class="dialog-section">
+                <label class="dialog-label">群聊名称</label>
+                <input 
+                    type="text" 
+                    v-model="groupDialogName" 
+                    class="retro-input" 
+                    placeholder="输入群聊名称"
+                >
+            </div>
+            <div class="dialog-section">
+                <label class="dialog-label">群成员</label>
+                <div class="member-select-list custom-scroll">
+                    <label class="member-select-item" v-for="member in groupMemberOptions" :key="member.id">
+                        <input type="checkbox" :value="member.name" v-model="groupDialogSelectedMembers">
+                        <span>{{ member.name }}</span>
+                    </label>
+                    <div v-if="groupMemberOptions.length === 0" class="empty-group-hint">
+                        暂无角色，请先在 Workshop 中创建
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="dialog-footer">
+            <button class="retro-btn cancel" @click="closeGroupDialog">取消</button>
+            <button class="retro-btn confirm" @click="saveGroupDialog">确认</button>
+        </div>
+    </div>
+</div>
+
+<!-- 宠物弹窗 -->
+<div class="dialog-overlay" v-if="showPetDialog" @click="closePetDialog">
+    <div class="retro-dialog" @click.stop>
+        <div class="dialog-header">
+            <i class="fas fa-paw"></i> 宠物状态 (PET)
+        </div>
+        <div class="dialog-body">
+            <div class="pet-preview">
+                <div class="pet-emoji">{{ soulLinkPet.emoji }}</div>
+                <div class="pet-name">{{ soulLinkPet.name }}</div>
+                <div class="pet-mood">MOOD: {{ getPetMoodLabel() }}</div>
+            </div>
+            <div class="dialog-section">
+                <label class="dialog-label">名字</label>
+                <input type="text" v-model="soulLinkPet.name" class="retro-input" placeholder="宠物名字">
+            </div>
+            <div class="dialog-section">
+                <label class="dialog-label">表情</label>
+                <input type="text" v-model="soulLinkPet.emoji" class="retro-input" placeholder="🐾">
+            </div>
+            <div class="pet-stats">
+                <div class="pet-stat">
+                    <span>能量</span>
+                    <strong>{{ Math.round(soulLinkPet.energy) }}</strong>
+                </div>
+                <div class="pet-stat">
+                    <span>饥饿</span>
+                    <strong>{{ Math.round(soulLinkPet.hunger) }}</strong>
+                </div>
+                <div class="pet-stat">
+                    <span>心情</span>
+                    <strong>{{ Math.round(soulLinkPet.mood) }}</strong>
+                </div>
+            </div>
+        </div>
+        <div class="dialog-footer pet-actions">
+            <button class="retro-btn" @click="handlePetAction('feed')">投喂</button>
+            <button class="retro-btn" @click="handlePetAction('play')">玩耍</button>
+            <button class="retro-btn" @click="handlePetAction('rest')">休息</button>
+            <button class="retro-btn confirm" @click="closePetDialog">完成</button>
+        </div>
+    </div>
+</div>
+
+<!-- Emoji 面板弹窗 -->
+<div class="dialog-overlay" v-if="showEmojiPanel" @click="showEmojiPanel = false">
+    <div class="retro-dialog emoji-panel" @click.stop>
+        <div class="dialog-header">
+            <i class="far fa-smile"></i> 表情 (EMOJI)
+        </div>
+        <div class="dialog-body">
+            <div class="emoji-grid">
+                <div 
+                    v-for="emoji in pixelEmojis" 
+                    :key="emoji"
+                    class="emoji-item"
+                    @click="insertEmoji(emoji)"
+                >
+                    {{ emoji }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+    </div>
+ <!-- ==========================================================================
+         WORLDBOOK EDITOR (MODAL)
+       ========================================================================== -->
+    <div class="dossier-overlay" v-if="editingWorldbook">
+        <div class="dossier-container">
+            <!-- Header -->
+            <div class="dossier-header">
+                <input type="text" v-model="editingWorldbook.name" class="dossier-title-input" placeholder="WORLDBOOK NAME">
+            </div>
+            
+            <!-- Description Section -->
+            <div class="worldbook-description-section">
+                <label>世界书描述 / DESCRIPTION</label>
+                <textarea 
+                    v-model="editingWorldbook.description" 
+                    class="retro-input" 
+                    placeholder="这本世界书的总体描述..."
+                    rows="3"
+                    style="resize: none;">
+                </textarea>
+            </div>
+            
+            <!-- Main Content: Accordion Style Entries -->
+            <div class="dossier-body accordion-style">
+                <div class="accordion-header-bar">
+                    <span>ENTRIES ({{ editingWorldbook.entries.length }})</span>
+                    <button class="add-kv-btn" @click="addWorldbookEntry" title="添加新条目">+</button>
+                </div>
+                
+                <div class="accordion-entries custom-scroll">
+                    <!-- 每个条目 -->
+                    <div 
+                        v-for="entry in editingWorldbook.entries" 
+                        :key="entry.id" 
+                        class="accordion-item"
+                        :class="{ expanded: isEntryExpanded(entry.id) }">
+                        
+                        <!-- 条目头部 (可点击展开/收起) -->
+                        <div class="accordion-header" @click="toggleEntryExpand(entry.id)">
+                            <i class="fas fa-caret-right accordion-icon"></i>
+                            <span class="entry-title">{{ entry.key || '未命名条目' }}</span>
+                            <button 
+                                class="delete-entry-btn" 
+                                @click.stop="deleteWorldbookEntry(entry.id)"
+                                title="删除条目">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </div>
+                        
+                        <!-- 条目内容 (展开时显示) -->
+                        <div class="accordion-content" v-show="isEntryExpanded(entry.id)">
+                            <div class="form-group">
+                                <label>条目关键词 / ENTRY KEY</label>
+                                <input 
+                                    type="text" 
+                                    v-model="entry.key" 
+                                    class="retro-input" 
+                                    placeholder="例如：夜之城、Night City">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>触发关键词 / KEYWORDS <small style="color: #666;">(用逗号分隔，用于自动匹配)</small></label>
+                                <input 
+                                    type="text" 
+                                    v-model="entry.keywords" 
+                                    class="retro-input" 
+                                    placeholder="例如：夜之城, Night City, NC">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>条目内容 / CONTENT</label>
+                                <textarea 
+                                    v-model="entry.content" 
+                                    class="retro-input" 
+                                    placeholder="详细描述这个设定..."
+                                    rows="10"
+                                    style="resize: vertical; line-height: 1.5;">
+                                </textarea>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 空状态提示 -->
+                    <div v-if="editingWorldbook.entries.length === 0" class="empty-state-text">
+                        暂无条目，点击上方 + 按钮添加
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Padding for bottom bar -->
+            <div style="height: 80px;"></div>
+        </div>
+
+        <!-- Bottom Action Bar -->
+        <div class="dossier-action-bar">
+            <button @click="deleteCurrentWorldbook" class="action-btn danger-btn">
+                <i class="fas fa-trash-alt"></i> 删除世界书
+            </button>
+            <div class="action-group-right">
+                <button @click="cancelWorldbookEditor" class="action-btn secondary-btn">取消</button>
+                <button @click="saveWorldbookEditor" class="action-btn primary-btn">保存</button>
+            </div>
+        </div>
+    </div> 
+    <!-- ==========================================================================
+         PRESET EDITOR (MODAL)
+       ========================================================================== -->
+    <div class="dossier-overlay" v-if="editingPreset">
+        <div class="dossier-container">
+             <!-- Header -->
+             <div class="dossier-header">
+                <div class="dossier-title">PRESET EDITOR</div>
+            </div>
+
+            <div class="dossier-body">
+                <div class="dossier-col" style="width: 100%;">
+                    <div class="form-group">
+                        <label>预设名称 / PRESET NAME</label>
+                        <input type="text" v-model="editingPreset.name" class="retro-input" placeholder="Preset Name">
+                    </div>
+                    <div class="form-group" style="flex: 1; display: flex; flex-direction: column;">
+                        <label>指令内容 / INSTRUCTION CONTENT</label>
+                        <textarea v-model="editingPreset.content" class="retro-input" style="flex: 1; resize: none; line-height: 1.5;" placeholder="System instructions..."></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Padding for bottom bar -->
+            <div style="height: 100px;"></div>
+        </div>
+
+        <!-- Bottom Action Bar -->
+        <div class="dossier-action-bar">
+            <button @click="deleteCurrentPreset" class="action-btn danger-btn">
+                <i class="fas fa-trash-alt"></i> 删除预设
+            </button>
+            <div class="action-group-right">
+                <button @click="cancelPresetEditor" class="action-btn secondary-btn">取消</button>
+                <button @click="savePresetEditor" class="action-btn primary-btn">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================================================
+         CHARACTER DOSSIER (MODAL)
+       ========================================================================== -->
+    <div class="dossier-overlay" v-if="editingCharacter">
+        <div class="dossier-container custom-scroll">
+            
+            <!-- Block 1: Core Identity -->
+            <div class="dossier-section">
+                <!-- Hidden File Input for Avatar Upload -->
+                <input type="file" ref="fileInput" accept="image/*" style="display: none" @change="handleAvatarFile">
+                
+                <div class="section-header">
+                    <span class="section-title">[ 核心识别 / CORE IDENTITY ]</span>
+                    <div class="section-line"></div>
+                </div>
+                
+                <div class="identity-grid">
+                    <!-- Avatar -->
+                    <div class="avatar-uploader" @click="triggerAvatarUpload">
+                        <img :src="editingCharacter.avatarUrl" class="dossier-avatar">
+                        <div class="avatar-overlay"><i class="fas fa-camera"></i></div>
+                    </div>
+                    
+                    <div class="identity-fields">
+                        <!-- Internal Designation -->
+                        <div class="form-group">
+                            <label>内部代号 / ID <i class="fas fa-exclamation-triangle warning-icon" title="不可轻易修改，影响记忆连续性"></i></label>
+                            <input type="text" v-model="editingCharacter.internalName" class="retro-input" placeholder="Unique ID...">
+                        </div>
+                        
+                        <!-- Public Nickname -->
+                        <div class="form-group">
+                            <label>公开昵称 / Nickname</label>
+                            <input type="text" v-model="editingCharacter.nickname" class="retro-input" placeholder="Public Name...">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Summary -->
+            <div class="form-group">
+                <label>档案简介 / Summary</label>
+                <textarea v-model="editingCharacter.summary" class="retro-input" rows="3" placeholder="Displayed on character card..."></textarea>
+            </div>
+
+            <!-- Tags -->
+            <div class="form-group">
+                <label>标签 / Tags</label>
+                <div class="tags-wrapper">
+                    <div class="tags-list">
+                        <span v-for="(tag, index) in editingCharacter.tags" :key="index" class="tag-chip">
+                            {{ tag }} <i class="fas fa-times" @click="removeTag(index)"></i>
+                        </span>
+                    </div>
+                    <input type="text" v-model="newTagInput" @keydown.enter="addTag" class="retro-input tag-input" placeholder="+ Tag (Enter)">
+                </div>
+            </div>
+            
+            <!-- Block 2: Persona Matrix -->
+            <div class="dossier-section">
+                <div class="section-header">
+                    <span class="section-title">[ 人格矩阵 / PERSONA MATRIX ]</span>
+                    <div class="section-line"></div>
+                </div>
+                
+                <div class="form-group">
+                    <label>核心设定 / Core Persona</label>
+                    <textarea v-model="editingCharacter.persona" class="retro-input large-text" rows="10" placeholder="Character soul, personality, background..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>世界书关联 / Worldbook Link</label>
+                    <select v-model="editingCharacter.worldbookId" class="retro-input">
+                        <option value="">- No Worldbook Linked -</option>
+                        <option v-for="wb in worldbooks" :key="wb.id" :value="wb.id">{{ wb.name }}</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>关键信息 / Key-Value Data</label>
+                    <div class="kv-container">
+                        <div v-for="(kv, index) in editingCharacter.kvData" :key="index" class="kv-row">
+                            <input type="text" v-model="kv.key" placeholder="Key" class="retro-input kv-key">
+                            <span class="kv-colon">:</span>
+                            <input type="text" v-model="kv.value" placeholder="Value" class="retro-input kv-value">
+                            <button @click="removeKv(index)" class="kv-delete-btn"><i class="fas fa-times"></i></button>
+                        </div>
+                        <button @click="addKv" class="add-kv-btn"><i class="fas fa-plus"></i> 添加数据项</button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>开场白 / Opening Line</label>
+                    <input type="text" v-model="editingCharacter.openingLine" class="retro-input" placeholder="First message when chat starts...">
+                </div>
+            </div>
+
+            <!-- Block 3: Relational Dynamics -->
+            <div class="dossier-section">
+                <div class="section-header">
+                    <span class="section-title">[ 关系设定 / RELATIONAL DYNAMICS ]</span>
+                    <div class="section-line"></div>
+                </div>
+                <div class="form-group">
+                    <label>你的设定 / Your Persona</label>
+                    <textarea v-model="editingCharacter.userPersona" class="retro-input" rows="4" placeholder="Your role in this character's world..."></textarea>
+                </div>
+            </div>
+            
+            <!-- Padding for bottom bar -->
+            <div style="height: 100px;"></div>
+        </div>
+
+        <!-- Bottom Action Bar -->
+        <div class="dossier-action-bar">
+            <button @click="deleteCharacter" class="action-btn danger-btn">
+                <i class="fas fa-trash-alt"></i> 删除角色
+            </button>
+            <div class="action-group-right">
+                <button @click="cancelDossier" class="action-btn secondary-btn">取消</button>
+                <button @click="saveDossier" class="action-btn primary-btn">保存</button>
+            </div>
+        </div>
+    </div>
+
+</div> <!-- THIS IS THE CLOSING TAG FOR #app -->
+
+<!-- Vue & Main Script -->
+<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+<script src="script.js"></script> 
+
+</body>
+</html>
