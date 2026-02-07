@@ -228,6 +228,7 @@ createApp({
         const presets = ref([]);
         const editingPreset = ref(null);
         const swipedPresetId = ref(null); // Track swiped state
+        const presetImportInput = ref(null);
 
         // --- Persistence Helpers ---
         const saveToStorage = (key, data) => {
@@ -897,7 +898,8 @@ createApp({
             const newPreset = {
                 id: `ps_${newId}`,
                 name: `新预设 ${presets.value.length + 1}`,
-                content: ''
+                content: '',
+                segments: []
             };
             presets.value.unshift(newPreset);
             openPresetEditor(newPreset);
@@ -935,7 +937,9 @@ createApp({
             if (swipedPresetId.value === preset.id) return;
             swipedPresetId.value = null;
             
-            editingPreset.value = JSON.parse(JSON.stringify(preset));
+            const cloned = JSON.parse(JSON.stringify(preset));
+            if (!Array.isArray(cloned.segments)) cloned.segments = [];
+            editingPreset.value = cloned;
         };
 
         const savePresetEditor = () => {
@@ -949,6 +953,89 @@ createApp({
 
         const cancelPresetEditor = () => {
             editingPreset.value = null;
+        };
+        
+        const triggerPresetImport = () => {
+            if (presetImportInput.value) presetImportInput.value.click();
+        };
+        const parsePresetJson = (file) => {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const arrayBuffer = e.target.result;
+                        const jsonString = new TextDecoder('utf-8').decode(arrayBuffer);
+                        const data = JSON.parse(jsonString);
+                        resolve(data);
+                    } catch (error) {
+                        reject(new Error('解析JSON预设失败。'));
+                    }
+                };
+                reader.onerror = () => reject(new Error('读取JSON文件失败。'));
+                reader.readAsArrayBuffer(file);
+            });
+        };
+        const normalizePresetObject = (obj, filenameHint = '') => {
+            if (!obj || typeof obj !== 'object') return null;
+            const fallbackName = filenameHint ? filenameHint.replace(/\.[^.]+$/, '') : `导入预设 ${Date.now()}`;
+            const name = String(obj.name || obj.title || obj.preset_name || fallbackName).trim();
+            const contentField = obj.content ?? obj.text ?? obj.system_prompt ?? obj.prompt ?? '';
+            const rawContent = typeof contentField === 'string' ? contentField : '';
+            const items = obj.items || obj.entries || obj.sections || obj.blocks || obj.prompts || [];
+            const segments = Array.isArray(items) ? items.map((it, idx) => ({
+                id: `seg_${Date.now()}_${idx}_${Math.random().toString(16).slice(2)}`,
+                title: String(it.title ?? it.name ?? it.key ?? `段落${idx + 1}`),
+                content: String(it.content ?? it.text ?? it.value ?? ''),
+                enabled: it.enabled !== false
+            })) : [];
+            if (segments.length === 0 && rawContent) {
+                // 尝试按分隔符拆分
+                const parts = rawContent.split(/\n-{3,}\n|^#{1,3}\s/m).map(s => s.trim()).filter(Boolean);
+                if (parts.length > 1) {
+                    parts.forEach((txt, idx) => {
+                        segments.push({
+                            id: `seg_${Date.now()}_${idx}_${Math.random().toString(16).slice(2)}`,
+                            title: `段落${idx + 1}`,
+                            content: txt,
+                            enabled: true
+                        });
+                    });
+                } else {
+                    segments.push({
+                        id: `seg_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+                        title: '正文',
+                        content: rawContent,
+                        enabled: true
+                    });
+                }
+            }
+            return {
+                id: `ps_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+                name,
+                content: rawContent || (segments.length > 0 ? segments.map(s => s.content).join('\n\n') : ''),
+                segments
+            };
+        };
+        const importPresetsFromData = (data, filenameHint = '') => {
+            const list = Array.isArray(data) ? data 
+                : Array.isArray(data?.presets) ? data.presets 
+                : (data?.preset ? [data.preset] : [data]);
+            list.forEach(item => {
+                const preset = normalizePresetObject(item, filenameHint);
+                if (preset) presets.value.unshift(preset);
+            });
+        };
+        const handlePresetImport = async (event) => {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+            try {
+                const data = await parsePresetJson(file);
+                importPresetsFromData(data, file.name || '');
+                event.target.value = '';
+                addConsoleLog('预设导入成功', 'success');
+            } catch (e) {
+                addConsoleLog('预设导入失败：' + e.message, 'error');
+            }
         };
         
         // --- Character Dossier Logic & Helpers ---
@@ -1059,6 +1146,7 @@ createApp({
         // --- Workshop Persistence Wiring ---
         watch(worldbooks, saveWorldbooks, { deep: true });
         watch(presets, savePresets, { deep: true });
+        watch(profiles, () => saveProfiles(true), { deep: true });
         
         onMounted(() => {
             loadWorldbooks();
@@ -1217,13 +1305,13 @@ createApp({
             availableModels.value = [];
         };
 
-        const saveProfiles = () => {
-            if (!activeProfile.value) return;
+        const saveProfiles = (silent = false) => {
+            if (!profiles.value || profiles.value.length === 0) return;
             try {
                 localStorage.setItem('soulos_api_profiles', JSON.stringify(profiles.value));
-                addConsoleLog('所有配置已保存，本地状态已更新。', 'success');
+                if (!silent) addConsoleLog('所有配置已保存，本地状态已更新。', 'success');
             } catch (error) {
-                addConsoleLog('保存配置时出错：' + error.message, 'error');
+                if (!silent) addConsoleLog('保存配置时出错：' + error.message, 'error');
             }
         };
 
@@ -1328,7 +1416,10 @@ createApp({
         watch(characters, saveCharacters, { deep: true });
         // 防护：只有在 Workshop 打开时才允许显示角色档案编辑页
         
-        watch(openedApp, (val) => {
+        watch(openedApp, (val, prev) => {
+            if (prev === 'Console') {
+                saveProfiles(true);
+            }
             if (val !== 'Workshop') {
                 editingCharacter.value = null;
             }
@@ -1473,6 +1564,11 @@ createApp({
             showVoiceDialog.value = true;
             voiceTextInput.value = '';
         };
+        const aiVoiceProbGeneral = ref(0.2);
+        const aiImageProbGeneral = ref(0.15);
+        const aiVoiceProbAttachment = ref(0.3);
+        const aiImageProbAttachment = ref(0.2);
+        const voiceDurationFactor = ref(3);
         const openTransferDialog = () => {
             showAttachmentsMenu.value = false;
             showTransferDialog.value = true;
@@ -1519,12 +1615,15 @@ createApp({
 
             pushMessageToActiveChat(newMsg);
             showImageDialog.value = false;
+            autoAiReplyForAttachment(newMsg);
+            const charForAutoImg = soulLinkActiveChatType.value === 'character' ? characters.value.find(c => c.id === soulLinkActiveChat.value) : null;
+            if (charForAutoImg) setTimeout(() => { maybeAutonomousFeedActivity(charForAutoImg.id); }, 600);
         };
         const sendVoiceMessage = () => {
             if (!soulLinkActiveChat.value || !voiceTextInput.value.trim()) return;
 
             const textLength = voiceTextInput.value.length;
-            const duration = `0:${String(Math.min(Math.max(Math.floor(textLength / 3), 1), 60)).padStart(2, '0')}`;
+            const duration = `0:${String(Math.min(Math.max(Math.floor(textLength / voiceDurationFactor.value), 1), 60)).padStart(2, '0')}`;
 
             const newMsg = {
                 id: Date.now(),
@@ -1540,6 +1639,9 @@ createApp({
             }
             pushMessageToActiveChat(newMsg);
             showVoiceDialog.value = false;
+            autoAiReplyForAttachment(newMsg);
+            const charForAuto = soulLinkActiveChatType.value === 'character' ? characters.value.find(c => c.id === soulLinkActiveChat.value) : null;
+            if (charForAuto) setTimeout(() => { maybeAutonomousFeedActivity(charForAuto.id); }, 600);
         };
         const toggleVoiceExpand = (msg) => {
             msg.expanded = !msg.expanded;
@@ -1561,15 +1663,44 @@ createApp({
             }
             pushMessageToActiveChat(newMsg);
             showTransferDialog.value = false;
+            setTimeout(() => {
+                const accept = Math.random() < 0.75;
+                newMsg.transferStatus = accept ? 'accepted' : 'rejected';
+                const replyTextPoolAccept = ['收到了~ 谢谢', 'OK，已签收', '已收到，谢谢你'];
+                const replyTextPoolReject = ['抱歉这次不收款', '暂时不方便收款', '这次先算了哈'];
+                const replyText = accept 
+                    ? replyTextPoolAccept[Math.floor(Math.random() * replyTextPoolAccept.length)]
+                    : replyTextPoolReject[Math.floor(Math.random() * replyTextPoolReject.length)];
+                pushMessageToActiveChat({
+                    id: Date.now() + 1,
+                    sender: 'ai',
+                    text: replyText,
+                    timestamp: Date.now()
+                });
+                syncActiveChatState();
+                persistActiveChat();
+            }, 2000);
         };
         const handleTransferAction = (msg, action) => {
             if (action === 'accept') {
                 msg.transferStatus = 'accepted';
                 // 这里可以调用 Wallet 接口进行实际的余额变动
                 addConsoleLog(`转账已接受: ¥${msg.amount}`, 'success');
+                pushMessageToActiveChat({
+                    id: Date.now(),
+                    sender: 'ai',
+                    text: '已收款~ 谢谢',
+                    timestamp: Date.now()
+                });
             } else if (action === 'reject') {
                 msg.transferStatus = 'rejected';
                 addConsoleLog(`转账已拒绝: ¥${msg.amount}`, 'info');
+                pushMessageToActiveChat({
+                    id: Date.now(),
+                    sender: 'ai',
+                    text: '这次不收哦',
+                    timestamp: Date.now()
+                });
             }
             syncActiveChatState();
             persistActiveChat();
@@ -1593,8 +1724,13 @@ createApp({
             // 构建预设内容
             const presetContents = selectedPresets.value.map(id => {
                 const preset = presets.value.find(p => p.id === id);
-                return preset ? preset.content : '';
+                if (!preset) return '';
+                if (Array.isArray(preset.segments) && preset.segments.length > 0) {
+                    return preset.segments.filter(s => s.enabled && s.content).map(s => s.content).join('\n\n');
+                }
+                return preset.content || '';
             }).filter(c => c).join('\n\n');
+            offlinePresetText.value = presetContents;
             
             // 发送系统消息
             if (soulLinkActiveChat.value) {
@@ -1606,10 +1742,91 @@ createApp({
                     isSystem: true,
                     isSpecial: true
                 });
+                
+                setTimeout(() => { generateOfflineNarrative(); }, 400);
             }
             
             showOfflineModeDialog.value = false;
             addConsoleLog('线下模式已激活', 'success');
+        };
+        
+        const generateOfflineNarrative = async () => {
+            if (!activeProfile.value) return;
+            if (!soulLinkActiveChat.value) return;
+            const isGroupChat = soulLinkActiveChatType.value === 'group';
+            const char = isGroupChat ? null : characters.value.find(c => c.id === soulLinkActiveChat.value);
+            const profile = activeProfile.value;
+            const endpoint = (profile.endpoint || '').trim();
+            const key = (profile.key || '').trim();
+            if (!endpoint || !key) return;
+            let modelId = profile.model;
+            if (!modelId && availableModels.value.length > 0) {
+                modelId = availableModels.value[0].id;
+                profile.model = modelId;
+            }
+            const history = isGroupChat ? (activeGroupChat.value?.history || []) : (soulLinkMessages.value[soulLinkActiveChat.value] || []);
+            const messagesPayload = [];
+            let systemPrompt = '';
+            if (isGroupChat) {
+                systemPrompt = `离线模式已开启。根据预设生成带描写的长文本，采用小说式叙述，细节丰富、氛围浓厚、连贯自然，不要使用列表或标题。\n预设：\n${offlinePresetText.value || ''}`;
+            } else if (char && char.persona) {
+                const charName = char.name || '角色';
+                systemPrompt = `离线模式已开启。你是【${charName}】。\n${char.persona}\n根据以下预设生成带描写的长文本，采用小说式叙述，细节丰富、氛围浓厚、连贯自然，不要使用列表或标题：\n${offlinePresetText.value || ''}`;
+                if (char.worldbookId) {
+                    const wb = worldbooks.value.find(w => w.id === char.worldbookId);
+                    if (wb && wb.entries && wb.entries.length > 0) {
+                        wb.entries.forEach(e => {
+                            if (e.keyword && e.content) {
+                                systemPrompt += `\n[${e.keyword}]\n${e.content}`;
+                            }
+                        });
+                    }
+                }
+            } else {
+                systemPrompt = `离线模式已开启。根据预设生成带描写的长文本，采用小说式叙述，细节丰富、氛围浓厚、连贯自然，不要使用列表或标题。\n预设：\n${offlinePresetText.value || ''}`;
+            }
+            messagesPayload.push({ role: 'system', content: systemPrompt });
+            history.forEach(m => {
+                if (m.isSystem || m.isHidden) return;
+                const senderLabel = m.senderName || (m.sender === 'user' ? '我' : '成员');
+                const ctx = buildSoulLinkReplyContext(m);
+                const raw = ctx.content || (m.text || '');
+                const content = senderLabel ? `${senderLabel}: ${raw}` : raw;
+                if (m.sender === 'user') messagesPayload.push({ role: 'user', content });
+                else if (m.sender === 'ai') messagesPayload.push({ role: 'assistant', content });
+            });
+            try {
+                const response = await fetch(endpoint.replace(/\/+$/, '') + '/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${key}`
+                    },
+                    body: JSON.stringify({
+                        model: modelId || '',
+                        messages: messagesPayload,
+                        temperature: profile.temperature ?? 0.7,
+                        stream: false
+                    })
+                });
+                if (!response.ok) throw new Error(`接口返回状态码 ${response.status}`);
+                const data = await response.json();
+                let reply = '';
+                if (data && Array.isArray(data.choices) && data.choices.length > 0) {
+                    const msg = data.choices[0].message || data.choices[0].delta;
+                    if (msg && msg.content) reply = msg.content;
+                }
+                if (!reply && data && data.message && data.message.content) reply = data.message.content;
+                if (!reply) reply = '...';
+                pushMessageToActiveChat({
+                    id: Date.now(),
+                    sender: 'ai',
+                    text: reply.trim(),
+                    timestamp: Date.now()
+                });
+            } catch (error) {
+                addConsoleLog('离线叙事生成失败：' + error.message, 'error');
+            }
         };
         const insertEmoji = (emoji) => {
             soulLinkInput.value += emoji;
@@ -1670,6 +1887,9 @@ createApp({
             }
             pushMessageToActiveChat(newMsg);
             showLocationDialog.value = false;
+            autoAiReplyForAttachment(newMsg);
+            const charForAutoLoc = soulLinkActiveChatType.value === 'character' ? characters.value.find(c => c.id === soulLinkActiveChat.value) : null;
+            if (charForAutoLoc) setTimeout(() => { maybeAutonomousFeedActivity(charForAutoLoc.id); }, 600);
         };
 
         
@@ -2272,7 +2492,7 @@ createApp({
                 `内容摘要: ${postSummary || '(图片动态)'}`,
                 `最近评论:\n${recentComments || '(暂无评论)'}`,
                 `NPC列表:\n${npcList}`,
-                '规则：只从NPC列表中选择1-3人，输出严格JSON数组，格式: [{"commenterName":"NPC名字","commentText":"评论内容","replyTo":"可选"}]'
+                '规则：只从NPC列表中选择1-3人，每人回复1-2句，每句不超过20字，口语自然，输出严格JSON数组，格式: [{"commenterName":"NPC名字","commentText":"评论内容","replyTo":"可选"}]'
             ].filter(Boolean).join('\n');
             try {
                 const response = await fetch(endpoint.replace(/\/+$/, '') + '/chat/completions', {
@@ -2328,6 +2548,41 @@ createApp({
                 saveFeedPosts();
             } catch (error) {
                 addConsoleLog(`NPC 评论失败：${error.message}`, 'error');
+            }
+        };
+
+        const maybeAutonomousFeedActivity = async (charId) => {
+            if (!charId || !activeProfile.value) return;
+            const character = characters.value.find(c => String(c.id) === String(charId));
+            if (!character) return;
+            const roll = Math.random();
+            try {
+                if (roll < 0.35) {
+                    const content = await generateFeedPostForChar(charId, 'chat');
+                    if (content) {
+                        const post = normalizeFeedPost({
+                            id: Date.now(),
+                            authorId: charId,
+                            type: 'shuoshuo',
+                            content,
+                            createdAt: Date.now()
+                        });
+                        feedPosts.value.unshift(post);
+                        saveFeedPosts();
+                    }
+                    return;
+                }
+                if (roll < 0.75) {
+                    const targets = feedPosts.value
+                        .filter(p => p.authorId !== charId)
+                        .slice(0, 3);
+                    if (targets.length > 0) {
+                        // 仅由该角色进行评论
+                        await generateFeedNpcComments(targets[0], [character], character);
+                    }
+                }
+            } catch (e) {
+                addConsoleLog(`自主动态/评论失败：${e.message}`, 'error');
             }
         };
 
@@ -2709,8 +2964,13 @@ createApp({
     
        
         const sendSoulLinkMessage = async (triggerApi) => {
+            const shouldTriggerApi = triggerApi === true;
             const text = soulLinkInput.value.trim();
-            if (!text || !soulLinkActiveChat.value) return;
+            if (!soulLinkActiveChat.value) return;
+            if (!text) {
+                addSystemMessageToActiveChat('请输入消息');
+                return;
+            }
 
             if (/^\/group\b/i.test(text)) {
                 soulLinkInput.value = '';
@@ -2729,6 +2989,7 @@ createApp({
             const isGroupChat = soulLinkActiveChatType.value === 'group';
             const activeGroup = isGroupChat ? activeGroupChat.value : null;
             if (isGroupChat && !activeGroup) return;
+            const char = isGroupChat ? null : characters.value.find(c => c.id === soulLinkActiveChat.value);
 
             // 1. Add User Message
             const newMsg = {
@@ -2736,7 +2997,7 @@ createApp({
                 sender: 'user',
                 text: text,
                 timestamp: Date.now(),
-                isLogOnly: !triggerApi
+                isLogOnly: !shouldTriggerApi
             };
 
             if (replyContextForPrompt) {
@@ -2749,8 +3010,11 @@ createApp({
             
             soulLinkInput.value = '';
             soulLinkReplyTarget.value = null;
+            if (!isGroupChat && char) {
+                setTimeout(() => { maybeAutonomousFeedActivity(char.id); }, 600);
+            }
 
-            if (triggerApi) {
+            if (shouldTriggerApi) {
                 if (!activeProfile.value) {
                     pushMessageToActiveChat({
                         id: Date.now() + 1,
@@ -2784,13 +3048,32 @@ createApp({
                 }
 
                 const history = isGroupChat ? (activeGroup.history || []) : (soulLinkMessages.value[soulLinkActiveChat.value] || []);
-                const char = isGroupChat ? null : characters.value.find(c => c.id === soulLinkActiveChat.value);
 
                 const messagesPayload = [];
 
                 // 【核心改造 V2】构建"像人一样聊天"的系统指令
                 let systemPrompt = '';
                 
+                if (isOfflineMode.value) {
+                    if (isGroupChat) {
+                        systemPrompt = `离线模式。根据预设生成带描写的长文本，采用小说式叙述，细节丰富、氛围浓厚、连贯自然，不要使用列表或标题。\n预设：\n${offlinePresetText.value || ''}`;
+                    } else if (char && char.persona) {
+                        const charName = char.name || '角色';
+                        systemPrompt = `离线模式。你是【${charName}】。\n${char.persona}\n根据以下预设生成带描写的长文本，采用小说式叙述，细节丰富、氛围浓厚、连贯自然，不要使用列表或标题：\n${offlinePresetText.value || ''}`;
+                        if (char.worldbookId) {
+                            const linkedWorldbook = worldbooks.value.find(wb => wb.id === char.worldbookId);
+                            if (linkedWorldbook && linkedWorldbook.entries && linkedWorldbook.entries.length > 0) {
+                                linkedWorldbook.entries.forEach(entry => {
+                                    if (entry.keyword && entry.content) {
+                                        systemPrompt += `\n[${entry.keyword}]\n${entry.content}`;
+                                    }
+                                });
+                            }
+                        }
+                    } else {
+                        systemPrompt = `离线模式。根据预设生成带描写的长文本，采用小说式叙述，细节丰富、氛围浓厚、连贯自然，不要使用列表或标题。\n预设：\n${offlinePresetText.value || ''}`;
+                    }
+                } else
                 if (isGroupChat) {
                     const groupName = activeGroup && activeGroup.name ? activeGroup.name : '群聊';
                     const members = activeGroup && Array.isArray(activeGroup.members) && activeGroup.members.length > 0 ? activeGroup.members : ['成员A', '成员B', '成员C'];
@@ -2868,7 +3151,9 @@ createApp({
                 history.forEach(m => {
                     if (m.isSystem || m.isHidden) return;
                     const senderLabel = m.senderName || (m.sender === 'user' ? '我' : '成员');
-                    const content = senderLabel ? `${senderLabel}: ${m.text || ''}` : (m.text || '');
+                    const ctx = buildSoulLinkReplyContext(m);
+                    const raw = ctx.content || (m.text || '');
+                    const content = senderLabel ? `${senderLabel}: ${raw}` : raw;
                     if (m.sender === 'user') {
                         messagesPayload.push({ role: 'user', content });
                     } else if (m.sender === 'ai') {
@@ -2933,12 +3218,35 @@ createApp({
                                 timestamp: Date.now()
                             });
                         } else {
-                            pushMessageToActiveChat({
-                                id: Date.now() + index,
-                                sender: 'ai',
-                                text: trimmedText,
-                                timestamp: Date.now()
-                            });
+                            const roll = Math.random();
+                            if (roll < aiVoiceProbGeneral.value) {
+                                const len = Math.max(1, Math.min(60, Math.floor(trimmedText.length / 3)));
+                                pushMessageToActiveChat({
+                                    id: Date.now() + index,
+                                    sender: 'ai',
+                                    messageType: 'voice',
+                                    text: trimmedText,
+                                    duration: `0:${String(len).padStart(2, '0')}`,
+                                    expanded: false,
+                                    timestamp: Date.now()
+                                });
+                            } else if (roll < aiVoiceProbGeneral.value + aiImageProbGeneral.value) {
+                                pushMessageToActiveChat({
+                                    id: Date.now() + index,
+                                    sender: 'ai',
+                                    messageType: 'image',
+                                    imageUrl: null,
+                                    text: trimmedText,
+                                    timestamp: Date.now()
+                                });
+                            } else {
+                                pushMessageToActiveChat({
+                                    id: Date.now() + index,
+                                    sender: 'ai',
+                                    text: trimmedText,
+                                    timestamp: Date.now()
+                                });
+                            }
                         }
                     };
                     
@@ -2971,6 +3279,193 @@ createApp({
                 }
             }
         };
+        
+        const autoAiReplyForAttachment = async (newMsg) => {
+            if (!soulLinkActiveChat.value) return;
+            if (!activeProfile.value) return;
+            const isGroupChat = soulLinkActiveChatType.value === 'group';
+            const char = characters.value.find(c => c.id === soulLinkActiveChat.value);
+            const activeGroup = isGroupChat ? activeGroupChat.value : null;
+            if (!isGroupChat && !char) return;
+            const profile = activeProfile.value;
+            const endpoint = (profile.endpoint || '').trim();
+            const key = (profile.key || '').trim();
+            if (!endpoint || !key) return;
+            let modelId = profile.model;
+            if (!modelId && availableModels.value.length > 0) {
+                modelId = availableModels.value[0].id;
+                profile.model = modelId;
+            }
+            const history = isGroupChat 
+                ? (activeGroup && Array.isArray(activeGroup.history) ? activeGroup.history : [])
+                : (soulLinkMessages.value[soulLinkActiveChat.value] || []);
+            const messagesPayload = [];
+            let systemPrompt = '';
+            if (!isGroupChat && char && char.persona) {
+                const charName = char.name || '角色';
+                systemPrompt = `你正在通过 SoulLink 和朋友聊天。\n\n`;
+                systemPrompt += `你的名字是【${charName}】。\n`;
+                systemPrompt += `${char.persona}\n\n`;
+                if (char.worldbookId) {
+                    const linkedWorldbook = worldbooks.value.find(wb => wb.id === char.worldbookId);
+                    if (linkedWorldbook && linkedWorldbook.entries && linkedWorldbook.entries.length > 0) {
+                        systemPrompt += `# 世界观与背景知识（必须严格遵守）\n`;
+                        linkedWorldbook.entries.forEach(entry => {
+                            if (entry.keyword && entry.content) {
+                                systemPrompt += `[${entry.keyword}]\n${entry.content}\n\n`;
+                            }
+                        });
+                    }
+                }
+                systemPrompt += `1. 像真实的人类那样自然地聊天。\n2. 回复保持简短（1-3句）。\n3. 使用符合角色的语气与口头禅。`;
+            } else if (!isGroupChat) {
+                systemPrompt = '你是一个友好的朋友，正在通过SoulLink聊天。请自然、简短地对话。';
+            } else {
+                const groupName = activeGroup && activeGroup.name ? activeGroup.name : '群聊';
+                const members = activeGroup && Array.isArray(activeGroup.members) && activeGroup.members.length > 0 ? activeGroup.members : ['成员A', '成员B', '成员C'];
+                systemPrompt = `你正在群聊【${groupName}】中与用户交流附件内容。\n\n`;
+                systemPrompt += `群成员\n${members.join('、')}\n\n`;
+                systemPrompt += `回复要简短自然。每次回复以其中一名成员口吻，格式为「成员名: 内容」。`;
+            }
+            messagesPayload.push({ role: 'system', content: systemPrompt });
+            history.forEach(m => {
+                if (m.isSystem || m.isHidden) return;
+                const senderLabel = m.senderName || (m.sender === 'user' ? '我' : '成员');
+                const ctx = buildSoulLinkReplyContext(m);
+                const raw = ctx.content || (m.text || '');
+                const content = senderLabel ? `${senderLabel}: ${raw}` : raw;
+                if (m.sender === 'user') {
+                    messagesPayload.push({ role: 'user', content });
+                } else if (m.sender === 'ai') {
+                    messagesPayload.push({ role: 'assistant', content });
+                }
+            });
+            const ctxNew = buildSoulLinkReplyContext(newMsg);
+            messagesPayload.push({ role: 'user', content: ctxNew.content || (newMsg.text || '') });
+            isAiTyping.value = true;
+            scrollToBottom();
+            try {
+                const response = await fetch(endpoint.replace(/\/+$/, '') + '/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${key}`
+                    },
+                    body: JSON.stringify({
+                        model: modelId || '',
+                        messages: messagesPayload,
+                        temperature: profile.temperature ?? 0.7,
+                        stream: false
+                    })
+                });
+                if (!response.ok) throw new Error(`接口返回状态码 ${response.status}`);
+                const data = await response.json();
+                let reply = '';
+                if (data && Array.isArray(data.choices) && data.choices.length > 0) {
+                    const msg = data.choices[0].message || data.choices[0].delta;
+                    if (msg && msg.content) reply = msg.content;
+                }
+                if (!reply && data && data.message && data.message.content) {
+                    reply = data.message.content;
+                }
+                if (!reply) reply = '收到。';
+                isAiTyping.value = false;
+                const separator = '---';
+                const appendAi = (rawText, index = 0) => {
+                    const trimmedText = rawText.trim();
+                    if (!trimmedText) return;
+                    const roll = Math.random();
+                    const voiceCut = aiVoiceProbAttachment.value;
+                    const imageCut = aiVoiceProbAttachment.value + aiImageProbAttachment.value;
+                    if (!isGroupChat) {
+                        if (roll < voiceCut) {
+                            const len = Math.max(1, Math.min(60, Math.floor(trimmedText.length / voiceDurationFactor.value)));
+                            pushMessageToActiveChat({
+                                id: Date.now() + index,
+                                sender: 'ai',
+                                messageType: 'voice',
+                                text: trimmedText,
+                                duration: `0:${String(len).padStart(2, '0')}`,
+                                expanded: false,
+                                timestamp: Date.now()
+                            });
+                        } else if (roll < imageCut) {
+                            pushMessageToActiveChat({
+                                id: Date.now() + index,
+                                sender: 'ai',
+                                messageType: 'image',
+                                imageUrl: null,
+                                text: trimmedText,
+                                timestamp: Date.now()
+                            });
+                        } else {
+                            pushMessageToActiveChat({
+                                id: Date.now() + index,
+                                sender: 'ai',
+                                text: trimmedText,
+                                timestamp: Date.now()
+                            });
+                        }
+                    } else {
+                        const parsed = parseGroupReply(trimmedText);
+                        if (roll < voiceCut) {
+                            const len = Math.max(1, Math.min(60, Math.floor(trimmedText.length / voiceDurationFactor.value)));
+                            pushMessageToActiveChat({
+                                id: Date.now() + index,
+                                sender: 'ai',
+                                senderName: parsed.senderName,
+                                messageType: 'voice',
+                                text: parsed.content,
+                                duration: `0:${String(len).padStart(2, '0')}`,
+                                expanded: false,
+                                timestamp: Date.now()
+                            });
+                        } else if (roll < imageCut) {
+                            pushMessageToActiveChat({
+                                id: Date.now() + index,
+                                sender: 'ai',
+                                senderName: parsed.senderName,
+                                messageType: 'image',
+                                imageUrl: null,
+                                text: parsed.content,
+                                timestamp: Date.now()
+                            });
+                        } else {
+                            pushMessageToActiveChat({
+                                id: Date.now() + index,
+                                sender: 'ai',
+                                senderName: parsed.senderName,
+                                text: parsed.content,
+                                timestamp: Date.now()
+                            });
+                        }
+                    }
+                };
+                if (reply.includes(separator)) {
+                    const parts = reply.split(separator);
+                    parts.forEach((part, index) => {
+                        if (part.trim()) {
+                            setTimeout(() => { appendAi(part, index); }, index * 800);
+                        }
+                    });
+                } else {
+                    appendAi(reply, 0);
+                }
+                addConsoleLog('附件消息：模型已回复。', 'success');
+            } catch (error) {
+                isAiTyping.value = false;
+                pushMessageToActiveChat({
+                    id: Date.now() + 5,
+                    sender: 'system',
+                    text: `请求模型时出错：${error.message}`,
+                    timestamp: Date.now(),
+                    isSystem: true
+                });
+                addConsoleLog('附件消息错误：' + error.message, 'error');
+            }
+        };
+        
+        const offlinePresetText = ref('');
 
         const switchSoulLinkTab = (tab) => {
             soulLinkTab.value = tab;
@@ -3164,6 +3659,61 @@ createApp({
             closeContextMenu();
         };
 
+        const showStarDialog = ref(false);
+        const openStarDialog = () => { showStarDialog.value = true; };
+        const starList = computed(() => {
+            const list = [];
+            for (const [cid, msgs] of Object.entries(soulLinkMessages.value)) {
+                const name = getCharacterName(Number(cid));
+                msgs.filter(m => m.isStarred).forEach(m => {
+                    list.push({
+                        key: `c-${cid}-${m.id}`,
+                        chatId: Number(cid),
+                        chatType: 'character',
+                        chatName: name,
+                        msgId: m.id,
+                        text: m.text || '',
+                        time: new Date(m.timestamp || Date.now()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+                    });
+                });
+            }
+            soulLinkGroups.value.forEach(g => {
+                const name = g.name || 'GROUP SIGNAL';
+                (g.history || []).filter(m => m.isStarred).forEach(m => {
+                    list.push({
+                        key: `g-${g.id}-${m.id}`,
+                        chatId: g.id,
+                        chatType: 'group',
+                        chatName: name,
+                        msgId: m.id,
+                        text: m.text || '',
+                        time: new Date(m.timestamp || Date.now()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+                    });
+                });
+            });
+            return list;
+        });
+        const deleteStarItem = (item) => {
+            if (item.chatType === 'group') {
+                const g = soulLinkGroups.value.find(x => x.id === item.chatId);
+                if (!g || !Array.isArray(g.history)) return;
+                const idx = g.history.findIndex(m => m.id === item.msgId);
+                if (idx !== -1) {
+                    g.history[idx].isStarred = false;
+                    syncActiveChatState();
+                    persistActiveChat();
+                }
+                return;
+            }
+            const msgs = soulLinkMessages.value[item.chatId] || [];
+            const idx = msgs.findIndex(m => m.id === item.msgId);
+            if (idx !== -1) {
+                msgs[idx].isStarred = false;
+                syncActiveChatState();
+                persistActiveChat();
+            }
+        };
+
         // --- Feed Actions ---
         const requestFeedUpdate = () => {
             addConsoleLog("Requesting Feed Update...", "info");
@@ -3215,6 +3765,7 @@ createApp({
             feedPosts, userProfile, contextMenu,
             startSoulLinkChat, openSoulLinkGroupChat, exitSoulLinkChat, sendSoulLinkMessage,
             switchSoulLinkTab, handlePaiYiPai, onMessageContextMenu, handleContextAction, closeContextMenu, requestFeedUpdate,
+            showStarDialog, openStarDialog, starList, deleteStarItem,
             getCharacterName, getCharacterAvatar, getActiveChatName, getActiveChatAvatar, getActiveChatStatus,
             groupMemberOptions, getLocationLabel, getLocationTrajectoryPoints,
             handleHeaderAvatarDblClick,
@@ -3267,6 +3818,7 @@ createApp({
             editingCharacter,
             fileInput,
             characterImportInput,
+            presetImportInput,
             handleAvatarFile,
             newTagInput, 
             addTag, 
@@ -3276,6 +3828,8 @@ createApp({
             triggerAvatarUpload, 
             triggerCharacterImport,
             handleCharacterImport,
+            triggerPresetImport,
+            handlePresetImport,
             deleteCharacter,
             openDossier,
             saveDossier,

@@ -206,7 +206,7 @@
                         <div class="control-group">
                             <label class="group-label">PROFILE SELECT</label>
                             <div class="profile-manager">
-                                <div class="input-screen"><select class="screen-text" v-model="activeProfileId" @change="onProfileSelect"><option v-for="profile in profiles" :key="profile.id" :value="profile.id">{{ profile.name }}</option></select></div>
+                                <div class="input-screen"><select class="screen-text" v-model="activeProfileId" @change="onProfileSelect(); saveProfiles(true)"><option v-for="profile in profiles" :key="profile.id" :value="profile.id">{{ profile.name }}</option></select></div>
                                 <button class="terminal-button icon-only" @click="createNewProfile" title="New Profile">+</button>
                                 <button class="terminal-button icon-only danger" @click="deleteActiveProfile" title="Delete Profile" :disabled="!activeProfile"><i class="fas fa-trash-alt"></i></button>
                             </div>
@@ -217,10 +217,10 @@
                             <div class="control-group">
                                 <label class="group-label">CONNECTION CONFIG</label>
                                 <div class="input-stack">
-                                    <div class="input-screen"><input type="text" class="screen-text" v-model="activeProfile.name" placeholder="Profile Name"></div>
-                                    <div class="input-screen"><input type="text" class="screen-text" v-model="activeProfile.endpoint" placeholder="API Endpoint"></div>
+                                    <div class="input-screen"><input type="text" class="screen-text" v-model="activeProfile.name" placeholder="Profile Name" @input="saveProfiles(true)"></div>
+                                    <div class="input-screen"><input type="text" class="screen-text" v-model="activeProfile.endpoint" placeholder="API Endpoint" @input="saveProfiles(true)"></div>
                                     <div class="input-screen with-icon">
-                                        <input :type="showApiKey ? 'text' : 'password'" class="screen-text" v-model="activeProfile.key" placeholder="API Secret Key">
+                                        <input :type="showApiKey ? 'text' : 'password'" class="screen-text" v-model="activeProfile.key" placeholder="API Secret Key" @input="saveProfiles(true)">
                                         <i class="fas" :class="showApiKey ? 'fa-eye-slash' : 'fa-eye'" @click="showApiKey = !showApiKey"></i>
                                     </div>
                                 </div>
@@ -231,7 +231,7 @@
                                 <label class="group-label">MODEL PARAMETERS</label>
                                 <div class="param-grid">
                                     <div class="model-select-area">
-                                        <div class="input-screen"><select class="screen-text" v-model="activeProfile.model"><option v-if="!availableModels.length" value="">- NOT LOADED -</option><option v-for="model in availableModels" :key="model.id" :value="model.id">{{ model.id }}</option></select></div>
+                                        <div class="input-screen"><select class="screen-text" v-model="activeProfile.model" @change="saveProfiles(true)"><option v-if="!availableModels.length" value="">- NOT LOADED -</option><option v-for="model in availableModels" :key="model.id" :value="model.id">{{ model.id }}</option></select></div>
                                     </div>
                                     <div class="knob-container">
                                         <div class="knob" @click="fetchModels" :class="{ 'fetching': fetchingModels }" title="Fetch Models">
@@ -242,7 +242,7 @@
                                 </div>
                                 <div class="slider-container">
                                     <label class="param-label">TEMPERATURE: {{ activeProfile.temperature }}</label>
-                                    <input type="range" class="crt-slider" min="0" max="1" step="0.1" v-model="activeProfile.temperature">
+                                    <input type="range" class="crt-slider" min="0" max="1" step="0.1" v-model="activeProfile.temperature" @input="saveProfiles(true)">
                                 </div>
                             </div>
                         </template>
@@ -380,6 +380,11 @@
                         <div class="add-icon-small">+</div>
                         <p>添加新预设</p>
                     </div>
+                    <input type="file" ref="presetImportInput" accept=".json" style="display:none" @change="handlePresetImport">
+                    <div class="workshop-list-item add-new-item" @click="triggerPresetImport">
+                        <div class="add-icon-small"><i class="fas fa-file-import"></i></div>
+                        <p>导入预设 (JSON)</p>
+                    </div>
                     <!-- Preset List -->
                     <div class="workshop-list-item-container" 
                          v-for="preset in presets" 
@@ -415,7 +420,7 @@
 </div>
 
         <!-- ================= Other App Placeholders ================= -->
-        <div class="app-content placeholder-app" v-if="['Peek', 'Gallery', 'Diary', 'Pulse', 'Void', 'Vibe', 'Muse', 'Period', 'Nest', 'Mall', 'Chamber', 'Music', 'Arcade', 'Browser', 'Theme', 'System', 'Wallet'].includes(openedApp)">
+        <div class="app-content placeholder-app" v-if="['Peek', 'Gallery', 'Diary', 'Pulse', 'Void', 'Vibe', 'Muse', 'Period', 'Nest', 'Mall', 'Chamber', 'Arcade', 'Browser', 'Theme', 'Wallet'].includes(openedApp)">
             <i @click="closeApp" class="fas fa-power-off close-button" title="Back to Home"></i>
             <i :class="getAppIcon(openedApp)" class="app-icon"></i>
             <h1>{{ openedApp }}</h1>
@@ -425,9 +430,49 @@
     </div>
 
     <!-- ==========================================================================
+         MUSIC APP (Embedded)
+         ========================================================================== -->
+    <div class="app-window music-app" data-app-name="Music" v-if="openedApp === 'Music'">
+        <div class="soullink-header">
+            <div class="soullink-brand">
+                <i class="fas fa-music"></i> Music
+            </div>
+            <div class="soullink-indicator"></div>
+            <button class="app-close-button" @click="closeApp" style="position:static; margin-left: auto;">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="soullink-screen-frame">
+            <div class="soullink-view custom-scroll" style="padding:0;">
+                <iframe src="music.html" class="embedded-app-frame" title="Music App"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================================================
+         SYSTEM APP (Embedded)
+         ========================================================================== -->
+    <div class="app-window system-app" data-app-name="System" v-if="openedApp === 'System'">
+        <div class="soullink-header">
+            <div class="soullink-brand">
+                <i class="fas fa-book"></i> System
+            </div>
+            <div class="soullink-indicator"></div>
+            <button class="app-close-button" @click="closeApp" style="position:static; margin-left: auto;">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="soullink-screen-frame">
+            <div class="soullink-view custom-scroll" style="padding:0;">
+                <iframe src="system.html" class="embedded-app-frame" title="System App"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================================================
          SOULLINK APP
          ========================================================================== -->
-    <div class="app-window soullink-app" data-app-name="SoulLink" v-if="openedApp === 'SoulLink'">
+    <div class="app-window soullink-app" :class="{ offline: isOfflineMode }" data-app-name="SoulLink" v-if="openedApp === 'SoulLink'">
         
         <!-- Header -->
         <div class="soullink-header">
@@ -571,7 +616,7 @@
                 <span v-else-if="msg.transferStatus === 'rejected'" class="status-fail">已退还</span>
             </div>
             <!-- 如果是AI收到的转账，显示操作按钮 -->
-            <div v-if="msg.sender === 'user' && msg.transferStatus === 'pending'" class="transfer-actions">
+            <div v-if="msg.sender === 'ai' && msg.transferStatus === 'pending'" class="transfer-actions">
                 <button class="transfer-btn accept" @click.stop="handleTransferAction(msg, 'accept')">
                     接受
                 </button>
@@ -643,7 +688,7 @@
 </button>
                             
                             <!-- Input -->
-                            <input type="text" class="console-input" v-model="soulLinkInput" @keyup.enter="sendSoulLinkMessage(true)" placeholder="INPUT DATA...">
+                            <input type="text" class="console-input" v-model="soulLinkInput" @keyup.enter="sendSoulLinkMessage(false)" placeholder="INPUT DATA...">
                             
                             <!-- [LOG] Send (No API) -->
                             <div class="btn-log" @click="sendSoulLinkMessage(false)" title="LOG (No Reply)">
@@ -798,7 +843,7 @@
                     </div>
                     
                     <div class="id-menu-list">
-                        <div class="id-menu-item"><i class="fas fa-bookmark"></i> MY ARCHIVES</div>
+                        <div class="id-menu-item" @click="openStarDialog"><i class="fas fa-bookmark"></i> MY ARCHIVES</div>
                         <div class="id-menu-item"><i class="fas fa-history"></i> SIGNAL LOGS</div>
                         <div class="id-menu-item"><i class="fas fa-cog"></i> PROTOCOLS</div>
                     </div>
@@ -887,6 +932,32 @@
             <button class="retro-btn confirm" @click="submitFeedPost" :disabled="isFeedPostSubmitting">
                 {{ isFeedPostSubmitting ? '生成中...' : (feedPostDialogMode === 'edit' ? '保存' : '发布') }}
             </button>
+        </div>
+    </div>
+</div>
+<!-- 收藏弹窗 -->
+<div class="dialog-overlay" v-if="showStarDialog" @click="showStarDialog = false">
+    <div class="retro-dialog" @click.stop>
+        <div class="dialog-header">
+            <i class="fas fa-bookmark"></i> 我的收藏 (ARCHIVES)
+        </div>
+        <div class="dialog-body">
+            <div class="archive-list custom-scroll">
+                <div class="archive-item" v-for="item in starList" :key="item.key">
+                    <div class="archive-meta">
+                        <span class="archive-chat">{{ item.chatName }}</span>
+                        <span class="archive-time">{{ item.time }}</span>
+                    </div>
+                    <div class="archive-text">{{ item.text }}</div>
+                    <div class="archive-actions">
+                        <button class="retro-btn mini danger" @click="deleteStarItem(item)">删除</button>
+                    </div>
+                </div>
+                <div v-if="!starList.length" class="empty-state-text">暂无收藏</div>
+            </div>
+        </div>
+        <div class="dialog-footer">
+            <button class="retro-btn cancel" @click="showStarDialog = false">关闭</button>
         </div>
     </div>
 </div>
@@ -1310,6 +1381,19 @@
                         <label>指令内容 / INSTRUCTION CONTENT</label>
                         <textarea v-model="editingPreset.content" class="retro-input" style="flex: 1; resize: none; line-height: 1.5;" placeholder="System instructions..."></textarea>
                     </div>
+                    <div class="form-group" style="margin-top: 10px;">
+                        <label>子条目 / SEGMENTS <small style="color:#666;">(逐条启用/停用)</small></label>
+                        <div class="segment-list custom-scroll" style="max-height: 180px; border:1px solid #333; padding:8px;">
+                            <div v-for="seg in editingPreset.segments" :key="seg.id" class="segment-item" style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                                <input type="checkbox" v-model="seg.enabled">
+                                <div style="flex:1;">
+                                    <div style="font-weight:bold; color:#ccc;">{{ seg.title }}</div>
+                                    <div style="font-size:12px; color:#888;">{{ (seg.content || '').slice(0, 60) }}{{ (seg.content || '').length > 60 ? '...' : '' }}</div>
+                                </div>
+                            </div>
+                            <div v-if="editingPreset.segments.length === 0" class="empty-state-text">暂无子条目。保存时将以“指令内容”作为单一条目。</div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1457,8 +1541,31 @@
 </div> <!-- THIS IS THE CLOSING TAG FOR #app -->
 
 <!-- Vue & Main Script -->
-<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-<script src="script.js"></script> 
+<script>
+  (function() {
+    if (window.__soulosBooted) return;
+    function loadScript(src, onload, onerror) {
+      var s = document.createElement('script');
+      s.src = src;
+      s.onload = onload;
+      s.onerror = onerror;
+      document.head.appendChild(s);
+    }
+    function boot() {
+      if (window.__soulosBooted) return;
+      if (!window.Vue) return;
+      window.__soulosBooted = true;
+      loadScript('script.js');
+    }
+    function loadFallback() {
+      loadScript('https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js', boot, function() {
+        if (!window.Vue) return;
+        boot();
+      });
+    }
+    loadScript('https://unpkg.com/vue@3/dist/vue.global.js', boot, loadFallback);
+  })();
+</script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js');

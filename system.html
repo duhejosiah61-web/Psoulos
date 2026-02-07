@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SoulOS System Logs</title>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --crt-green: #4aff4a;
+            --crt-dim: #0a2b0a;
+            --bg: #000;
+            --grid: rgba(0, 80, 0, 0.15);
+            --accent: #66ff66;
+            --danger: #ff5555;
+            --font-main: 'VT323', monospace;
+            --font-ui: 'Share Tech Mono', monospace;
+        }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+        html, body { height: 100%; }
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--crt-green);
+            font-family: var(--font-main);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        /* CRT scanlines + grid overlay */
+        .crt-screen {
+            position: relative;
+            flex: 1;
+            background: #050505;
+            overflow: hidden;
+        }
+        .crt-screen::before {
+            content: '';
+            position: absolute; inset: 0;
+            background-image: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                              linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+        .crt-screen::after {
+            content: '';
+            position: absolute; inset: 0;
+            background:
+                linear-gradient(var(--grid) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+            background-size: 10px 10px, 10px 10px;
+            mix-blend-mode: screen;
+            pointer-events: none;
+        }
+        /* Header bar */
+        .sys-header {
+            height: 48px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 0 12px;
+            border-bottom: 1px solid #0f0;
+            background: #000;
+        }
+        .brand {
+            display: flex; align-items: center; gap: 8px;
+            font-family: var(--font-ui); color: var(--accent); letter-spacing: 1px; text-transform: uppercase;
+        }
+        .brand i { color: var(--accent); }
+        .indicator {
+            width: 12px; height: 12px; border-radius: 50%;
+            background: #1a1; box-shadow: 0 0 8px #1f4; margin-left: 4px;
+            animation: blink 1.2s infinite;
+        }
+        @keyframes blink { 50% { opacity: 0.3; } }
+        /* Controls */
+        .controls { display: none; }
+        /* Content area */
+        .content {
+            height: calc(100% - 48px);
+            display: flex; flex-direction: column;
+        }
+        .list-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 12px; border-bottom: 1px dashed #0f0; background: rgba(0,30,0,0.4);
+            font-family: var(--font-ui); color: #9f9;
+        }
+        .list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+        .log-row {
+            display: flex; align-items: center; gap: 12px;
+            padding: 10px 12px;
+            border-bottom: 1px dashed #093;
+            cursor: pointer;
+        }
+        .log-row:hover { background: rgba(0, 255, 0, 0.06); }
+        .ver { font-family: var(--font-ui); color: var(--accent); font-size: 12px; border: 1px solid #093; padding: 2px 6px; }
+        .date { font-family: var(--font-ui); color: #9f9; font-size: 11px; }
+        .title { flex: 1; font-size: 18px; text-shadow: 0 0 6px rgba(74,255,74,0.4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .detail {
+            display: none;
+            padding: 8px 12px 12px 12px;
+            border-left: 2px solid #093;
+            border-right: 2px solid #093;
+            border-bottom: 2px solid #093;
+            background: #020;
+            color: #cf9;
+            font-size: 16px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+        .log-row.expanded + .detail { display: block; }
+        /* Modal */
+        .input, .textarea { display: none; }
+    </style>
+</head>
+<body>
+    <div class="sys-header">
+        <div class="brand"><i class="fas fa-book"></i> SYSTEM LOGS</div>
+        <div class="indicator"></div>
+        <div class="controls"></div>
+    </div>
+    <div class="crt-screen">
+        <div class="content">
+            <div class="list-header">
+                <span>UPDATE STREAM</span>
+                <span id="statsText">1 entry</span>
+            </div>
+            <div id="logList" class="list">
+                <div class="log-row">
+                    <span class="ver">2025.02.08</span>
+                    <span class="date">2025-02-08</span>
+                    <div class="title">Music 1.0、System日志、性能优化</div>
+                    <i class="fas fa-chevron-right" style="color:#0f0;"></i>
+                </div>
+                <div class="detail">
+                    SoulOS 更新日志 - 2025.02.08
+                    
+                    全新应用：Music 1.0
+                    HOME：智能搜索、每日推荐、角色歌单
+                    PLAY：复古唱片机、实时歌词、播放控制、收藏、乐评互动
+                    CHAT：与角色对话，基于聊天推荐音乐，支持收藏
+                    MINE：管理收藏歌单、乐评、对话记录
+                    
+                    SYSTEM
+                    新增更新日志页面，后续版本记录于此
+                    
+                    优化
+                    WORKSHOP 支持导入预设
+                    优化 WORKSHOP UI
+                    提升聊天性能与角色真实感
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.log-row').forEach(row => {
+                row.addEventListener('click', () => {
+                    const expanded = row.classList.toggle('expanded');
+                    const icon = row.querySelector('i');
+                    if (icon) icon.className = expanded ? 'fas fa-chevron-down' : 'fas fa-chevron-right';
+                });
+            });
+        });
+    </script>
+</body>
+</html>
