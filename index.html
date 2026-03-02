@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>简约小手机·欧美白</title>
+    <title>SoulOS · 欧美极简版</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
-    <link rel="manifest" href="manifest.json">
 </head>
 <body>
     <div id="app" v-cloak>
@@ -100,10 +99,6 @@
                    <i class="fas fa-terminal"></i>
                    <span>CONSOLE</span>
                </div>
-               <div class="dock-icon" @click="openApp('hub')">
-                   <i class="fas fa-globe"></i>
-                   <span>HUB</span>
-               </div>
                <div class="dock-icon" @click="openApp('theme')">
                    <i class="fas fa-palette"></i>
                    <span>THEME</span>
@@ -186,44 +181,57 @@
 
                 <!-- 普通聊天 -->
                 <template v-else>
-                    <div class="wechat-messages" ref="chatMessagesContainer">
+                    <div class="wechat-messages" :class="{ 'novel-mode': isOfflineMode }" ref="chatMessagesContainer">
                         <div v-for="msg in currentChatMessages" :key="msg.id" class="message" :class="msg.sender"
                              @contextmenu="onMessageContextMenu($event, msg)"
                              @touchstart="onMessageTouchStart($event, msg)"
                              @touchmove="onMessageTouchMove"
                              @touchend="onMessageTouchEnd">
-                            <!-- 图片消息 -->
-                            <div v-if="msg.messageType === 'image'" class="bubble image-bubble">
-                                <div v-if="!msg.imageUrl" class="image-placeholder">{{ msg.text }}</div>
-                                <img v-else-if="!msg.imageUrl.startsWith('mock:')" :src="msg.imageUrl" class="chat-image" @click="previewImage(msg.imageUrl)">
-                                <div v-else class="mock-image" :style="{ backgroundColor: msg.imageUrl.substring(5) }" @click="previewImage(msg.imageUrl, msg.imageDescription)">
-                                    <div v-if="msg.imageDescription" class="mock-image-desc">{{ msg.imageDescription }}</div>
+                            
+                            <!-- 线下模式：强制小说模式显示 -->
+                            <template v-if="isOfflineMode && !msg.isSystem">
+                                <div class="novel-text">
+                                    <span v-if="msg.sender === 'ai'" class="novel-char-name">「{{ getCharacterName(soulLinkActiveChat) }}」</span>
+                                    <span v-else class="novel-user-name">「我」</span>
+                                    <span class="novel-content">{{ msg.text }}</span>
                                 </div>
-                            </div>
-                            <!-- 位置消息 -->
-                            <div v-else-if="msg.messageType === 'location'" class="bubble location-bubble">
-                                <div class="location-card">
-                                    <div class="location-header">📍 位置</div>
-                                    <div class="location-address">我：{{ msg.userLocation || msg.address || '未知位置' }}</div>
-                                    <div class="location-address" v-if="msg.aiLocation">TA：{{ msg.aiLocation }}</div>
-                                    <div v-if="msg.distance" class="location-distance">距离你 {{ msg.distance }}</div>
+                            </template>
+
+                            <!-- 线上模式：气泡显示 -->
+                            <template v-else>
+                                <!-- 图片消息 -->
+                                <div v-if="msg.messageType === 'image'" class="bubble image-bubble">
+                                    <div v-if="!msg.imageUrl" class="image-placeholder">{{ msg.text }}</div>
+                                    <img v-else-if="!msg.imageUrl.startsWith('mock:')" :src="msg.imageUrl" class="chat-image" @click="previewImage(msg.imageUrl)">
+                                    <div v-else class="mock-image" :style="{ backgroundColor: msg.imageUrl.substring(5) }" @click="previewImage(msg.imageUrl, msg.imageDescription)">
+                                        <div v-if="msg.imageDescription" class="mock-image-desc">{{ msg.imageDescription }}</div>
+                                    </div>
                                 </div>
-                            </div>
-                            <!-- 转账消息 -->
-                            <div v-else-if="msg.messageType === 'transfer'" class="bubble transfer-bubble" :class="{ 'transfer-received': (msg.transferStatus || msg.status) === 'received' }">
-                                <div class="transfer-header">
-                                    <span>💸 转账</span>
-                                    <span class="transfer-status">{{ (msg.transferStatus || msg.status) === 'pending' ? '待收款' : '已收款' }}</span>
+                                <!-- 位置消息 -->
+                                <div v-else-if="msg.messageType === 'location'" class="bubble location-bubble">
+                                    <div class="location-card">
+                                        <div class="location-header">📍 位置</div>
+                                        <div class="location-address">我：{{ msg.userLocation || msg.address || '未知位置' }}</div>
+                                        <div class="location-address" v-if="msg.aiLocation">TA：{{ msg.aiLocation }}</div>
+                                        <div v-if="msg.distance" class="location-distance">距离你 {{ msg.distance }}</div>
+                                    </div>
                                 </div>
-                                <div class="transfer-amount">￥{{ msg.amount }}</div>
-                                <div v-if="msg.note" class="transfer-note">{{ msg.note }}</div>
-                            </div>
-                            <!-- 普通文本 -->
-                            <div v-else class="bubble text-bubble">
-                                <span v-if="msg.isCallMessage" class="call-icon">{{ msg.callIcon }}</span>
-                                {{ msg.text }}
-                            </div>
-                            <div class="message-time">{{ formatTime(msg.timestamp) }}</div>
+                                <!-- 转账消息 -->
+                                <div v-else-if="msg.messageType === 'transfer'" class="bubble transfer-bubble" :class="{ 'transfer-received': (msg.transferStatus || msg.status) === 'received' }">
+                                    <div class="transfer-header">
+                                        <span>💸 转账</span>
+                                        <span class="transfer-status">{{ (msg.transferStatus || msg.status) === 'pending' ? '待收款' : '已收款' }}</span>
+                                    </div>
+                                    <div class="transfer-amount">￥{{ msg.amount }}</div>
+                                    <div v-if="msg.note" class="transfer-note">{{ msg.note }}</div>
+                                </div>
+                                <!-- 普通文本 -->
+                                <div v-else class="bubble text-bubble">
+                                    <span v-if="msg.isCallMessage" class="call-icon">{{ msg.callIcon }}</span>
+                                    {{ msg.text }}
+                                </div>
+                                <div class="message-time">{{ formatTime(msg.timestamp) }}</div>
+                            </template>
                         </div>
                         <div v-if="isAiTyping" class="message ai">
                             <div class="bubble">...</div>
@@ -238,7 +246,6 @@
                         </div>
                     </div>
                     <div class="chat-input-area wechat-input-area">
-                        <button class="action-btn" @click.stop="startVoiceInput"><i class="fas fa-microphone"></i></button>
                         <input type="text" class="chat-input" v-model="soulLinkInput" @input="onInputChange" @keyup.enter="onEnterPress" placeholder="输入消息...">
                         <button class="action-btn" @click.stop="toggleEmojiPanel"><i class="far fa-smile"></i></button>
                         <button class="action-btn" @click.stop="toggleAttachmentPanel"><i class="fas fa-plus"></i></button>
@@ -790,19 +797,24 @@
                         <div class="sleep-indicator">
                             <div class="ecg-monitor">
                                 <svg class="ecg-svg" viewBox="0 0 100 40">
-                                    <path class="ecg-path" d="M0 20 L10 20 L15 5 L20 35 L25 20 L40 20 L45 10 L50 30 L55 20 L70 20 L75 0 L80 40 L85 20 L100 20"></path>
+                                    <path class="ecg-path" :class="{ 'animating': mate.isSleeping }" d="M0 20 L10 20 L15 5 L20 35 L25 20 L40 20 L45 10 L50 30 L55 20 L70 20 L75 0 L80 40 L85 20 L100 20"></path>
                                 </svg>
                                 <div class="heart-rate-mini">{{ mate.heartRate }} BPM</div>
                             </div>
-                            <i class="fas fa-moon sleep-moon"></i>
-                            <span>已进入深睡诱导</span>
-                            <div class="sleep-duration">已持续 {{ Math.floor(mate.sleepDuration / 60) }} 小时 {{ mate.sleepDuration % 60 }} 分钟</div>
+                            <i class="fas fa-moon sleep-moon" :class="{ 'sleeping': mate.isSleeping }"></i>
+                            <span v-if="!mate.isSleeping">准备入睡吗？</span>
+                            <span v-else>已进入深睡诱导</span>
+                            <div class="sleep-duration" v-if="mate.isSleeping">已持续 {{ Math.floor(mate.sleepDuration / 60) }} 小时 {{ mate.sleepDuration % 60 }} 分钟</div>
                         </div>
                         
-                        <!-- Stop Sleep Action -->
+                        <!-- Sleep Actions -->
                         <div class="sleep-actions mt-2">
-                            <button class="glass-button w-100" @click="mate.setMode('focus')" :disabled="mate.isGeneratingSleepDiary">
+                            <button v-if="!mate.isSleeping" class="glass-button w-100" @click="mate.startSleeping">
+                                <i class="fas fa-bed"></i> 开始入睡
+                            </button>
+                            <button v-else class="glass-button w-100" @click="mate.wakeUp" :disabled="mate.isGeneratingSleepDiary">
                                 <i v-if="mate.isGeneratingSleepDiary" class="fas fa-spinner fa-spin"></i>
+                                <i v-else class="fas fa-sun"></i>
                                 {{ mate.isGeneratingSleepDiary ? '正在生成梦境...' : '醒来' }}
                             </button>
                         </div>
@@ -867,6 +879,11 @@
                 <div class="mate-finance">
                     <div class="section-header">
                         <h3 class="section-title">财务状况</h3>
+                        <div class="month-selector">
+                            <button class="month-btn" @click="mate.changeViewMonth(-1)"><i class="fas fa-chevron-left"></i></button>
+                            <span class="current-month">{{ mate.currentViewDate.getFullYear() }}年{{ mate.currentViewDate.getMonth() + 1 }}月</span>
+                            <button class="month-btn" @click="mate.changeViewMonth(1)"><i class="fas fa-chevron-right"></i></button>
+                        </div>
                     </div>
                     <div class="finance-card">
                         <div class="balance-info">
@@ -880,16 +897,55 @@
                             </div>
                         </div>
                         <div class="expense-bubbles">
-                            <div v-for="expense in mate.expenses" :key="expense.id" class="expense-bubble" 
-                                 :style="{ width: Math.max(60, (expense.amount / mate.monthlyBudget) * 500) + 'px', 
-                                           height: Math.max(60, (expense.amount / mate.monthlyBudget) * 500) + 'px' }"
-                                 @click="mate.deleteExpense(expense.id)">
+                            <div v-for="group in mate.groupedExpenses" :key="group.category" class="expense-bubble" 
+                                 :style="{ width: Math.max(70, Math.min(120, (group.amount / mate.monthlyBudget) * 800)) + 'px', 
+                                           height: Math.max(70, Math.min(120, (group.amount / mate.monthlyBudget) * 800)) + 'px' }"
+                                 @click="mate.viewCategoryDetail(group.category)">
                                 <div class="bubble-content">
-                                    <span class="bubble-amount">¥{{ expense.amount }}</span>
-                                    <span class="bubble-category">{{ expense.category }}</span>
+                                    <span class="bubble-amount">¥{{ group.amount }}</span>
+                                    <span class="bubble-category">{{ group.category }}</span>
+                                    <span class="bubble-count" v-if="group.count > 1">{{ group.count }}笔</span>
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Comparison Chart Section -->
+                        <div class="finance-comparison mt-3">
+                            <div class="comparison-header">
+                                <span class="comparison-title">支出趋势对比</span>
+                                <div class="comparison-legend">
+                                    <span class="legend-item current"><i class="fas fa-circle"></i> 本月</span>
+                                    <span class="legend-item prev"><i class="fas fa-circle"></i> 上月</span>
+                                </div>
+                            </div>
+                            <div class="chart-container">
+                                <svg class="comparison-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+                                    <!-- Grid Lines -->
+                                    <line x1="0" y1="25" x2="100" y2="25" class="grid-line" />
+                                    <line x1="0" y1="50" x2="100" y2="50" class="grid-line" />
+                                    <line x1="0" y1="75" x2="100" y2="75" class="grid-line" />
+                                    
+                                    <!-- Prev Month Path -->
+                                    <path :d="mate.comparisonChartData.prevPath" class="chart-line prev-line" />
+                                    <!-- Current Month Path -->
+                                    <path :d="mate.comparisonChartData.currentPath" class="chart-line current-line" />
+                                </svg>
+                                <div class="chart-y-axis">
+                                    <span>¥{{ mate.comparisonChartData.maxAmount }}</span>
+                                    <span>¥0</span>
+                                </div>
+                            </div>
+                            <div class="comparison-summary">
+                                <span v-if="mate.comparisonChartData.currentTotal > mate.comparisonChartData.prevTotal" class="spending-up">
+                                    比上月多支出 ¥{{ mate.comparisonChartData.currentTotal - mate.comparisonChartData.prevTotal }}
+                                </span>
+                                <span v-else-if="mate.comparisonChartData.currentTotal < mate.comparisonChartData.prevTotal" class="spending-down">
+                                    比上月少支出 ¥{{ mate.comparisonChartData.prevTotal - mate.comparisonChartData.currentTotal }}
+                                </span>
+                                <span v-else>支出持平</span>
+                            </div>
+                        </div>
+
                         <div class="finance-actions">
                             <button class="glass-button" @click="mate.showAddExpenseModal = true"><i class="fas fa-plus"></i> 支出</button>
                             <button class="glass-button" @click="mate.promptAiBookkeep(activeProfile)"><i class="fas fa-bolt"></i> AI 记账</button>
@@ -944,6 +1000,29 @@
                 </div>
 
                 <!-- Modals for Mate -->
+                <!-- Category Detail Modal -->
+                <div v-if="mate.showCategoryDetailModal" class="modal-overlay" @click.self="mate.showCategoryDetailModal = false">
+                    <div class="modal-content category-detail-modal">
+                        <div class="modal-header">
+                            <span>{{ mate.selectedCategoryDetail }} - 账单详情</span>
+                            <button class="close-btn" @click="mate.showCategoryDetailModal = false"><i class="fas fa-times"></i></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="detail-list">
+                                <div v-for="item in mate.categoryDetails" :key="item.id" class="detail-item">
+                                    <div class="detail-main">
+                                        <div class="detail-desc">{{ item.description }}</div>
+                                        <div class="detail-date">{{ new Date(item.date).toLocaleDateString() }}</div>
+                                    </div>
+                                    <div class="detail-amount">¥{{ item.amount }}</div>
+                                    <button class="delete-mini-btn" @click="mate.deleteExpense(item.id)"><i class="fas fa-trash"></i></button>
+                                </div>
+                                <div v-if="mate.categoryDetails.length === 0" class="no-data">暂无记录</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Period Settings Modal -->
                 <div v-if="mate.showPeriodSettings" class="modal-overlay" @click.self="mate.showPeriodSettings = false">
                     <div class="modal-content">
@@ -983,6 +1062,9 @@
                             </select>
                             <label class="mt-2">描述</label>
                             <input type="text" v-model="mate.newExpense.description" placeholder="去哪儿花了？">
+                            
+                            <label class="mt-2">日期</label>
+                            <input type="date" v-model="mate.newExpense.date">
                             
                             <label class="mt-2">选择留言角色</label>
                             <select v-model="mate.newExpense.selectedCharacterId">
@@ -1674,8 +1756,11 @@
                 </div>
 
                 <div class="card" v-if="activeProfile">
-                    <div class="card-title">当前配置: {{ activeProfile.name }}</div>
+                    <div class="card-title">当前配置</div>
                     <div class="flex">
+                        <input type="text" placeholder="配置名称" v-model="activeProfile.name">
+                    </div>
+                    <div class="flex mt-2">
                         <input type="text" placeholder="API 地址" v-model="activeProfile.endpoint">
                     </div>
                     <div class="flex mt-2">
@@ -1782,13 +1867,21 @@
                     <textarea v-model="editingCharacter.summary" rows="2"></textarea>
                     <label class="mt-2">人设</label>
                     <textarea v-model="editingCharacter.persona" rows="4"></textarea>
-                    <label class="mt-2">头像 URL</label>
-                    <input v-model="editingCharacter.avatarUrl" placeholder="头像链接">
+                    <label class="mt-2">头像</label>
+                    <div class="flex" style="gap: 8px;">
+                        <input v-model="editingCharacter.avatarUrl" placeholder="头像 URL" style="flex: 1;">
+                        <button class="btn-small" @click="triggerAvatarUpload"><i class="fas fa-image"></i> 相册</button>
+                    </div>
+                    
                     <label class="mt-2">开场白</label>
-                    <textarea v-model="editingCharacter.openingLine" rows="3" placeholder="角色的开场白，首次聊天时会自动发送，多个开场白请用空行分隔"></textarea>
-                    <div class="flex mt-1" style="justify-content: flex-start;">
-                        <button class="btn btn-secondary" @click="addDefaultGreeting" style="margin-right: 8px;">添加默认开场白</button>
-                        <button class="btn btn-secondary" @click="addCustomGreeting">添加自定义开场白</button>
+                    <div v-for="(line, index) in editingCharacter.openingLines" :key="index" class="flex mt-1" style="gap: 8px;">
+                        <input v-model="editingCharacter.openingLines[index]" placeholder="输入开场白内容..." style="flex: 1;">
+                        <button class="btn-small danger" @click="removeOpeningLine(index)" v-if="editingCharacter.openingLines.length > 1"><i class="fas fa-minus"></i></button>
+                    </div>
+                    <button class="btn-small mt-1" @click="addOpeningLine"><i class="fas fa-plus"></i> 添加更多开场白</button>
+                    
+                    <div class="flex mt-2" style="justify-content: flex-start;">
+                        <button class="btn btn-secondary" @click="addDefaultGreeting" style="margin-right: 8px;">随机默认</button>
                     </div>
                     <label class="mt-2">绑定世界书</label>
                     <div v-if="worldbooks.length === 0" class="profile-meta">暂无世界书，请先在工作室创建</div>
@@ -1798,6 +1891,12 @@
                             <input type="checkbox" v-model="editingCharacter.worldbookIds" :value="wb.id">
                         </div>
                     </div>
+
+                    <label class="mt-2">绑定预设 (线下模式使用)</label>
+                    <select v-model="editingCharacter.selectedPresetId">
+                        <option :value="null">不绑定预设</option>
+                        <option v-for="p in presets" :key="p.id" :value="p.id">{{ p.name }}</option>
+                    </select>
                     <div class="flex mt-2" style="justify-content: flex-end;">
                         <button class="btn" @click="deleteCharacter">删除</button>
                         <button class="btn-primary" @click="saveDossier">保存</button>
@@ -1940,16 +2039,5 @@
         </div>
     </div>
     <script type="module" src="main.js"></script>
-        <script type="module" src="main.js"></script>
-
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js')
-            .then(reg => console.log('简约小手机 PWA 注册成功'))
-            .catch(err => console.error('PWA 注册失败:', err));
-        });
-      }
-    </script>
 </body>
 </html>

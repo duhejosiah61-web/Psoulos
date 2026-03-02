@@ -3,7 +3,7 @@
 // == 智能陪伴助手
 // =========================================================================
 
-import { ref, computed, onMounted, onUnmounted } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
+import { ref, computed, onMounted, onUnmounted, watch } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
 
 export function useMate(soulLinkMessages, characters, activeProfile) {
     // --- 状态管理 ---
@@ -22,8 +22,16 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
     // 财务状态
     const monthlyBudget = ref(Number(localStorage.getItem('mate_budget')) || 3000);
     const monthlyExpenses = ref(0);
-    const expenses = ref(JSON.parse(localStorage.getItem('mate_expenses') || '[]'));
+    const expenses = ref(JSON.parse(localStorage.getItem('mate_expenses') || '[]').map(e => ({
+        ...e,
+        date: new Date(e.date)
+    })));
     
+    // 财务历史和详情
+    const currentViewDate = ref(new Date()); // 用于切换查看月份
+    const selectedCategoryDetail = ref(null);
+    const showCategoryDetailModal = ref(false);
+
     // 日历和待办
     const events = ref(JSON.parse(localStorage.getItem('mate_events') || '[]').map(e => ({
         ...e,
@@ -55,27 +63,24 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
             { id: 2, amount: 15, category: '交通', date: new Date(), description: '打车' }
         ];
     }
-    if (events.value.length === 0 && !localStorage.getItem('mate_events')) {
-        events.value = [
-            { id: 1, title: '早会', startTime: new Date(new Date().setHours(9, 0, 0)), endTime: new Date(new Date().setHours(10, 0, 0)), category: 'class' },
-            { id: 2, title: '午休', startTime: new Date(new Date().setHours(12, 0, 0)), endTime: new Date(new Date().setHours(13, 30, 0)), category: 'exercise' }
-        ];
-    }
-    if (todos.value.length === 0 && !localStorage.getItem('mate_todos')) {
-        todos.value = [
-            { id: 1, text: '喝水', completed: false, time: new Date() },
-            { id: 2, text: '站立活动', completed: true, time: new Date() }
-        ];
-    }
     
     // 计算已发生的月度支出
     const calculateMonthlyExpenses = () => {
-        const now = new Date();
+        const viewYear = currentViewDate.value.getFullYear();
+        const viewMonth = currentViewDate.value.getMonth();
         monthlyExpenses.value = expenses.value
-            .filter(e => new Date(e.date).getMonth() === now.getMonth())
+            .filter(e => {
+                const d = new Date(e.date);
+                return d.getFullYear() === viewYear && d.getMonth() === viewMonth;
+            })
             .reduce((sum, e) => sum + e.amount, 0);
     };
     calculateMonthlyExpenses();
+
+    // 监听查看日期变化，重新计算
+    watch(currentViewDate, () => {
+        calculateMonthlyExpenses();
+    });
     
     // 运动状态
     const steps = ref(Number(localStorage.getItem('mate_steps')) || 5432);
@@ -94,13 +99,20 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
     // 睡眠状态
     const sleepDuration = ref(Number(localStorage.getItem('mate_sleep_duration')) || 0); // 分钟
     const sleepQuality = ref('good');
-    const sleepStartTime = ref(null);
+    const sleepStartTime = ref(localStorage.getItem('mate_sleep_start_time') ? new Date(localStorage.getItem('mate_sleep_start_time')) : null);
+    const isSleeping = ref(localStorage.getItem('mate_is_sleeping') === 'true');
     
     // UI 状态
     const showAddExpenseModal = ref(false);
     const showAddTodoModal = ref(false);
     const showAddEventModal = ref(false);
-    const newExpense = ref({ amount: '', category: '餐饮', description: '', selectedCharacterId: null });
+    const newExpense = ref({ 
+        amount: '', 
+        category: '餐饮', 
+        description: '', 
+        selectedCharacterId: null,
+        date: new Date().toISOString().split('T')[0] 
+    });
     const isGeneratingComment = ref(false);
     const newTodo = ref({ text: '', time: '' });
     const newEvent = ref({ title: '', startTime: '', endTime: '', category: 'class' });
@@ -119,6 +131,9 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
         localStorage.setItem('mate_target_steps', targetSteps.value.toString());
         localStorage.setItem('mate_sleep_duration', sleepDuration.value.toString());
         localStorage.setItem('mate_sleep_diaries', JSON.stringify(sleepDiaries.value));
+        localStorage.setItem('mate_is_sleeping', isSleeping.value.toString());
+        if (sleepStartTime.value) localStorage.setItem('mate_sleep_start_time', sleepStartTime.value.toISOString());
+        else localStorage.removeItem('mate_sleep_start_time');
         if (lastPeriodDate.value) localStorage.setItem('mate_last_period', lastPeriodDate.value.toISOString());
         localStorage.setItem('mate_cycle_length', cycleLength.value.toString());
         localStorage.setItem('mate_period_days', periodLength.value.toString());
@@ -196,6 +211,113 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
     
     const monthlyBalance = computed(() => monthlyBudget.value - monthlyExpenses.value);
     
+    const groupedExpenses = computed(() => {
+        const viewYear = currentViewDate.value.getFullYear();
+        const viewMonth = currentViewDate.value.getMonth();
+        
+        const filteredExpenses = expenses.value.filter(e => {
+            const d = new Date(e.date);
+            return d.getFullYear() === viewYear && d.getMonth() === viewMonth;
+        });
+        
+        const groups = {};
+        filteredExpenses.forEach(e => {
+            if (!groups[e.category]) {
+                groups[e.category] = {
+                    category: e.category,
+                    amount: 0,
+                    count: 0
+                };
+            }
+            groups[e.category].amount += e.amount;
+            groups[e.category].count += 1;
+        });
+        
+        return Object.values(groups).sort((a, b) => b.amount - a.amount);
+    });
+
+    const categoryDetails = computed(() => {
+        if (!selectedCategoryDetail.value) return [];
+        const viewYear = currentViewDate.value.getFullYear();
+        const viewMonth = currentViewDate.value.getMonth();
+        
+        return expenses.value
+            .filter(e => {
+                const d = new Date(e.date);
+                return d.getFullYear() === viewYear && 
+                       d.getMonth() === viewMonth && 
+                       e.category === selectedCategoryDetail.value;
+            })
+            .sort((a, b) => b.date - a.date);
+    });
+
+    const comparisonChartData = computed(() => {
+        const viewYear = currentViewDate.value.getFullYear();
+        const viewMonth = currentViewDate.value.getMonth();
+        
+        // 准备上个月的日期
+        const prevMonthDate = new Date(viewYear, viewMonth - 1, 1);
+        const prevYear = prevMonthDate.getFullYear();
+        const prevMonth = prevMonthDate.getMonth();
+
+        // 获取当月和上个月的支出
+        const currentExpenses = expenses.value.filter(e => {
+            const d = new Date(e.date);
+            return d.getFullYear() === viewYear && d.getMonth() === viewMonth;
+        });
+        const prevExpenses = expenses.value.filter(e => {
+            const d = new Date(e.date);
+            return d.getFullYear() === prevYear && d.getMonth() === prevMonth;
+        });
+
+        // 计算每日累计支出 (1-31日)
+        const getDailyCumulative = (monthExpenses, year, month) => {
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const dailyData = new Array(daysInMonth).fill(0);
+            
+            monthExpenses.forEach(e => {
+                // 确保 e.date 是有效的 Date 对象
+                const d = e.date instanceof Date ? e.date : new Date(e.date);
+                if (d.getFullYear() === year && d.getMonth() === month) {
+                    const day = d.getDate();
+                    if (day <= daysInMonth) {
+                        dailyData[day - 1] += e.amount;
+                    }
+                }
+            });
+
+            let cumulative = 0;
+            return dailyData.map(amount => {
+                cumulative += amount;
+                return cumulative;
+            });
+        };
+
+        const currentLine = getDailyCumulative(currentExpenses, viewYear, viewMonth);
+        const prevLine = getDailyCumulative(prevExpenses, prevYear, prevMonth);
+
+        // 归一化用于 SVG 绘图 (0-100)
+        const maxVal = Math.max(...currentLine, ...prevLine, 100);
+        const scale = (val) => 100 - (val / maxVal * 100);
+
+        const buildPath = (lineData) => {
+            if (lineData.length === 0) return '';
+            const stepX = 100 / (lineData.length - 1 || 1);
+            return lineData.map((val, i) => `${i * stepX},${scale(val)}`).join(' L ');
+        };
+
+        const currentPath = buildPath(currentLine);
+        const prevPath = buildPath(prevLine);
+
+        return {
+            currentPath: currentPath ? 'M ' + currentPath : '',
+            prevPath: prevPath ? 'M ' + prevPath : '',
+            maxAmount: Math.round(maxVal),
+            currentTotal: currentLine[currentLine.length - 1] || 0,
+            prevTotal: prevLine[prevLine.length - 1] || 0
+        };
+    });
+
     const containerClass = computed(() => {
         const hour = currentHour.value;
         if (hour >= 6 && hour < 12) return 'morning';
@@ -342,6 +464,17 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
         saveToLocal();
     };
 
+    const changeViewMonth = (offset) => {
+        const d = new Date(currentViewDate.value);
+        d.setMonth(d.getMonth() + offset);
+        currentViewDate.value = d;
+    };
+
+    const viewCategoryDetail = (category) => {
+        selectedCategoryDetail.value = category;
+        showCategoryDetailModal.value = true;
+    };
+
     const submitExpense = async (allCharacters, activeProfileObj) => {
         if (!newExpense.value.amount) return;
         
@@ -350,7 +483,7 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
             id: expenseId,
             amount: Number(newExpense.value.amount),
             category: newExpense.value.category,
-            date: new Date(),
+            date: new Date(newExpense.value.date),
             description: newExpense.value.description,
             comment: null
         };
@@ -380,7 +513,13 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
         calculateMonthlyExpenses();
         saveToLocal();
         showAddExpenseModal.value = false;
-        newExpense.value = { amount: '', category: '餐饮', description: '', selectedCharacterId: null };
+        newExpense.value = { 
+            amount: '', 
+            category: '餐饮', 
+            description: '', 
+            selectedCharacterId: null,
+            date: new Date().toISOString().split('T')[0] 
+        };
     };
 
     const toggleTodo = (todoId) => {
@@ -521,7 +660,8 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
                     amount: result.amount,
                     category: result.category || '其他',
                     description: result.description || text,
-                    selectedCharacterId: null
+                    selectedCharacterId: null,
+                    date: new Date().toISOString().split('T')[0]
                 };
                 showAddExpenseModal.value = true;
             }
@@ -639,20 +779,36 @@ ${recentMessages || '最近没有聊天。'}
     };
 
     const setMode = async (mode) => {
-        if (currentMode.value === 'sleep' && mode !== 'sleep') {
-            // 停止睡眠模式，生成日记
-            const duration = Math.floor((new Date() - (sleepStartTime.value || new Date())) / (1000 * 60));
-            sleepDuration.value = duration;
-            if (selectedMateCharacterId.value && activeProfile.value) {
-                await generateSleepDiary();
-            }
-        }
-        
         if (mode === 'sleep') {
-            sleepStartTime.value = new Date();
+            // 进入睡眠模式，但不代表立即“入睡”
+            // 只是切换界面
+        } else if (currentMode.value === 'sleep' && isSleeping.value) {
+            // 如果从正在入睡状态切换走，强制醒来
+            await wakeUp();
         }
 
         currentMode.value = mode;
+        saveToLocal();
+    };
+
+    const startSleeping = () => {
+        isSleeping.value = true;
+        sleepStartTime.value = new Date();
+        saveToLocal();
+    };
+
+    const wakeUp = async () => {
+        if (!isSleeping.value) return;
+        
+        const duration = Math.floor((new Date() - (sleepStartTime.value || new Date())) / (1000 * 60));
+        sleepDuration.value = duration;
+        
+        if (selectedMateCharacterId.value && activeProfile.value) {
+            await generateSleepDiary();
+        }
+        
+        isSleeping.value = false;
+        sleepStartTime.value = null;
         saveToLocal();
     };
     
@@ -688,6 +844,12 @@ ${recentMessages || '最近没有聊天。'}
         monthlyBudget,
         monthlyExpenses,
         monthlyBalance,
+        groupedExpenses,
+        currentViewDate,
+        selectedCategoryDetail,
+        showCategoryDetailModal,
+        categoryDetails,
+        comparisonChartData,
         expenses,
         events,
         todos,
@@ -698,6 +860,8 @@ ${recentMessages || '最近没有聊天。'}
         exerciseTypes,
         clockHands,
         currentExerciseIcon,
+        isSleeping,
+        sleepStartTime,
         sleepDuration,
         sleepQuality,
         sleepDiaries,
@@ -737,9 +901,13 @@ ${recentMessages || '最近没有聊天。'}
         promptUpdateBudget,
         promptAiBookkeep,
         setPeriodStartDate,
+        changeViewMonth,
+        viewCategoryDetail,
         getCurrentStatus,
         getGreeting,
         setMode,
+        startSleeping,
+        wakeUp,
         aiBookkeep,
         generatePeriodicAIComment,
         generateSleepDiary

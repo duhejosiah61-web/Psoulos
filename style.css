@@ -148,6 +148,21 @@ body { font-family: 'Inter', sans-serif; background: #f2f2f7; color: #333; overf
     padding: 20px;
     margin-bottom: 20px;
     transition: all 0.3s ease;
+    width: 100%;
+    overflow: hidden;
+}
+
+.card .flex {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.card input[type="text"],
+.card select {
+    flex: 1;
+    min-width: 0;
 }
 
 .card:hover {
@@ -361,6 +376,8 @@ body { font-family: 'Inter', sans-serif; background: #f2f2f7; color: #333; overf
     overflow-y: auto;
     padding: 16px;
     -webkit-overflow-scrolling: touch;
+    width: 100%;
+    max-width: 100vw;
 }
 
 /* SoulLink Styles */
@@ -1062,6 +1079,58 @@ body { font-family: 'Inter', sans-serif; background: #f2f2f7; color: #333; overf
 .save-button:active {
     transform: translateY(0);
     box-shadow: 0 2px 8px rgba(7, 193, 96, 0.3);
+}
+
+@font-face {
+    font-family: 'NovelFont';
+    src: url('https://image.uglycat.cc/ldyvzq.ttf');
+}
+
+/* Novel Mode Styles */
+.wechat-messages.novel-mode {
+    background-color: #fdf6e3;
+    background-image: linear-gradient(#e1d9c1 1px, transparent 1px);
+    background-size: 100% 36px; /* 横线间距与行高匹配 */
+    padding: 24px;
+    padding-top: 60px;
+    padding-bottom: 120px; /* 增加底部间距，防止被输入栏遮挡 */
+    position: relative;
+}
+
+.wechat-messages.novel-mode .message {
+    max-width: 100%;
+    margin-bottom: 0; /* 配合横线背景，使用行高控制间距 */
+    background: none;
+    box-shadow: none;
+    backdrop-filter: none;
+    padding: 0;
+    display: block;
+}
+
+.novel-text {
+    font-family: 'NovelFont', "Noto Serif SC", serif;
+    font-size: 18px;
+    line-height: 36px; /* 行高必须与 background-size 匹配 */
+    color: #34495e;
+    text-align: justify;
+    word-break: break-all;
+    white-space: pre-wrap;
+}
+
+.novel-char-name, .novel-user-name {
+    font-weight: 700;
+    color: #8b4513;
+    margin-right: 8px;
+    display: inline-block;
+}
+
+.novel-content {
+    display: inline;
+}
+
+/* Offline Mode Specifics */
+.is-offline-mode .bubble {
+    border: 1px dashed #999;
 }
 
 /* Submenu Styles */
@@ -3217,6 +3286,9 @@ body { font-family: 'Inter', sans-serif; background: #f2f2f7; color: #333; overf
     stroke-width: 2;
     stroke-dasharray: 200;
     stroke-dashoffset: 200;
+}
+
+.ecg-path.animating {
     animation: draw-ecg 2s linear infinite;
 }
 
@@ -3234,9 +3306,16 @@ body { font-family: 'Inter', sans-serif; background: #f2f2f7; color: #333; overf
 }
 
 .sleep-moon {
-    font-size: 40px;
-    color: #f1c40f;
+    font-size: 48px;
+    color: rgba(241, 196, 15, 0.3);
     margin-bottom: 12px;
+    transition: all 0.5s ease;
+}
+
+.sleep-moon.sleeping {
+    color: #f1c40f;
+    text-shadow: 0 0 20px rgba(241, 196, 15, 0.5);
+    animation: float 3s ease-in-out infinite;
 }
 
 /* Analog Clock Rotations (Removed timer-circle) */
@@ -3597,6 +3676,115 @@ body { font-family: 'Inter', sans-serif; background: #f2f2f7; color: #333; overf
     color: white;
 }
 
+/* Month Selector */
+.month-selector {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.3);
+    padding: 4px 12px;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.month-btn {
+    background: none;
+    border: none;
+    color: #333;
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.month-btn:hover {
+    transform: scale(1.2);
+}
+
+.current-month {
+    font-size: 13px;
+    font-weight: 700;
+    color: #333;
+    min-width: 80px;
+    text-align: center;
+}
+
+.mate-container.night .month-btn,
+.mate-container.night .current-month {
+    color: white;
+}
+
+/* Category Detail Modal */
+.category-detail-modal {
+    max-width: 320px;
+}
+
+.detail-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.detail-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 12px;
+    gap: 12px;
+}
+
+.mate-container.night .detail-item {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.detail-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.detail-desc {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.detail-date {
+    font-size: 11px;
+    color: #888;
+}
+
+.detail-amount {
+    font-size: 15px;
+    font-weight: 700;
+    color: #ff4757;
+}
+
+.delete-mini-btn {
+    background: none;
+    border: none;
+    color: #ff4757;
+    cursor: pointer;
+    padding: 8px;
+    opacity: 0.3;
+    transition: opacity 0.2s;
+}
+
+.delete-mini-btn:hover {
+    opacity: 1;
+}
+
+.mate-container.night .detail-desc { color: white; }
+.mate-container.night .detail-date { color: rgba(255,255,255,0.5); }
+
 /* Timeline Section */
 .mate-timeline {
     margin-bottom: 24px;
@@ -3913,6 +4101,13 @@ body { font-family: 'Inter', sans-serif; background: #f2f2f7; color: #333; overf
     color: #666;
 }
 
+.bubble-count {
+    display: block;
+    font-size: 8px;
+    color: #999;
+    margin-top: 2px;
+}
+
 .mate-container.night .expense-bubble {
     background: rgba(255, 255, 255, 0.1);
     border-color: rgba(255, 255, 255, 0.2);
@@ -3926,10 +4121,120 @@ body { font-family: 'Inter', sans-serif; background: #f2f2f7; color: #333; overf
     color: rgba(255, 255, 255, 0.8);
 }
 
+.mate-container.night .bubble-count {
+    color: rgba(255, 255, 255, 0.5);
+}
+
 .finance-actions {
     display: flex;
     gap: 12px;
 }
+
+/* Finance Comparison Chart */
+.finance-comparison {
+    background: rgba(255, 255, 255, 0.4);
+    border-radius: 16px;
+    padding: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.mate-container.night .finance-comparison {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.comparison-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.comparison-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #333;
+}
+
+.mate-container.night .comparison-title {
+    color: white;
+}
+
+.comparison-legend {
+    display: flex;
+    gap: 8px;
+}
+
+.legend-item {
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.legend-item.current { color: #667eea; }
+.legend-item.prev { color: rgba(102, 126, 234, 0.5); }
+
+.chart-container {
+    height: 120px;
+    position: relative;
+    margin-bottom: 12px;
+}
+
+.comparison-svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.grid-line {
+    stroke: rgba(0, 0, 0, 0.08);
+    stroke-width: 1;
+}
+
+.mate-container.night .grid-line {
+    stroke: rgba(255, 255, 255, 0.1);
+}
+
+.chart-line {
+    fill: none;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: all 0.5s ease;
+}
+
+.current-line {
+    stroke: #667eea;
+    filter: drop-shadow(0 2px 4px rgba(102, 126, 234, 0.3));
+}
+
+.prev-line {
+    stroke: rgba(102, 126, 234, 0.4);
+    stroke-dasharray: 6 4;
+}
+
+.chart-y-axis {
+    position: absolute;
+    left: -5px;
+    top: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    font-size: 8px;
+    color: #999;
+    pointer-events: none;
+}
+
+.comparison-summary {
+    font-size: 12px;
+    font-weight: 600;
+    text-align: center;
+}
+
+.spending-up { color: #ff4757; }
+.spending-down { color: #07C160; }
 
 .finance-actions .glass-button {
     flex: 1;
@@ -3939,8 +4244,32 @@ body { font-family: 'Inter', sans-serif; background: #f2f2f7; color: #333; overf
     gap: 8px;
 }
 
-/* Responsive Design */
+/* Global Responsive Adjustments */
 @media (max-width: 480px) {
+    .modal-content {
+        width: 92%;
+        max-width: 360px;
+        padding: 16px;
+    }
+    
+    .chat-input-area {
+        padding: 8px 12px;
+        gap: 8px;
+    }
+    
+    .bubble {
+        max-width: 85%;
+    }
+
+    .card {
+        padding: 16px;
+    }
+
+    .console .profile-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
     .mate-content {
         padding: 16px;
     }

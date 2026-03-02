@@ -172,11 +172,29 @@ export function setupApp() {
                 tags: ['新角色'],
                 persona: '',
                 kvData: [],
-                openingLine: '',
+                openingLines: [''],
                 userPersona: '',
-                worldbookId: ''
+                worldbookIds: [],
+                selectedPresetId: null
             };
             characters.value.unshift(newCharacter); 
+        };
+
+        const triggerAvatarUpload = () => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (file && editingCharacter.value) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        editingCharacter.value.avatarUrl = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+            input.click();
         };
 
         const triggerCharacterImport = () => {
@@ -968,12 +986,6 @@ export function setupApp() {
             }
         };
 
-        const triggerAvatarUpload = () => {
-            if (fileInput.value) {
-                fileInput.value.click();
-            }
-        };
-
         const handleAvatarFile = (event) => {
             const file = event.target.files[0];
             if (file && editingCharacter.value) {
@@ -1003,13 +1015,39 @@ export function setupApp() {
             if (!copy.worldbookIds) copy.worldbookIds = [];
             if (!copy.internalName) copy.internalName = copy.name || `Char_${copy.id}`;
             if (!copy.nickname) copy.nickname = copy.name || '未命名';
-            if (!copy.openingLine) copy.openingLine = '';
             if (!copy.userPersona) copy.userPersona = '';
+            if (!copy.selectedPresetId) copy.selectedPresetId = null;
+            
+            // 兼容旧数据：将 openingLine (string) 转换为 openingLines (array)
+            if (copy.openingLine && (!copy.openingLines || copy.openingLines.length === 0)) {
+                copy.openingLines = copy.openingLine.split('\n\n').filter(l => l.trim());
+            }
+            if (!copy.openingLines || copy.openingLines.length === 0) {
+                copy.openingLines = [''];
+            }
             editingCharacter.value = copy;
+        };
+
+        const addOpeningLine = () => {
+            if (editingCharacter.value) {
+                editingCharacter.value.openingLines.push('');
+            }
+        };
+
+        const removeOpeningLine = (index) => {
+            if (editingCharacter.value && editingCharacter.value.openingLines.length > 1) {
+                editingCharacter.value.openingLines.splice(index, 1);
+            }
         };
 
         const saveDossier = () => {
             if (!editingCharacter.value) return;
+            
+            // 将 openingLines 合并回 openingLine 以保持兼容性
+            editingCharacter.value.openingLine = editingCharacter.value.openingLines
+                .filter(l => l.trim())
+                .join('\n\n');
+                
             editingCharacter.value.name = editingCharacter.value.nickname || editingCharacter.value.internalName || '未命名角色';
             const index = characters.value.findIndex(c => c.id === editingCharacter.value.id);
             if (index !== -1) {
@@ -1359,7 +1397,10 @@ export function setupApp() {
         const soulLinkInput = ref('');
         const soulLinkReplyTarget = ref(null);
         const soulLinkMessages = ref({});
+        const novelMode = ref(localStorage.getItem('soulos_novel_mode') === 'true');
         
+        watch(novelMode, (val) => localStorage.setItem('soulos_novel_mode', val));
+
         // Initialize App Hooks with Dependencies
         const hub = reactive(useHub(activeProfile));
         const mate = reactive(useMate(soulLinkMessages, characters, activeProfile));
@@ -2099,7 +2140,7 @@ export function setupApp() {
                     
                     systemPrompt += `# 你是谁\n`;
                     systemPrompt += `你的名字是【${charName}】。\n`;
-                    systemPrompt += `${char.persona}\n\n`;
+                    systemPrompt += `${replaceUserPlaceholder(char.persona)}\n\n`;
                     
                     if (char.worldbookId) {
                         const linkedWorldbook = worldbooks.value.find(wb => wb.id === char.worldbookId);
@@ -2108,7 +2149,7 @@ export function setupApp() {
                             systemPrompt += `以下是关于你所在世界的重要设定，你必须在对话中遵循这些设定：\n\n`;
                             linkedWorldbook.entries.forEach(entry => {
                                 if (entry.keyword && entry.content) {
-                                    systemPrompt += `[${entry.keyword}]\n${entry.content}\n\n`;
+                                    systemPrompt += `[${entry.keyword}]\n${replaceUserPlaceholder(entry.content)}\n\n`;
                                 }
                             });
                             systemPrompt += `--- 世界观设定结束 ---\n\n`;
@@ -2127,7 +2168,7 @@ export function setupApp() {
                     systemPrompt += `9. 如果要给对方转账，请用“[转账] 金额 备注(可选)”格式，并单独成一条消息。\n`;
 
                     if (char.openingLine && history.length === 1) {
-                        systemPrompt += `# 开场\n这是你们的第一次对话。你可以主动打招呼：\n${char.openingLine}\n\n`;
+                        systemPrompt += `# 开场\n这是你们的第一次对话。你可以主动打招呼：\n${replaceUserPlaceholder(char.openingLine)}\n\n`;
                     }
 
                     if (replyContextForPrompt) {
@@ -2282,8 +2323,19 @@ export function setupApp() {
             }
         };
         
+        const replaceUserPlaceholder = (text) => {
+            if (!text) return '';
+            const name = userIdentity.value || '用户';
+            return text.replace(/\{\{user\}\}/g, name);
+        };
+
         const triggerSoulLinkAiReply = async () => {
             if (!soulLinkActiveChat.value) return;
+
+            const isGroupChat = soulLinkActiveChatType.value === 'group';
+            const char = isGroupChat ? null : characters.value.find(c => c.id === soulLinkActiveChat.value);
+            
+            // 线上/线下模式统一调用 API
             if (!activeProfile.value) {
                 pushMessageToActiveChat({
                     id: Date.now() + 1,
@@ -2294,10 +2346,10 @@ export function setupApp() {
                 });
                 return;
             }
-            const isGroupChat = soulLinkActiveChatType.value === 'group';
+            
             const activeGroup = isGroupChat ? activeGroupChat.value : null;
             if (isGroupChat && !activeGroup) return;
-            const char = isGroupChat ? null : characters.value.find(c => c.id === soulLinkActiveChat.value);
+            
             const history = isGroupChat ? (activeGroup.history || []) : (soulLinkMessages.value[soulLinkActiveChat.value] || []);
             const pendingUserMessages = getPendingUserMessages(history);
             if (pendingUserMessages.length === 0) {
@@ -2336,30 +2388,62 @@ export function setupApp() {
                 systemPrompt = `你正在通过 SoulLink 和朋友聊天。\n\n`;
                 systemPrompt += `# 你是谁\n`;
                 systemPrompt += `你的名字是【${charName}】。\n`;
-                systemPrompt += `${char.persona}\n\n`;
-                if (char.worldbookId) {
-                    const linkedWorldbook = worldbooks.value.find(wb => wb.id === char.worldbookId);
-                    if (linkedWorldbook && linkedWorldbook.entries && linkedWorldbook.entries.length > 0) {
-                        systemPrompt += `# 世界观与背景知识（必须严格遵守）\n`;
-                        systemPrompt += `以下是关于你所在世界的重要设定，你必须在对话中遵循这些设定：\n\n`;
-                        linkedWorldbook.entries.forEach(entry => {
-                            if (entry.keyword && entry.content) {
-                                systemPrompt += `[${entry.keyword}]\n${entry.content}\n\n`;
+                systemPrompt += `${replaceUserPlaceholder(char.persona)}\n\n`;
+
+                // 线下模式：读取预设并注入 Prompt
+                if (isOfflineMode.value) {
+                    systemPrompt += `# 【当前模式：线下剧情/小说模式】\n`;
+                    systemPrompt += `1. 你现在处于长篇叙事/小说模式，不再是短促的即时通讯聊天。\n`;
+                    systemPrompt += `2. 【最高优先级】请根据当前的剧情发展，给出富有文学性、描述详尽的长篇回复（建议每次回复在 300-800 字左右，甚至更长，取决于预设内容）。\n`;
+                    systemPrompt += `3. 你的回复应包含大量的环境描写、心理描写、动作描写，而不仅仅是对话。你可以像写小说一样展开叙述。\n\n`;
+
+                    if (char.selectedPresetId) {
+                        const preset = presets.value.find(p => p.id === char.selectedPresetId);
+                        if (preset && preset.segments && preset.segments.length > 0) {
+                            const enabledSegments = preset.segments.filter(s => s.enabled);
+                            if (enabledSegments.length > 0) {
+                                systemPrompt += `# 核心剧情参考 (必须严格遵循风格与内容)\n`;
+                                enabledSegments.forEach((seg, idx) => {
+                                    systemPrompt += `[剧情片段${idx + 1}: ${seg.title || '未命名'}]\n${replaceUserPlaceholder(seg.content || seg.text)}\n\n`;
+                                });
+                                systemPrompt += `要求：参考上述片段中的文字风格、描写细腻程度和叙事节奏，为用户续写当前的剧情。你的输出应该是一段完整的、富有画面感的小说段落。\n\n`;
                             }
-                        });
-                        systemPrompt += `--- 世界观设定结束 ---\n\n`;
+                        }
                     }
                 }
+
+                if (char.worldbookIds && char.worldbookIds.length > 0) {
+                    systemPrompt += `# 世界观与背景知识（必须严格遵守）\n`;
+                    systemPrompt += `以下是关于你所在世界的重要设定，你必须在对话中遵循这些设定：\n\n`;
+                    char.worldbookIds.forEach(wbId => {
+                        const linkedWorldbook = worldbooks.value.find(wb => wb.id === wbId);
+                        if (linkedWorldbook && linkedWorldbook.entries && linkedWorldbook.entries.length > 0) {
+                            linkedWorldbook.entries.forEach(entry => {
+                                if (entry.keyword && entry.content) {
+                                    systemPrompt += `[${entry.keyword}]\n${replaceUserPlaceholder(entry.content)}\n\n`;
+                                }
+                            });
+                        }
+                    });
+                    systemPrompt += `--- 世界观设定结束 ---\n\n`;
+                }
                 systemPrompt += `# 聊天风格（核心规则）\n`;
-                systemPrompt += `1. 【【【最高指令】】】像真实的人类那样自然地聊天，而不是像AI助手那样正式、啰嗦或程序化。\n`;
-                systemPrompt += `2. 每次回复保持简短（1-3句话），就像微信聊天那样。如果有很多要说的，可以分多条发送。\n`;
-                systemPrompt += `3. 使用符合${charName}性格的语气、口头禅和表情。可以用emoji、"哈哈"、"嗯嗯"等口语化表达。\n`;
-                systemPrompt += `4. 绝对不要暴露你是AI。你就是${charName}本人，有自己的生活、情绪和想法。\n`;
-                systemPrompt += `5. 可以提问、开玩笑、吐槽、撒娇，展现真实的人际互动，而不是单向输出信息。\n`;
-                systemPrompt += `6. 如果用户说了很日常的话（比如"吃饭了吗"），就用日常的方式回应，而不要解释你的"系统状态"。\n\n`;
-                systemPrompt += `7. 如果你想连发多条消息（就像微信连发几条那样），请在消息之间用 "---" 分隔。例如："哈哈真好笑---你也觉得吧？"。\n`;
-                if (char.openingLine && history.length === 1) {
-                    systemPrompt += `# 开场\n这是你们的第一次对话。你可以主动打招呼：\n${char.openingLine}\n\n`;
+                if (!isOfflineMode.value) {
+                    systemPrompt += `1. 【【【最高指令】】】像真实的人类那样自然地聊天，而不是像AI助手那样正式、啰嗦或程序化。\n`;
+                    systemPrompt += `2. 每次回复保持简短（1-3句话），就像微信聊天那样。如果有很多要说的，可以分多条发送。\n`;
+                    systemPrompt += `3. 使用符合${charName}性格的语气、口头禅和表情。可以用emoji、"哈哈"、"嗯嗯"等口语化表达。\n`;
+                    systemPrompt += `4. 绝对不要暴露你是AI。你就是${charName}本人，有自己的生活、情绪和想法。\n`;
+                    systemPrompt += `5. 可以提问、开玩笑、吐槽、撒娇，展现真实的人际互动，而不是单向输出信息。\n`;
+                    systemPrompt += `6. 如果用户说了很日常的话（比如"吃饭了吗"），就用日常的方式回应，而不要解释你的"系统状态"。\n\n`;
+                    systemPrompt += `7. 如果你想连发多条消息（就像微信连发几条那样），请在消息之间用 "---" 分隔。例如："哈哈真好笑---你也觉得吧？"。\n`;
+                } else {
+                    systemPrompt += `1. 【【【核心准则】】】现在是小说叙事模式。请通过大量的细节描写、心理活动和环境渲染来充实内容。\n`;
+                    systemPrompt += `2. 你的输出应该是一段流畅的叙述，而不是碎片化的聊天气泡。\n`;
+                    systemPrompt += `3. 请根据用户的输入，合理安排${charName}的行为和对白，确保内容长度符合“众生相”般的文学深度。\n\n`;
+                }
+                if (char.openingLines && char.openingLines.length > 0 && history.length === 1) {
+                    const replacedOpeningLines = char.openingLines.map(line => replaceUserPlaceholder(line));
+                    systemPrompt += `# 开场\n这是你们的第一次对话。你可以从以下开场白中选择一个打招呼：\n${replacedOpeningLines.join('\n')}\n\n`;
                 }
                 systemPrompt += `现在，请以${charName}的身份，自然地回复对方。记住：简短、真实、有人情味。`;
             } else {
@@ -3546,17 +3630,20 @@ export function setupApp() {
             if (!soulLinkActiveChat.value) return;
 
             const activeCharacter = characters.value.find(c => c.id === soulLinkActiveChat.value);
-            if (activeCharacter && activeCharacter.openingLine) {
-                // 解析开场白，支持多个开场白
-                const greetings = activeCharacter.openingLine.split('\n\n').filter(g => g.trim());
-                // 格式化开场白，添加标题
-                availableGreetings.value = greetings.map((greeting, index) => {
-                    // 尝试从开场白的第一行提取标题
-                    const lines = greeting.split('\n');
-                    const title = lines[0].length < 50 ? lines[0] : `开场白 ${index + 1}`;
-                    const content = greeting;
-                    return { title, content };
-                });
+            if (activeCharacter) {
+                // 如果没有 openingLines 但有 openingLine，进行迁移
+                if (activeCharacter.openingLine && (!activeCharacter.openingLines || activeCharacter.openingLines.length === 0)) {
+                    activeCharacter.openingLines = activeCharacter.openingLine.split('\n\n').filter(l => l.trim());
+                }
+                
+                if (activeCharacter.openingLines && activeCharacter.openingLines.length > 0) {
+                    availableGreetings.value = activeCharacter.openingLines.map((greeting, index) => {
+                        const title = greeting.length < 50 ? greeting : `开场白 ${index + 1}`;
+                        return { title, content: greeting };
+                    });
+                } else {
+                    availableGreetings.value = [];
+                }
             } else {
                 availableGreetings.value = [];
             }
@@ -4187,6 +4274,7 @@ export function setupApp() {
             insertEmoji,
             isAiTyping,
             isOfflineMode,
+            novelMode,
             showGreetingSelect,
             availableGreetings,
 
@@ -4243,6 +4331,8 @@ export function setupApp() {
             openDossier,
             saveDossier,
             cancelDossier,
+            addOpeningLine,
+            removeOpeningLine,
             // Worldbook & Presets
             worldbooks, editingWorldbook, activeWorldbookEntryId, activeWorldbookEntry, showWorldbookImport, importWorldbookName, importFile, importMode, openWorldbookImport, handleFileUpload, importWorldbook,
             addNewWorldbook, deleteWorldbook, deleteCurrentWorldbook, openWorldbookEditor, saveWorldbookEditor, cancelWorldbookEditor,
