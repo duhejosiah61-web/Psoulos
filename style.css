@@ -4630,53 +4630,64 @@ label {
     transform: scale(1.2);
 }
 
+/* Attachment Panel Overlay */
+.attachment-panel-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 149;
+}
+
 /* Attachment Panel */
 .attachment-panel {
-    position: absolute;
+    position: fixed;
     bottom: 90px;
     left: 20px;
     right: 20px;
-    background: #FFFFFF;
-    border: 2px solid #000000;
-    border-radius: 20px;
+    background: #F8F8F8;
+    border-radius: 24px;
     padding: 20px;
     z-index: 150;
-    box-shadow: 4px 4px 0px rgba(0,0,0,0.1);
 }
 
 .attachment-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
+    gap: 12px;
 }
 
 .attachment-item {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
-    gap: 8px;
-    padding: 16px;
-    border: 2px solid #000000;
+    gap: 12px;
+    padding: 16px 20px;
     border-radius: 16px;
     cursor: pointer;
     transition: all 0.2s ease;
     background: #FFFFFF;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    border: 1px solid rgba(0,0,0,0.05);
 }
 
-.attachment-item:hover {
-    background: #000000;
-    color: #FFFFFF;
-    transform: translateY(-2px);
+.attachment-item:active {
+    transform: scale(0.98);
+    background: #F0F0F0;
 }
 
 .attachment-item i {
-    font-size: 24px;
+    font-size: 28px;
+    color: #000000;
+    min-width: 36px;
 }
 
 .attachment-item span {
-    font-size: 12px;
+    font-size: 18px;
     font-family: 'Inter', sans-serif;
     font-weight: 500;
+    color: #000000;
 }
 
 /* Context Menu */
@@ -6081,11 +6092,15 @@ label {
 }
 
 /* Special Card Base Style */
-.message.special-card-message .bubble {
+.message.special-card-message .bubble,
+.message.user.special-card-message .bubble,
+.message.ai.special-card-message .bubble {
     background: transparent !important;
     border: none !important;
     padding: 0 !important;
     border-radius: 0 !important;
+    box-shadow: none !important;
+    max-width: 280px !important;
 }
 
 .special-card {
@@ -6282,6 +6297,327 @@ label {
     font-size: 11px;
     color: #666666;
     letter-spacing: 1px;
+}
+
+/* Takeaway Card */
+.takeaway-card {
+    background: #FFF8E7;
+    padding: 16px;
+    min-width: 200px;
+}
+
+.takeaway-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #000000;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed #000000;
+}
+
+.takeaway-header i {
+    font-size: 18px;
+}
+
+.takeaway-content {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.takeaway-restaurant {
+    font-family: 'Playfair Display', serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: #000000;
+}
+
+.takeaway-food {
+    font-size: 14px;
+    color: #666666;
+}
+
+.takeaway-price {
+    font-family: 'Inter', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: #000000;
+    margin-top: 8px;
+}
+
+/* Tarot Card */
+.tarot-card {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    padding: 20px;
+    min-width: 200px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.tarot-emoji {
+    font-size: 48px;
+    filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.5));
+}
+
+.tarot-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.tarot-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: #FFD700;
+}
+
+.tarot-meaning {
+    font-size: 12px;
+    color: #CCCCCC;
+    line-height: 1.4;
+}
+
+/* Pet Card */
+.pet-card {
+    background: #FFF0F5;
+    padding: 16px;
+    min-width: 200px;
+}
+
+.pet-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 700;
+    color: #000000;
+    margin-bottom: 8px;
+}
+
+.pet-action {
+    font-size: 14px;
+    color: #666666;
+    margin-bottom: 12px;
+}
+
+.pet-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.pet-stat {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #000000;
+}
+
+.pet-stat i {
+    width: 16px;
+    color: #FF69B4;
+}
+
+/* Vote Card */
+.vote-card {
+    background: #F8F9FA;
+    padding: 16px;
+    min-width: 220px;
+}
+
+.vote-question {
+    font-family: 'Playfair Display', serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: #000000;
+    margin-bottom: 12px;
+}
+
+.vote-options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.vote-option {
+    position: relative;
+    background: #FFFFFF;
+    border: 2px solid #000000;
+    border-radius: 8px;
+    padding: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    overflow: hidden;
+}
+
+.vote-option:hover:not(.voted) {
+    background: #F0F0F0;
+    transform: translateX(4px);
+}
+
+.vote-option.voted {
+    cursor: default;
+}
+
+.vote-option-text {
+    position: relative;
+    z-index: 1;
+    font-size: 14px;
+    font-weight: 500;
+    color: #000000;
+}
+
+.vote-option-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.1);
+    transition: width 0.3s ease;
+}
+
+.vote-option-count {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+    color: #666666;
+}
+
+.vote-total {
+    font-size: 12px;
+    color: #666666;
+    text-align: right;
+    margin-top: 8px;
+}
+
+/* Vote Modal */
+.vote-modal {
+    width: 100%;
+    max-width: 400px;
+    background: #FFFFFF;
+    border: 3px solid #000000;
+    border-radius: 24px;
+    padding: 24px;
+    box-shadow: 8px 8px 0px #000000;
+}
+
+.vote-input-group {
+    margin-bottom: 20px;
+}
+
+.vote-input-group label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: #000000;
+    margin-bottom: 8px;
+}
+
+.vote-input-group input {
+    width: 100%;
+    height: 48px;
+    padding: 0 16px;
+    border: 2px solid #000000;
+    border-radius: 12px;
+    font-size: 16px;
+    outline: none;
+    box-sizing: border-box;
+}
+
+.vote-options-group {
+    margin-bottom: 20px;
+}
+
+.vote-options-group label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: #000000;
+    margin-bottom: 8px;
+}
+
+.vote-option-input {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.vote-option-input input {
+    flex: 1;
+    height: 44px;
+    padding: 0 16px;
+    border: 2px solid #000000;
+    border-radius: 12px;
+    font-size: 14px;
+    outline: none;
+}
+
+.remove-option-btn {
+    width: 44px;
+    height: 44px;
+    border: 2px solid #000000;
+    border-radius: 12px;
+    background: #FFFFFF;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.remove-option-btn:hover {
+    background: #FFEBEE;
+}
+
+.add-option-btn {
+    width: 100%;
+    height: 44px;
+    border: 2px dashed #000000;
+    border-radius: 12px;
+    background: transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #000000;
+    transition: all 0.2s ease;
+}
+
+.add-option-btn:hover {
+    background: #F5F5F5;
+}
+
+.create-vote-btn {
+    width: 100%;
+    height: 52px;
+    border: none;
+    border-radius: 12px;
+    background: #000000;
+    color: #FFFFFF;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.create-vote-btn:hover:not(:disabled) {
+    background: #333333;
+}
+
+.create-vote-btn:disabled {
+    background: #CCCCCC;
+    cursor: not-allowed;
 }
 
 /* Image Message Style */

@@ -540,7 +540,7 @@
                 <!-- 普通聊天 -->
                 <template v-else>
                     <div class="wechat-messages" :class="{ 'novel-mode': isOfflineMode, 'group-chat': soulLinkActiveChatType === 'group' }" ref="chatMessagesContainer">
-                        <div v-for="(msg, index) in currentChatMessages" :key="index" class="message" :class="[msg.sender, { 'novel-message': isOfflineMode, 'call-message': msg.isCallMessage, 'special-card-message': msg.messageType === 'location' || msg.messageType === 'transfer' || msg.messageType === 'textImage' || msg.messageType === 'image', 'group-message': soulLinkActiveChatType === 'group', 'system-message': msg.isSystem }]" @contextmenu="onMessageContextMenu($event, msg)" @touchstart="onMessageTouchStart($event, msg)" @touchmove="onMessageTouchMove" @touchend="onMessageTouchEnd">
+                        <div v-for="(msg, index) in currentChatMessages" :key="index" class="message" :class="[msg.sender, { 'novel-message': isOfflineMode, 'call-message': msg.isCallMessage, 'special-card-message': msg.messageType === 'location' || msg.messageType === 'transfer' || msg.messageType === 'textImage' || msg.messageType === 'image' || msg.messageType === 'takeaway' || msg.messageType === 'tarot' || msg.messageType === 'pet' || msg.messageType === 'vote', 'group-message': soulLinkActiveChatType === 'group', 'system-message': msg.isSystem }]" @contextmenu="onMessageContextMenu($event, msg)" @touchstart="onMessageTouchStart($event, msg)" @touchmove="onMessageTouchMove" @touchend="onMessageTouchEnd">
                             <div class="message-content-wrapper">
                                 <div v-if="soulLinkActiveChatType === 'group' && msg.senderName && !msg.isSystem" class="group-sender-name">{{ msg.senderName }}</div>
                                 <div v-if="!isOfflineMode" class="bubble">
@@ -605,6 +605,59 @@
                                         <span class="polaroid-date">{{ formatMessageDate(msg.timestamp) }}</span>
                                     </div>
                                 </div>
+                                <div v-else-if="msg.messageType === 'takeaway'" class="special-card takeaway-card">
+                                    <div class="takeaway-header">
+                                        <i class="fas fa-bowl-food"></i>
+                                        <span>外卖</span>
+                                    </div>
+                                    <div class="takeaway-content">
+                                        <div class="takeaway-restaurant">{{ msg.restaurant }}</div>
+                                        <div class="takeaway-food">{{ msg.food }}</div>
+                                        <div class="takeaway-price">¥{{ msg.price }}</div>
+                                    </div>
+                                </div>
+                                <div v-else-if="msg.messageType === 'tarot'" class="special-card tarot-card">
+                                    <div class="tarot-emoji">{{ msg.emoji }}</div>
+                                    <div class="tarot-info">
+                                        <div class="tarot-name">{{ msg.cardName }}{{ msg.isReversed ? '（逆位）' : '' }}</div>
+                                        <div class="tarot-meaning">{{ msg.cardMeaning }}</div>
+                                    </div>
+                                </div>
+                                <div v-else-if="msg.messageType === 'pet'" class="special-card pet-card">
+                                    <div class="pet-header">
+                                        <i class="fas fa-paw"></i>
+                                        <span>{{ msg.petName }}</span>
+                                    </div>
+                                    <div class="pet-action">{{ msg.action }} {{ msg.emoji }}</div>
+                                    <div class="pet-stats">
+                                        <div class="pet-stat">
+                                            <i class="fas fa-heart"></i>
+                                            <span>心情: {{ msg.mood }}%</span>
+                                        </div>
+                                        <div class="pet-stat">
+                                            <i class="fas fa-drumstick-bite"></i>
+                                            <span>饱食: {{ msg.hunger }}%</span>
+                                        </div>
+                                        <div class="pet-stat">
+                                            <i class="fas fa-star"></i>
+                                            <span>Lv.{{ msg.level }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div v-else-if="msg.messageType === 'vote'" class="special-card vote-card">
+                                    <div class="vote-question">{{ msg.question }}</div>
+                                    <div class="vote-options">
+                                        <div v-for="(opt, optIndex) in msg.options" :key="optIndex" 
+                                             class="vote-option" 
+                                             :class="{ 'voted': msg.hasVoted }"
+                                             @click="!msg.hasVoted && castVoteInChat(index, optIndex)">
+                                            <div class="vote-option-text">{{ opt.text }}</div>
+                                            <div v-if="msg.hasVoted" class="vote-option-bar" :style="{ width: (opt.votes / msg.totalVotes * 100) + '%' }"></div>
+                                            <div v-if="msg.hasVoted" class="vote-option-count">{{ opt.votes }}票</div>
+                                        </div>
+                                    </div>
+                                    <div v-if="msg.hasVoted" class="vote-total">共 {{ msg.totalVotes }} 票</div>
+                                </div>
                                 <template v-else>
                                     {{ msg.text }}
                                 </template>
@@ -646,9 +699,6 @@
                         <div class="wechat-input-row">
                             <button class="action-btn" @click="toggleAttachmentPanel" title="添加">
                                 <i class="fas fa-plus"></i>
-                            </button>
-                            <button class="action-btn" @click="toggleEmojiPanel" title="表情">
-                                <i class="fas fa-smile"></i>
                             </button>
                             <input type="text" v-model="soulLinkInput" @keyup.enter="onSendOrCall" :placeholder="editingMessageId ? '修改消息...' : (isOfflineMode ? '输入消息（线下模式）' : '输入消息...')">
                             <button class="send-btn" @click="onSendOrCall" title="发送">
@@ -2571,18 +2621,82 @@
         <div v-if="showAttachmentPanel" class="attachment-panel-overlay" @click.self="showAttachmentPanel = false">
             <div class="attachment-panel">
                 <div class="attachment-grid">
-                    <div class="attachment-item" @click="openLocationPanel">
-                        <i class="fas fa-map-marker-alt"></i>
-                        <span>位置</span>
+                    <div class="attachment-item" @click="toggleEmojiPanel; showAttachmentPanel = false">
+                        <i class="fas fa-face-smile"></i>
+                        <span>表情</span>
+                    </div>
+                    <div class="attachment-item" @click="handleRetry">
+                        <i class="fas fa-rotate-right"></i>
+                        <span>重试</span>
                     </div>
                     <div class="attachment-item" @click="showPhotoSelectPanel = true; showAttachmentPanel = false">
                         <i class="fas fa-image"></i>
-                        <span>照片</span>
+                        <span>相册</span>
                     </div>
+                    
                     <div class="attachment-item" @click="openTransferPanel">
-                        <i class="fas fa-money-bill-wave"></i>
+                        <i class="fas fa-yen-sign"></i>
                         <span>转账</span>
                     </div>
+                    <div class="attachment-item" @click="startVoiceCall">
+                        <i class="fas fa-phone"></i>
+                        <span>语音</span>
+                    </div>
+                    <div class="attachment-item" @click="handleTakeaway">
+                        <i class="fas fa-bowl-food"></i>
+                        <span>外卖</span>
+                    </div>
+                    
+                    <div class="attachment-item" @click="handleVote">
+                        <i class="fas fa-square-poll-vertical"></i>
+                        <span>投票</span>
+                    </div>
+                    <div class="attachment-item" @click="handleShare">
+                        <i class="fas fa-share-nodes"></i>
+                        <span>分享</span>
+                    </div>
+                    <div class="attachment-item" @click="openLocationPanel">
+                        <i class="fas fa-location-dot"></i>
+                        <span>定位</span>
+                    </div>
+                    
+                    <div class="attachment-item" @click="handleTarot">
+                        <i class="fas fa-moon"></i>
+                        <span>塔罗</span>
+                    </div>
+                    <div class="attachment-item" @click="handlePet">
+                        <i class="fas fa-paw"></i>
+                        <span>宠物</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 投票面板 -->
+        <div v-if="showVotePanel" class="modal-overlay" @click.self="showVotePanel = false">
+            <div class="vote-modal">
+                <div class="modal-header">
+                    <h3>创建投票</h3>
+                    <button class="close-btn" @click="showVotePanel = false"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="modal-content">
+                    <div class="vote-input-group">
+                        <label>投票问题</label>
+                        <input type="text" v-model="voteQuestion" placeholder="输入投票问题...">
+                    </div>
+                    <div class="vote-options-group">
+                        <label>选项</label>
+                        <div v-for="(option, index) in voteOptions" :key="index" class="vote-option-input">
+                            <input type="text" v-model="voteOptions[index]" :placeholder="'选项 ' + (index + 1)">
+                            <button v-if="voteOptions.length > 2" class="remove-option-btn" @click="removeVoteOption(index)">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <button v-if="voteOptions.length < 6" class="add-option-btn" @click="addVoteOption">
+                            <i class="fas fa-plus"></i> 添加选项
+                        </button>
+                    </div>
+                    <button class="create-vote-btn" @click="createVote" :disabled="!voteQuestion.trim()">创建投票</button>
                 </div>
             </div>
         </div>

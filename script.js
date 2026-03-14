@@ -1,4 +1,4 @@
-﻿﻿// =========================================================================
+﻿﻿﻿﻿﻿﻿﻿﻿// =========================================================================
 // == SOUL OS SCRIPT (FIXED VERSION)
 // =========================================================================
 import { ref, computed, onMounted, watch, reactive } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
@@ -1877,6 +1877,10 @@ export function setupApp() {
         const archiveName = ref('');
         const archiveDescription = ref('');
         const showCreateGroupDialog = ref(false);
+        const showVotePanel = ref(false);
+        const voteQuestion = ref('');
+        const voteOptions = ref(['', '']);
+        const activeVote = ref(null);
         const newGroupName = ref('');
         const newGroupMembers = ref('');
         const newGroupAvatar = ref('');
@@ -5223,6 +5227,257 @@ export function setupApp() {
                 showTransferPanel.value = false;
             }
         };
+
+        const handleRetry = async () => {
+            showAttachmentPanel.value = false;
+            
+            const isGroupChat = soulLinkActiveChatType.value === 'group';
+            const history = isGroupChat 
+                ? (activeGroupChat.value?.history || []) 
+                : (soulLinkMessages.value[soulLinkActiveChat.value] || []);
+            
+            if (history.length === 0) {
+                alert('没有可重试的消息');
+                return;
+            }
+            
+            const lastAiMsgIndex = history.map((m, i) => ({...m, index: i})).reverse().find(m => m.sender === 'ai');
+            if (!lastAiMsgIndex) {
+                alert('没有可重试的AI回复');
+                return;
+            }
+            
+            history.splice(lastAiMsgIndex.index, 1);
+            
+            pushMessageToActiveChat({
+                id: Date.now(),
+                sender: 'system',
+                text: '正在重新生成回复...',
+                timestamp: Date.now(),
+                isSystem: true
+            });
+            
+            await triggerSoulLinkAiReply();
+        };
+
+        const handleTakeaway = () => {
+            showAttachmentPanel.value = false;
+            
+            const restaurants = [
+                { name: '麦当劳', food: '巨无霸套餐', price: 38 },
+                { name: '肯德基', food: '香辣鸡腿堡套餐', price: 35 },
+                { name: '必胜客', food: '至尊披萨', price: 89 },
+                { name: '星巴克', food: '拿铁咖啡', price: 32 },
+                { name: '海底捞', food: '番茄锅底', price: 128 }
+            ];
+            
+            const randomRestaurant = restaurants[Math.floor(Math.random() * restaurants.length)];
+            
+            const msg = {
+                id: Date.now(),
+                sender: 'user',
+                messageType: 'takeaway',
+                text: `外卖：${randomRestaurant.food}`,
+                restaurant: randomRestaurant.name,
+                food: randomRestaurant.food,
+                price: randomRestaurant.price,
+                timestamp: Date.now(),
+                time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+            };
+            
+            pushMessageToActiveChat(msg);
+            saveSoulLinkMessages();
+        };
+
+        const handleVote = () => {
+            showAttachmentPanel.value = false;
+            showVotePanel.value = true;
+        };
+
+        const addVoteOption = () => {
+            if (voteOptions.value.length < 6) {
+                voteOptions.value.push('');
+            }
+        };
+
+        const removeVoteOption = (index) => {
+            if (voteOptions.value.length > 2) {
+                voteOptions.value.splice(index, 1);
+            }
+        };
+
+        const createVote = () => {
+            const validOptions = voteOptions.value.filter(opt => opt.trim());
+            if (!voteQuestion.value.trim() || validOptions.length < 2) {
+                alert('请输入投票问题和至少两个选项');
+                return;
+            }
+
+            const msg = {
+                id: Date.now(),
+                sender: 'user',
+                messageType: 'vote',
+                text: `投票：${voteQuestion.value}`,
+                question: voteQuestion.value,
+                options: validOptions.map(opt => ({ text: opt, votes: 0 })),
+                totalVotes: 0,
+                hasVoted: false,
+                timestamp: Date.now(),
+                time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+            };
+
+            pushMessageToActiveChat(msg);
+            saveSoulLinkMessages();
+
+            voteQuestion.value = '';
+            voteOptions.value = ['', ''];
+            showVotePanel.value = false;
+        };
+
+        const castVoteInChat = (msgIndex, optionIndex) => {
+            const isGroupChat = soulLinkActiveChatType.value === 'group';
+            const history = isGroupChat 
+                ? (activeGroupChat.value?.history || []) 
+                : (soulLinkMessages.value[soulLinkActiveChat.value] || []);
+
+            const msg = history[msgIndex];
+            if (msg && msg.messageType === 'vote' && !msg.hasVoted) {
+                msg.options[optionIndex].votes++;
+                msg.totalVotes++;
+                msg.hasVoted = true;
+                saveSoulLinkMessages();
+            }
+        };
+
+        const handleShare = () => {
+            showAttachmentPanel.value = false;
+            if (navigator.share) {
+                navigator.share({
+                    title: '分享',
+                    text: '分享内容',
+                    url: window.location.href
+                }).catch(console.error);
+            } else {
+                alert('分享功能');
+            }
+        };
+
+        const handleTarot = () => {
+            showAttachmentPanel.value = false;
+            
+            const tarotCards = [
+                { name: '愚者', meaning: '新的开始、冒险、纯真', emoji: '🃏' },
+                { name: '魔术师', meaning: '创造力、自信、行动力', emoji: '🎩' },
+                { name: '女祭司', meaning: '直觉、神秘、智慧', emoji: '🌙' },
+                { name: '女皇', meaning: '丰盛、母性、创造力', emoji: '👑' },
+                { name: '皇帝', meaning: '权威、结构、领导力', emoji: '🏛️' },
+                { name: '恋人', meaning: '爱情、选择、和谐', emoji: '💕' },
+                { name: '战车', meaning: '意志力、胜利、决心', emoji: '⚔️' },
+                { name: '力量', meaning: '勇气、耐心、内在力量', emoji: '🦁' },
+                { name: '隐士', meaning: '内省、寻求真理、智慧', emoji: '🏔️' },
+                { name: '命运之轮', meaning: '变化、机遇、命运', emoji: '🎡' },
+                { name: '正义', meaning: '公平、真相、因果', emoji: '⚖️' },
+                { name: '倒吊人', meaning: '牺牲、等待、新视角', emoji: '🙃' },
+                { name: '死神', meaning: '结束、转变、重生', emoji: '🦋' },
+                { name: '节制', meaning: '平衡、耐心、调和', emoji: '🌈' },
+                { name: '恶魔', meaning: '束缚、诱惑、物质', emoji: '😈' },
+                { name: '塔', meaning: '突变、觉醒、重建', emoji: '🗼' },
+                { name: '星星', meaning: '希望、灵感、平静', emoji: '⭐' },
+                { name: '月亮', meaning: '幻觉、恐惧、潜意识', emoji: '🌕' },
+                { name: '太阳', meaning: '成功、活力、快乐', emoji: '☀️' },
+                { name: '审判', meaning: '觉醒、重生、召唤', emoji: '📯' },
+                { name: '世界', meaning: '完成、整合、成就', emoji: '🌍' }
+            ];
+            
+            const randomCard = tarotCards[Math.floor(Math.random() * tarotCards.length)];
+            const isReversed = Math.random() > 0.5;
+            
+            const msg = {
+                id: Date.now(),
+                sender: 'user',
+                messageType: 'tarot',
+                text: `塔罗占卜：${randomCard.emoji} ${randomCard.name}${isReversed ? '（逆位）' : ''}`,
+                cardName: randomCard.name,
+                cardMeaning: randomCard.meaning,
+                isReversed: isReversed,
+                emoji: randomCard.emoji,
+                timestamp: Date.now(),
+                time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+            };
+            
+            pushMessageToActiveChat(msg);
+            saveSoulLinkMessages();
+        };
+
+        const handlePet = () => {
+            showAttachmentPanel.value = false;
+            
+            if (!soulLinkPet.value) {
+                soulLinkPet.value = {
+                    name: '小可爱',
+                    mood: 100,
+                    hunger: 100,
+                    level: 1,
+                    exp: 0
+                };
+            }
+            
+            const actions = [
+                { action: 'feed', text: '喂食', emoji: '🍖' },
+                { action: 'play', text: '玩耍', emoji: '🎾' },
+                { action: 'pet', text: '抚摸', emoji: '🤚' }
+            ];
+            
+            const randomAction = actions[Math.floor(Math.random() * actions.length)];
+            
+            let moodChange = 0;
+            let hungerChange = 0;
+            let expGain = 0;
+            
+            switch(randomAction.action) {
+                case 'feed':
+                    hungerChange = 20;
+                    moodChange = 5;
+                    expGain = 5;
+                    break;
+                case 'play':
+                    moodChange = 15;
+                    hungerChange = -5;
+                    expGain = 10;
+                    break;
+                case 'pet':
+                    moodChange = 10;
+                    expGain = 3;
+                    break;
+            }
+            
+            soulLinkPet.value.mood = Math.min(100, Math.max(0, soulLinkPet.value.mood + moodChange));
+            soulLinkPet.value.hunger = Math.min(100, Math.max(0, soulLinkPet.value.hunger + hungerChange));
+            soulLinkPet.value.exp += expGain;
+            
+            if (soulLinkPet.value.exp >= soulLinkPet.value.level * 100) {
+                soulLinkPet.value.level += 1;
+                soulLinkPet.value.exp = 0;
+            }
+            
+            const msg = {
+                id: Date.now(),
+                sender: 'user',
+                messageType: 'pet',
+                text: `与${soulLinkPet.value.name}${randomAction.text}${randomAction.emoji}`,
+                petName: soulLinkPet.value.name,
+                action: randomAction.text,
+                emoji: randomAction.emoji,
+                mood: soulLinkPet.value.mood,
+                hunger: soulLinkPet.value.hunger,
+                level: soulLinkPet.value.level,
+                timestamp: Date.now(),
+                time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+            };
+            
+            pushMessageToActiveChat(msg);
+            saveSoulLinkMessages();
+        };
         
         const startVoiceInput = () => {
             alert('语音输入功能开发中...');
@@ -5403,6 +5658,8 @@ export function setupApp() {
             moodValue, bedTiming, showLocationPanel, showTransferPanel, showChatSettings,
             showAttachmentPanel, showImageSubmenu, toggleEmojiPanel, toggleAttachmentPanel, toggleOfflineMode, selectGreeting, addDefaultGreeting, addCustomGreeting,
             startVoiceInput, onSendOrCall, selectFromAlbum, sendTextImage,
+            handleRetry, handleTakeaway, handleVote, handleShare, handleTarot, handlePet,
+            showVotePanel, voteQuestion, voteOptions, addVoteOption, removeVoteOption, createVote, castVoteInChat,
             showPhotoSelectPanel, showTextImagePanel, textImageText, textImageBgColor, textImageColors,
             // App Launch
             openApp, closeApp, goBack, openGame, joinGame, startGameSession, castVote, endDay, closeGame, getAppIcon,
