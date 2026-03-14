@@ -49,24 +49,6 @@ export const LayoutConfig = {
         },
     },
 
-    appHeader: {
-        width: '100%',
-        height: 'auto',
-        paddingTop: 'calc(10% + env(safe-area-inset-top))',
-        paddingBottom: '4%',
-        paddingLeft: '5%',
-        paddingRight: '5%',
-    },
-
-    appContent: {
-        width: '100%',
-        flex: '1',
-        overflowY: 'auto',
-        paddingLeft: '5%',
-        paddingRight: '5%',
-        paddingBottom: 'calc(5% + env(safe-area-inset-bottom))',
-    },
-
     chat: {
         container: {
             width: '100%',
@@ -76,21 +58,30 @@ export const LayoutConfig = {
         },
         header: {
             width: '100%',
-            height: 'auto',
+            flexShrink: '0',
             paddingTop: 'calc(10% + env(safe-area-inset-top))',
             paddingBottom: '3%',
+            paddingLeft: '5%',
+            paddingRight: '5%',
+            borderBottom: '2px solid rgba(0,0,0,0.15)',
         },
         messages: {
+            width: '100%',
             flex: '1',
             overflowY: 'auto',
-            paddingBottom: 'calc(18% + env(safe-area-inset-bottom))',
+            padding: '5%',
+            paddingBottom: 'calc(20% + env(safe-area-inset-bottom))',
         },
         input: {
             position: 'fixed',
             bottom: '0',
             left: '0',
             right: '0',
+            paddingTop: '3%',
             paddingBottom: 'calc(4% + env(safe-area-inset-bottom))',
+            paddingLeft: '5%',
+            paddingRight: '5%',
+            zIndex: 100,
         },
     },
 
@@ -98,19 +89,34 @@ export const LayoutConfig = {
         container: {
             width: '100%',
             height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
             paddingTop: 'env(safe-area-inset-top)',
             paddingBottom: 'env(safe-area-inset-bottom)',
         },
         header: {
             width: '100%',
-            paddingTop: 'calc(8% + env(safe-area-inset-top))',
+            flexShrink: '0',
+            paddingTop: '8%',
+            textAlign: 'center',
         },
-        content: {
+        avatar: {
+            width: '100%',
             flex: '1',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+        },
+        messages: {
+            width: '100%',
+            maxHeight: '25%',
             overflowY: 'auto',
+            padding: '4%',
         },
         controls: {
             width: '100%',
+            flexShrink: '0',
+            paddingTop: '4%',
             paddingBottom: 'calc(5% + env(safe-area-inset-bottom))',
         },
     },
@@ -124,30 +130,179 @@ export const LayoutConfig = {
         },
         header: {
             width: '100%',
-            height: 'auto',
+            flexShrink: '0',
             paddingTop: 'calc(3% + env(safe-area-inset-top))',
             paddingBottom: '3%',
+            paddingLeft: '4%',
+            paddingRight: '4%',
         },
         posts: {
+            width: '100%',
             flex: '1',
             overflowY: 'auto',
-            paddingBottom: 'calc(15% + env(safe-area-inset-bottom))',
+            paddingBottom: 'calc(18% + env(safe-area-inset-bottom))',
         },
         bottomNav: {
             position: 'fixed',
             bottom: '0',
             left: '0',
             right: '0',
+            paddingTop: '3%',
             paddingBottom: 'calc(3% + env(safe-area-inset-bottom))',
             zIndex: 100,
         },
     },
 
-    card: {
-        width: '100%',
-        marginBottom: '5%',
-        padding: '5%',
-        flexShrink: '0',
+    workshop: {
+        container: {
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+        },
+        header: {
+            width: '100%',
+            flexShrink: '0',
+            paddingTop: 'calc(10% + env(safe-area-inset-top))',
+            paddingBottom: '4%',
+            paddingLeft: '5%',
+            paddingRight: '5%',
+        },
+        content: {
+            width: '100%',
+            flex: '1',
+            overflowY: 'auto',
+            padding: '5%',
+            paddingBottom: 'calc(5% + env(safe-area-inset-bottom))',
+        },
+        card: {
+            width: '100%',
+            flexShrink: '0',
+            marginBottom: '5%',
+            padding: '5%',
+            overflow: 'visible',
+        },
+    },
+
+    console: {
+        container: {
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+        },
+        header: {
+            width: '100%',
+            flexShrink: '0',
+            paddingTop: 'calc(10% + env(safe-area-inset-top))',
+            paddingBottom: '4%',
+            paddingLeft: '5%',
+            paddingRight: '5%',
+        },
+        content: {
+            width: '100%',
+            flex: '1',
+            overflowY: 'auto',
+            padding: '5%',
+            paddingBottom: 'calc(5% + env(safe-area-inset-bottom))',
+        },
+        card: {
+            width: '100%',
+            flexShrink: '0',
+            marginBottom: '5%',
+            padding: '5%',
+        },
+    },
+
+    theme: {
+        container: {
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+        },
+        header: {
+            width: '100%',
+            flexShrink: '0',
+            paddingTop: 'calc(10% + env(safe-area-inset-top))',
+            paddingBottom: '4%',
+            paddingLeft: '5%',
+            paddingRight: '5%',
+        },
+        content: {
+            width: '100%',
+            flex: '1',
+            overflowY: 'auto',
+            padding: '5%',
+            paddingBottom: 'calc(5% + env(safe-area-inset-bottom))',
+        },
+        card: {
+            width: '100%',
+            flexShrink: '0',
+            marginBottom: '5%',
+            padding: '5%',
+        },
+    },
+
+    mate: {
+        container: {
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+        },
+        header: {
+            width: '100%',
+            flexShrink: '0',
+            paddingTop: 'calc(10% + env(safe-area-inset-top))',
+            paddingBottom: '4%',
+            paddingLeft: '5%',
+            paddingRight: '5%',
+        },
+        content: {
+            width: '100%',
+            flex: '1',
+            overflowY: 'auto',
+            padding: '5%',
+            paddingBottom: 'calc(5% + env(safe-area-inset-bottom))',
+        },
+        card: {
+            width: '100%',
+            flexShrink: '0',
+            marginBottom: '5%',
+            padding: '5%',
+        },
+    },
+
+    feed: {
+        container: {
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+        },
+        header: {
+            width: '100%',
+            flexShrink: '0',
+            paddingTop: 'calc(8% + env(safe-area-inset-top))',
+            paddingBottom: '4%',
+            paddingLeft: '5%',
+            paddingRight: '5%',
+        },
+        content: {
+            width: '100%',
+            flex: '1',
+            overflowY: 'auto',
+            paddingBottom: 'calc(15% + env(safe-area-inset-bottom))',
+        },
+        fab: {
+            position: 'fixed',
+            bottom: 'calc(12% + env(safe-area-inset-bottom))',
+            right: '5%',
+            width: '56px',
+            height: '56px',
+            zIndex: 50,
+        },
     },
 
     modal: {
@@ -157,6 +312,9 @@ export const LayoutConfig = {
             left: '0',
             right: '0',
             bottom: '0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             zIndex: 200,
         },
         content: {
@@ -164,6 +322,7 @@ export const LayoutConfig = {
             maxWidth: '400px',
             maxHeight: '80%',
             borderRadius: '16px',
+            overflow: 'hidden',
         },
     },
 

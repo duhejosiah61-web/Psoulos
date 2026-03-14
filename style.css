@@ -233,6 +233,294 @@
 }
 
 /* ==========================================================
+   APP-SPECIFIC WIDGETS - 各应用专用布局
+   ========================================================== */
+
+/* Chat App Widget */
+.chat-app-widget {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.chat-header-widget {
+    width: 100%;
+    flex-shrink: 0;
+    padding: var(--spacing-lg);
+    padding-top: calc(10% + env(safe-area-inset-top));
+    border-bottom: 2px solid rgba(0,0,0,0.15);
+}
+
+.chat-messages-widget {
+    width: 100%;
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--spacing-lg);
+    padding-bottom: calc(20% + env(safe-area-inset-bottom));
+}
+
+.chat-input-widget {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: var(--spacing-md);
+    padding-bottom: calc(var(--spacing-md) + env(safe-area-inset-bottom));
+    background: #FDFDFB;
+    border-top: 2px solid #000000;
+    z-index: 100;
+}
+
+/* Call App Widget */
+.call-app-widget {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+.call-header-widget {
+    width: 100%;
+    flex-shrink: 0;
+    padding: var(--spacing-lg);
+    padding-top: 8%;
+    text-align: center;
+}
+
+.call-avatar-widget {
+    width: 100%;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.call-messages-widget {
+    width: 100%;
+    max-height: 25%;
+    overflow-y: auto;
+    padding: var(--spacing-md);
+}
+
+.call-controls-widget {
+    width: 100%;
+    flex-shrink: 0;
+    padding: var(--spacing-lg);
+    padding-bottom: calc(var(--spacing-lg) + env(safe-area-inset-bottom));
+}
+
+/* Hub App Widget */
+.hub-app-widget {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.hub-header-widget {
+    width: 100%;
+    flex-shrink: 0;
+    padding: var(--spacing-md);
+    padding-top: calc(3% + env(safe-area-inset-top));
+}
+
+.hub-posts-widget {
+    width: 100%;
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: calc(18% + env(safe-area-inset-bottom));
+}
+
+.hub-nav-widget {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: var(--spacing-sm);
+    padding-bottom: calc(var(--spacing-sm) + env(safe-area-inset-bottom));
+    background: #ffffff;
+    border-top: 1px solid #e5e5e5;
+    z-index: 100;
+}
+
+/* Workshop App Widget */
+.workshop-app-widget {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.workshop-header-widget {
+    width: 100%;
+    flex-shrink: 0;
+    padding: var(--spacing-lg);
+    padding-top: calc(10% + env(safe-area-inset-top));
+}
+
+.workshop-content-widget {
+    width: 100%;
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--spacing-lg);
+    padding-bottom: calc(var(--spacing-lg) + env(safe-area-inset-bottom));
+}
+
+.workshop-card-widget {
+    width: 100%;
+    flex-shrink: 0;
+    margin-bottom: var(--spacing-lg);
+    padding: var(--spacing-lg);
+    background: #FFFFFF;
+    border: 2px solid #000000;
+    border-radius: 16px;
+    box-shadow: 6px 6px 0px rgba(0,0,0,0.08);
+    overflow: visible;
+}
+
+/* Console App Widget */
+.console-app-widget {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.console-header-widget {
+    width: 100%;
+    flex-shrink: 0;
+    padding: var(--spacing-lg);
+    padding-top: calc(10% + env(safe-area-inset-top));
+}
+
+.console-content-widget {
+    width: 100%;
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--spacing-lg);
+    padding-bottom: calc(var(--spacing-lg) + env(safe-area-inset-bottom));
+}
+
+.console-card-widget {
+    width: 100%;
+    flex-shrink: 0;
+    margin-bottom: var(--spacing-lg);
+    padding: var(--spacing-lg);
+    background: #FFFFFF;
+    border: 2px solid #000000;
+    box-shadow: 8px 8px 0 rgba(0,0,0,0.12);
+}
+
+/* Theme App Widget */
+.theme-app-widget {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.theme-header-widget {
+    width: 100%;
+    flex-shrink: 0;
+    padding: var(--spacing-lg);
+    padding-top: calc(10% + env(safe-area-inset-top));
+}
+
+.theme-content-widget {
+    width: 100%;
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--spacing-lg);
+    padding-bottom: calc(var(--spacing-lg) + env(safe-area-inset-bottom));
+}
+
+.theme-card-widget {
+    width: 100%;
+    flex-shrink: 0;
+    margin-bottom: var(--spacing-lg);
+    padding: var(--spacing-lg);
+    background: #FFFFFF;
+    border: 2px solid #000000;
+    border-radius: 16px;
+    box-shadow: 6px 6px 0px rgba(0,0,0,0.08);
+}
+
+/* Mate App Widget */
+.mate-app-widget {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.mate-header-widget {
+    width: 100%;
+    flex-shrink: 0;
+    padding: var(--spacing-lg);
+    padding-top: calc(10% + env(safe-area-inset-top));
+}
+
+.mate-content-widget {
+    width: 100%;
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--spacing-lg);
+    padding-bottom: calc(var(--spacing-lg) + env(safe-area-inset-bottom));
+}
+
+.mate-card-widget {
+    width: 100%;
+    flex-shrink: 0;
+    margin-bottom: var(--spacing-lg);
+    padding: var(--spacing-lg);
+    background: #FFFFFF;
+    border: 2px solid #000000;
+    border-radius: 16px;
+    box-shadow: 6px 6px 0px rgba(0,0,0,0.08);
+}
+
+/* Feed App Widget */
+.feed-app-widget {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.feed-header-widget {
+    width: 100%;
+    flex-shrink: 0;
+    padding: var(--spacing-lg);
+    padding-top: calc(8% + env(safe-area-inset-top));
+}
+
+.feed-content-widget {
+    width: 100%;
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: calc(15% + env(safe-area-inset-bottom));
+}
+
+.feed-fab-widget {
+    position: fixed;
+    bottom: calc(12% + env(safe-area-inset-bottom));
+    right: 5%;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: #000000;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* ==========================================================
    END WIDGET CONTAINER
    ========================================================== */
 
