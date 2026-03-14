@@ -15,6 +15,9 @@ export function useHub(state = {}) {
     const page = ref(1);
     const hasMore = ref(true);
     
+    // 角色列表 - 从state中获取ref对象或使用空数组
+    const characters = state.characters || ref([]);
+    
     // 界面状态
     const showSearchBar = ref(false);
     const showUserMenu = ref(false);

@@ -1,22 +1,110 @@
 // feed.js
 import { ref } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
 
-// 可以在此处配置 API 地址，或者通过 script.js 中的 profiles 动态获取（这里简化处理）
-const API_BASE_URL = 'http://localhost:3000/api'; 
 const CURRENT_USER_NAME = '我';
 
-export function useFeed() {
+// IndexedDB Setup
+let feedDB = null;
+const FEED_DB_NAME = 'FeedDB';
+const FEED_DB_VERSION = 1;
+
+async function initFeedDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(FEED_DB_NAME, FEED_DB_VERSION);
+        
+        request.onerror = () => {
+            console.error('FeedDB 打开失败');
+            reject(request.error);
+        };
+        
+        request.onsuccess = () => {
+            feedDB = request.result;
+            console.log('FeedDB 打开成功');
+            resolve(feedDB);
+        };
+        
+        request.onupgradeneeded = (event) => {
+            const database = event.target.result;
+            
+            if (!database.objectStoreNames.contains('posts')) {
+                const postsStore = database.createObjectStore('posts', { keyPath: 'id' });
+                postsStore.createIndex('author', 'author', { unique: false });
+                postsStore.createIndex('timestamp', 'timestamp', { unique: false });
+            }
+        };
+    });
+}
+
+async function savePostToIndexedDB(post) {
+    if (!feedDB) {
+        console.warn('FeedDB 未初始化，跳过保存');
+        return false;
+    }
+    
+    return new Promise((resolve, reject) => {
+        const transaction = feedDB.transaction(['posts'], 'readwrite');
+        const store = transaction.objectStore('posts');
+        
+        const request = store.put({
+            ...post,
+            timestamp: post.id
+        });
+        
+        request.onsuccess = () => {
+            console.log('帖子保存到 IndexedDB 成功:', post.id);
+            resolve(true);
+        };
+        
+        request.onerror = () => {
+            console.error('帖子保存到 IndexedDB 失败:', request.error);
+            reject(request.error);
+        };
+    });
+}
+
+async function loadPostsFromIndexedDB() {
+    if (!feedDB) {
+        console.warn('FeedDB 未初始化，返回空数组');
+        return [];
+    }
+    
+    return new Promise((resolve, reject) => {
+        const transaction = feedDB.transaction(['posts'], 'readonly');
+        const store = transaction.objectStore('posts');
+        const request = store.getAll();
+        
+        request.onsuccess = () => {
+            const posts = request.result || [];
+            console.log('从 IndexedDB 加载了', posts.length, '个帖子');
+            resolve(posts);
+        };
+        
+        request.onerror = () => {
+            console.error('从 IndexedDB 加载帖子失败:', request.error);
+            reject(request.error);
+        };
+    });
+}
+
+export function useFeed(profiles, activeProfile) {
     const posts = ref([]);
     const loading = ref(false);
     const error = ref(null);
     const scrollTop = ref(0);
     const activeCommentPostId = ref(null);
+    const activeReplyCommentId = ref(null);
     const commentInput = ref('');
+    const replyInput = ref('');
     
     // Create Post State
     const showCreatePost = ref(false);
     const newPostText = ref('');
-    const newPostImages = ref([]); // Store image URLs
+    const newPostImages = ref([]);
+    const showTextImageCreator = ref(false);
+    const feedTextImageText = ref('');
+    const feedTextImageBgColor = ref('#ffffff');
+    const feedTextImageColors = ['#ffffff', '#f8f5f0', '#fef3c7', '#dbeafe', '#f3e8ff', '#fce7f3', '#dcfce7'];
+    const showFabMenu = ref(false);
     
     // User Profile State
     const userProfile = ref({
@@ -28,6 +116,7 @@ export function useFeed() {
 
     // Profile Viewer State
     const viewingUserProfile = ref(null); // null = main feed, object = showing profile
+    const viewingUserPosts = ref([]);
     const isEditingProfile = ref(false);
 
     // Load User Profile from LocalStorage
@@ -42,8 +131,19 @@ export function useFeed() {
 
     // Save User Profile
     function saveUserProfile() {
-        localStorage.setItem('feed_user_profile', JSON.stringify(userProfile.value));
-        isEditingProfile.value = false;
+        try {
+            const profileToSave = {
+                name: userProfile.value.name,
+                avatar: userProfile.value.avatar,
+                bio: userProfile.value.bio,
+                bgImage: userProfile.value.bgImage
+            };
+            localStorage.setItem('feed_user_profile', JSON.stringify(profileToSave));
+            console.log('Profile saved successfully:', profileToSave);
+            isEditingProfile.value = false;
+        } catch (e) {
+            console.error('Failed to save profile:', e);
+        }
     }
 
     // Open Profile
@@ -54,6 +154,10 @@ export function useFeed() {
                 ...userProfile.value,
                 isCurrentUser: true
             };
+            // Show all my posts
+            viewingUserPosts.value = posts.value.filter(p => p.author === authorName).sort((a, b) => {
+                return (b.id || 0) - (a.id || 0);
+            });
         } else {
             // Other User Profile
             // Try to find avatar from posts
@@ -67,12 +171,17 @@ export function useFeed() {
                 bgImage: 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&q=80', // Default BG for others
                 isCurrentUser: false
             };
+            // Show all posts by this author
+            viewingUserPosts.value = posts.value.filter(p => p.author === authorName).sort((a, b) => {
+                return (b.id || 0) - (a.id || 0);
+            });
         }
     }
 
     // Close Profile
     function closeProfile() {
         viewingUserProfile.value = null;
+        viewingUserPosts.value = [];
         isEditingProfile.value = false;
     }
 
@@ -80,23 +189,38 @@ export function useFeed() {
     function handleProfileImageUpload(event, type) {
         // type: 'avatar' | 'bg'
         const file = event.target.files[0];
-        if (!file || !file.type.startsWith('image/')) return;
+        if (!file || !file.type.startsWith('image/')) {
+            console.log('No valid image file selected');
+            return;
+        }
+
+        console.log('Uploading image:', type, file.name);
 
         const reader = new FileReader();
         reader.onload = (e) => {
+            const imageData = e.target.result;
+            
             if (type === 'avatar') {
-                userProfile.value.avatar = e.target.result;
+                userProfile.value.avatar = imageData;
+                console.log('Avatar updated');
             } else if (type === 'bg') {
-                userProfile.value.bgImage = e.target.result;
+                userProfile.value.bgImage = imageData;
+                console.log('Background updated');
             }
+            
             // Auto save when image changes
             saveUserProfile();
             
             // Update viewing profile if we are viewing ourselves
             if (viewingUserProfile.value && viewingUserProfile.value.isCurrentUser) {
-                viewingUserProfile.value[type === 'avatar' ? 'avatar' : 'bgImage'] = e.target.result;
+                viewingUserProfile.value[type === 'avatar' ? 'avatar' : 'bgImage'] = imageData;
             }
         };
+        
+        reader.onerror = (error) => {
+            console.error('Error reading file:', error);
+        };
+        
         reader.readAsDataURL(file);
     }
 
@@ -112,43 +236,66 @@ export function useFeed() {
         loading.value = true;
         error.value = null;
         
-        // 1. Load local user posts
+        // 1. Load posts from IndexedDB
         let localPosts = [];
         try {
-            localPosts = JSON.parse(localStorage.getItem('feed_user_posts') || '[]');
+            localPosts = await loadPostsFromIndexedDB();
         } catch (e) {
-            console.error('Error parsing local posts:', e);
+            console.error('Error loading posts from IndexedDB:', e);
             localPosts = [];
         }
         
         try {
-            // 2. Try fetch API posts (Role posts)
-            // Note: If API fails, we just use local posts
-            const response = await fetch(`${API_BASE_URL}/posts`);
-            if (response.ok) {
-                const apiData = await response.json();
-                const processedApiPosts = apiData.map(post => ({
-                    ...post,
-                    isLiked: post.likes && post.likes.includes(CURRENT_USER_NAME),
-                    isFavorited: post.isFavorited || false
-                }));
+            if (activeProfile.value && activeProfile.value.endpoint) {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
                 
-                // Merge local posts and API posts
-                // Sort by time (newest first) - assuming id is timestamp or time field is comparable
-                // For simplicity, we just concat and let the UI render. 
-                // In a real app, we'd sort by date.
-                posts.value = [...localPosts, ...processedApiPosts].sort((a, b) => {
-                    // Simple sort by ID if ID is timestamp, otherwise needs date parsing
+                try {
+                    const response = await fetch(`${activeProfile.value.endpoint}/posts`, {
+                        signal: controller.signal,
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    clearTimeout(timeoutId);
+                    
+                    if (response.ok) {
+                        const apiData = await response.json();
+                        const processedApiPosts = apiData.map(post => ({
+                            ...post,
+                            isLiked: post.likes && post.likes.includes(CURRENT_USER_NAME),
+                            isFavorited: post.isFavorited || false
+                        }));
+                        
+                        posts.value = [...localPosts, ...processedApiPosts].sort((a, b) => {
+                            return (b.id || 0) - (a.id || 0);
+                        });
+                    } else {
+                    posts.value = localPosts.sort((a, b) => {
+                        return (b.id || 0) - (a.id || 0);
+                    });
+                }
+                } catch (fetchErr) {
+                    if (fetchErr.name === 'AbortError') {
+                        console.warn('Feed API request timed out, using local posts only');
+                    } else {
+                        console.warn('Feed API error:', fetchErr);
+                    }
+                    posts.value = localPosts.sort((a, b) => {
+                        return (b.id || 0) - (a.id || 0);
+                    });
+                }
+            } else {
+                posts.value = localPosts.sort((a, b) => {
                     return (b.id || 0) - (a.id || 0);
                 });
-            } else {
-                // API failed but not network error (e.g. 404, 500)
-                posts.value = localPosts;
             }
         } catch (err) {
             console.warn('Feed API unreachable (Role posts skipped), using local only:', err);
-            // API network error - just show local posts
-            posts.value = localPosts;
+            posts.value = localPosts.sort((a, b) => {
+                return (b.id || 0) - (a.id || 0);
+            });
         } finally {
             loading.value = false;
         }
@@ -197,49 +344,141 @@ export function useFeed() {
             commentInput.value = '';
         } else {
             activeCommentPostId.value = postId;
+            activeReplyCommentId.value = null;
             commentInput.value = '';
+            replyInput.value = '';
         }
     }
 
-    // Submit Comment
-    async function submitComment(postId) {
-        if (!commentInput.value.trim()) return;
-        
+    // Show/Hide Reply Input
+    function toggleReplyInput(commentId) {
+        if (activeReplyCommentId.value === commentId) {
+            activeReplyCommentId.value = null;
+            replyInput.value = '';
+        } else {
+            activeReplyCommentId.value = commentId;
+            replyInput.value = '';
+        }
+    }
+
+    // Submit Comment or Reply
+    async function submitComment(postId, commentId = null) {
         const post = posts.value.find(p => p.id === postId);
         if (!post) return;
 
-        const content = commentInput.value;
+        let content, inputToReset;
+        if (commentId) {
+            // It's a reply
+            content = replyInput.value;
+            inputToReset = replyInput;
+        } else {
+            // It's a top-level comment
+            content = commentInput.value;
+            inputToReset = commentInput;
+        }
+
+        if (!content.trim()) return;
+
         const tempId = Date.now();
         
         // Local update
         if (!post.comments) post.comments = [];
-        post.comments.push({
-            id: tempId,
-            user: CURRENT_USER_NAME,
-            content: content
-        });
+        
+        if (commentId) {
+            // Find the comment to reply to
+            const comment = findCommentById(post.comments, commentId);
+            if (comment) {
+                if (!comment.replies) comment.replies = [];
+                comment.replies.push({
+                    id: tempId,
+                    user: CURRENT_USER_NAME,
+                    content: content,
+                    time: '刚刚'
+                });
+            }
+        } else {
+            // Top-level comment
+            post.comments.push({
+                id: tempId,
+                user: CURRENT_USER_NAME,
+                content: content,
+                time: '刚刚',
+                replies: []
+            });
+        }
 
         // Close input
-        activeCommentPostId.value = null;
-        commentInput.value = '';
+        if (commentId) {
+            activeReplyCommentId.value = null;
+        } else {
+            activeCommentPostId.value = null;
+        }
+        inputToReset.value = '';
 
         // Save locally
         saveLocalPostUpdate(post);
     }
 
+    // Delete Comment
+    function deleteComment(postId, commentId) {
+        const post = posts.value.find(p => p.id === postId);
+        if (!post) return;
+
+        // Remove comment from top level
+        post.comments = post.comments.filter(c => c.id !== commentId);
+
+        // Also check in replies
+        post.comments.forEach(comment => {
+            if (comment.replies) {
+                comment.replies = comment.replies.filter(r => r.id !== commentId);
+            }
+        });
+
+        // Save locally
+        saveLocalPostUpdate(post);
+    }
+
+    // Delete Post
+    async function deletePost(postId) {
+        const postIndex = posts.value.findIndex(p => p.id === postId);
+        if (postIndex === -1) return;
+
+        const post = posts.value[postIndex];
+
+        // Check if user is the author
+        if (post.author !== CURRENT_USER_NAME) return;
+
+        // Remove from posts array
+        posts.value.splice(postIndex, 1);
+
+        // Remove from IndexedDB
+        if (feedDB) {
+            const transaction = feedDB.transaction(['posts'], 'readwrite');
+            const store = transaction.objectStore('posts');
+            store.delete(postId);
+        }
+    }
+
+    // Helper function to find comment by ID
+    function findCommentById(comments, commentId) {
+        for (const comment of comments) {
+            if (comment.id === commentId) {
+                return comment;
+            }
+            if (comment.replies) {
+                const found = findCommentById(comment.replies, commentId);
+                if (found) return found;
+            }
+        }
+        return null;
+    }
+
     // Helper to save updates to local posts
-    function saveLocalPostUpdate(post) {
-        const localPosts = JSON.parse(localStorage.getItem('feed_user_posts') || '[]');
-        const idx = localPosts.findIndex(p => p.id === post.id);
-        if (idx > -1) {
-            // Update existing local post
-            localPosts[idx] = post;
-            localStorage.setItem('feed_user_posts', JSON.stringify(localPosts));
-        } else {
-            // It might be an API post that we modified locally (liked/commented)
-            // If we want to persist likes on API posts without API, we need a separate "user_interactions" storage.
-            // For simplicity, we won't persist interactions on API posts across reloads 
-            // unless we store them. But the user requirement "User actions NO API" is strict.
+    async function saveLocalPostUpdate(post) {
+        try {
+            await savePostToIndexedDB(post);
+        } catch (e) {
+            console.error('Failed to save post update:', e);
         }
     }
 
@@ -263,15 +502,51 @@ export function useFeed() {
     }
 
     async function generateAndSubmitComment(characters, activeProfile) {
-        if (!selectedRoleId.value || !commentTargetPost.value || !activeProfile) {
+        if (!selectedRoleId.value || !commentTargetPost.value) {
             console.warn('Missing data for comment generation');
             return;
         }
 
-        const character = characters.find(c => c.id === selectedRoleId.value);
-        if (!character) return;
+        // Handle both ref and raw array
+        const charsArray = Array.isArray(characters) ? characters : (characters.value || []);
+        const character = charsArray.find(c => String(c.id) === String(selectedRoleId.value));
+        if (!character) {
+            console.error('Character not found for comment:', selectedRoleId.value);
+            return;
+        }
 
         isGeneratingComment.value = true;
+        
+        // 如果没有配置AI，使用模拟评论
+        if (!activeProfile || !activeProfile.endpoint || !activeProfile.key) {
+            // 模拟生成评论
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            const mockComments = [
+                '哈哈，这个太有意思了！😄',
+                '看起来不错哦～',
+                '赞！👍',
+                '这个我喜欢！',
+                '有意思，继续保持！',
+                '哇，这个好棒！',
+                '支持支持！💪',
+                '说得好！',
+                '学到了学到了',
+                '这个角度很独特！'
+            ];
+            
+            const randomComment = mockComments[Math.floor(Math.random() * mockComments.length)];
+            
+            roleAction('comment', {
+                postId: commentTargetPost.value.id,
+                author: character.nickname || character.name,
+                content: randomComment
+            });
+            
+            isGeneratingComment.value = false;
+            closeRoleCommentModal();
+            return;
+        }
         
         const endpoint = (activeProfile.endpoint || '').trim();
         const key = (activeProfile.key || '').trim();
@@ -355,7 +630,7 @@ ${postContext}
                 avatar: data.avatar || 'https://placehold.co/100x100?text=?',
                 content: data.content,
                 images: data.images || [],
-                imageDescriptions: data.imageDescriptions || [], // Store image descriptions
+                imageDescriptions: data.imageDescriptions || [],
                 time: '刚刚',
                 likes: [],
                 comments: [],
@@ -363,16 +638,15 @@ ${postContext}
                 isFavorited: false
              };
 
-             // Add to in-memory list
+             // Add to in-memory list (keep original images for display)
              posts.value.unshift(newPost);
              
-             // Save to localStorage
+             // Save to IndexedDB
              try {
-                const localPosts = JSON.parse(localStorage.getItem('feed_user_posts') || '[]');
-                localPosts.unshift(newPost);
-                localStorage.setItem('feed_user_posts', JSON.stringify(localPosts));
+                await savePostToIndexedDB(newPost);
              } catch (e) {
                  console.error('Failed to save role post:', e);
+                 // Still show the post in current session even if storage fails
              }
         } else if (actionType === 'comment') {
             const post = posts.value.find(p => p.id === data.postId);
@@ -403,6 +677,32 @@ ${postContext}
         showCreatePost.value = false;
         newPostText.value = '';
         newPostImages.value = [];
+    }
+
+    function openTextImageCreator() {
+        showTextImageCreator.value = true;
+        feedTextImageText.value = '';
+        feedTextImageBgColor.value = '#ffffff';
+    }
+
+    function closeTextImageCreator() {
+        showTextImageCreator.value = false;
+        feedTextImageText.value = '';
+    }
+
+    function addTextImageToPost() {
+        if (!feedTextImageText.value.trim()) return;
+        
+        // 创建一个简单的文字图数据对象
+        const textImageData = {
+            type: 'textImage',
+            text: feedTextImageText.value,
+            bgColor: feedTextImageBgColor.value
+        };
+        
+        // 把它作为特殊图片添加
+        newPostImages.value.push(textImageData);
+        closeTextImageCreator();
     }
 
     // Handle Image Upload from Album
@@ -445,7 +745,7 @@ ${postContext}
             const newPost = {
                 id: Date.now(),
                 author: CURRENT_USER_NAME,
-                avatar: 'https://placehold.co/100x100/333/fff?text=Me',
+                avatar: userProfile.value.avatar || 'https://placehold.co/100x100/333/fff?text=Me',
                 content: content,
                 images: images,
                 time: '刚刚',
@@ -455,17 +755,15 @@ ${postContext}
                 isFavorited: false
             };
             
-            // Add to in-memory list
+            // Add to in-memory list (keep original images for display)
             posts.value.unshift(newPost);
             
-            // Save to localStorage
+            // Save to IndexedDB
             try {
-                const localPosts = JSON.parse(localStorage.getItem('feed_user_posts') || '[]');
-                localPosts.unshift(newPost);
-                localStorage.setItem('feed_user_posts', JSON.stringify(localPosts));
+                await savePostToIndexedDB(newPost);
             } catch (storageErr) {
-                console.error('LocalStorage Save Error:', storageErr);
-                alert('存储空间不足，图片可能过大，无法保存到本地历史，但本次会话可见。');
+                console.error('IndexedDB Save Error:', storageErr);
+                alert('保存失败，但本次会话可见。');
             }
 
             // Success
@@ -578,8 +876,13 @@ ${character.persona || ''}
     function publishRolePost(characters) {
         if (!selectedRoleId.value || !rolePostText.value.trim()) return;
         
-        const character = characters.find(c => c.id === selectedRoleId.value);
-        if (!character) return;
+        // Handle both ref and raw array
+        const charsArray = Array.isArray(characters) ? characters : (characters.value || []);
+        const character = charsArray.find(c => String(c.id) === String(selectedRoleId.value));
+        if (!character) {
+            console.error('Character not found:', selectedRoleId.value, 'Available:', charsArray.map(c => c.id));
+            return;
+        }
 
         let finalContent = rolePostText.value;
         const images = [];
@@ -632,18 +935,31 @@ ${character.persona || ''}
         error,
         scrollTop,
         activeCommentPostId,
+        activeReplyCommentId,
         commentInput,
+        replyInput,
         showCreatePost,
         newPostText,
         newPostImages,
+        showTextImageCreator,
+        feedTextImageText,
+        feedTextImageBgColor,
+        feedTextImageColors,
+        showFabMenu,
         loadPosts,
         toggleLike,
         toggleFavorite,
         toggleCommentInput,
         submitComment,
+        deleteComment,
+        deletePost,
         handleScroll,
         openCreatePost,
         closeCreatePost,
+        openTextImageCreator,
+        closeTextImageCreator,
+        addTextImageToPost,
+        toggleReplyInput,
         publishPost,
         addImageToPost,
         handleImageUpload,
@@ -652,6 +968,7 @@ ${character.persona || ''}
         // Profile related exports
         userProfile,
         viewingUserProfile,
+        viewingUserPosts,
         isEditingProfile,
         openProfile,
         closeProfile,
@@ -678,6 +995,8 @@ ${character.persona || ''}
         isGeneratingComment,
         openRoleCommentModal,
         closeRoleCommentModal,
-        generateAndSubmitComment
+        generateAndSubmitComment,
+        // IndexedDB
+        initFeedDB
     };
 }

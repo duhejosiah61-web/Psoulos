@@ -1,13 +1,106 @@
-// =========================================================================
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿// =========================================================================
 // == SOUL OS SCRIPT (FIXED VERSION)
 // =========================================================================
 import { ref, computed, onMounted, watch, reactive } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
 import { useFeed } from './feed.js';
 import { useHub } from './hub.js';
 import { useMate } from './mate.js';
+import { useNotice } from './notice.js';
+import { useGames } from './games.js';
 
 export function setupApp() {
     console.log('setup start'); 
+    
+    // IndexedDB 初始化
+    let db = null;
+    const DB_NAME = 'SoulOS_DB';
+    const DB_VERSION = 1;
+    
+    const initDB = () => {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
+            
+            request.onerror = () => {
+                console.error('IndexedDB 打开失败');
+                reject(request.error);
+            };
+            
+            request.onsuccess = () => {
+                db = request.result;
+                console.log('IndexedDB 打开成功');
+                resolve(db);
+            };
+            
+            request.onupgradeneeded = (event) => {
+                const database = event.target.result;
+                
+                if (!database.objectStoreNames.contains('soulLinkMessages')) {
+                    database.createObjectStore('soulLinkMessages', { keyPath: 'id' });
+                }
+                
+                if (!database.objectStoreNames.contains('soulLinkGroups')) {
+                    database.createObjectStore('soulLinkGroups', { keyPath: 'id' });
+                }
+                
+                if (!database.objectStoreNames.contains('archivedChats')) {
+                    database.createObjectStore('archivedChats', { keyPath: 'id' });
+                }
+                
+                if (!database.objectStoreNames.contains('settings')) {
+                    database.createObjectStore('settings', { keyPath: 'key' });
+                }
+            };
+        });
+    };
+    
+    const dbGet = (storeName, key) => {
+        return new Promise((resolve, reject) => {
+            if (!db) {
+                reject(new Error('数据库未初始化'));
+                return;
+            }
+            
+            const transaction = db.transaction([storeName], 'readonly');
+            const store = transaction.objectStore(storeName);
+            const request = store.get(key);
+            
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    };
+    
+    const dbPut = (storeName, data) => {
+        return new Promise((resolve, reject) => {
+            if (!db) {
+                reject(new Error('数据库未初始化'));
+                return;
+            }
+            
+            const transaction = db.transaction([storeName], 'readwrite');
+            const store = transaction.objectStore(storeName);
+            const request = store.put(data);
+            
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    };
+    
+    const dbGetAll = (storeName) => {
+        return new Promise((resolve, reject) => {
+            if (!db) {
+                reject(new Error('数据库未初始化'));
+                return;
+            }
+            
+            const transaction = db.transaction([storeName], 'readonly');
+            const store = transaction.objectStore(storeName);
+            const request = store.getAll();
+            
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    };
+    
     try {
         // --- DATA (State) ---
         const currentTime = ref('');
@@ -29,6 +122,13 @@ export function setupApp() {
             'url(https://images.unsplash.com/photo-1557683316-973673baf926?w=300)',
             'url(https://images.unsplash.com/photo-1557682250-33bd709cbe85?w=300)'
         ]);
+        const randomHexCode = ref('0x00000000');
+        
+        const generateRandomHex = () => {
+            const hex = Math.floor(Math.random() * 0xFFFFFFFF).toString(16).toUpperCase().padStart(8, '0');
+            randomHexCode.value = `0x${hex}`;
+        };
+        
         const currentScreen = computed(() => {
              return openedApp.value ? openedApp.value.toLowerCase() : 'homescreen';
         });
@@ -161,7 +261,7 @@ export function setupApp() {
         };
 
         const addNewCharacter = () => {
-            const newId = Date.now();
+            const newId = Date.now().toString();
             const newCharacter = {
                 id: newId,
                 internalName: `Char_${newId}`,
@@ -172,14 +272,51 @@ export function setupApp() {
                 tags: ['新角色'],
                 persona: '',
                 kvData: [],
+                openingLine: '',
                 openingLines: [''],
                 userPersona: '',
                 worldbookIds: [],
-                selectedPresetId: null
+                selectedPresetId: null,
+                creator: '',
+                version: '1.0'
             };
-            characters.value.unshift(newCharacter); 
+            characters.value.unshift(newCharacter);
+            console.log('addNewCharacter: created new character with id:', newId);
         };
 
+        const compressAvatarImage = (dataUrl, callback) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const maxWidth = 400;
+                const maxHeight = 400;
+                
+                let width = img.width;
+                let height = img.height;
+                
+                if (width > height) {
+                    if (width > maxWidth) {
+                        height = Math.round((height * maxWidth) / width);
+                        width = maxWidth;
+                    }
+                } else {
+                    if (height > maxHeight) {
+                        width = Math.round((width * maxHeight) / height);
+                        height = maxHeight;
+                    }
+                }
+                
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                
+                const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                callback(compressedDataUrl);
+            };
+            img.src = dataUrl;
+        };
+        
         const triggerAvatarUpload = () => {
             const input = document.createElement('input');
             input.type = 'file';
@@ -187,9 +324,17 @@ export function setupApp() {
             input.onchange = (e) => {
                 const file = e.target.files[0];
                 if (file && editingCharacter.value) {
+                    const maxSize = 5 * 1024 * 1024;
+                    if (file.size > maxSize) {
+                        alert('图片大小不能超过5MB，请选择小一点的图片');
+                        return;
+                    }
+                    
                     const reader = new FileReader();
                     reader.onload = (e) => {
-                        editingCharacter.value.avatarUrl = e.target.result;
+                        compressAvatarImage(e.target.result, (compressedDataUrl) => {
+                            editingCharacter.value.avatarUrl = compressedDataUrl;
+                        });
                     };
                     reader.readAsDataURL(file);
                 }
@@ -368,7 +513,8 @@ export function setupApp() {
                 worldbooks.value.unshift(newWorldbook);
                 worldbookId = newWorldbook.id;
             }
-            const newId = Date.now();
+            // 使用字符串类型的id，确保与saveDossier中的查找逻辑一致
+            const newId = Date.now().toString();
             const newCharacter = {
                 id: newId,
                 internalName: `Char_${newId}`,
@@ -381,9 +527,13 @@ export function setupApp() {
                 kvData: [],
                 openingLine,
                 userPersona: '',
-                worldbookId
+                worldbookIds: worldbookId ? [worldbookId] : [],
+                selectedPresetId: null,
+                creator: charData && charData.creator ? String(charData.creator) : '',
+                version: charData && charData.version ? String(charData.version) : '1.0'
             };
             characters.value.unshift(newCharacter);
+            console.log('createCharacterFromData: created new character with id:', newId);
             return newCharacter;
         };
 
@@ -989,9 +1139,17 @@ export function setupApp() {
         const handleAvatarFile = (event) => {
             const file = event.target.files[0];
             if (file && editingCharacter.value) {
+                const maxSize = 5 * 1024 * 1024;
+                if (file.size > maxSize) {
+                    alert('图片大小不能超过5MB，请选择小一点的图片');
+                    return;
+                }
+                
                 const reader = new FileReader();
                 reader.onload = (e) => {
-                    editingCharacter.value.avatarUrl = e.target.result;
+                    compressAvatarImage(e.target.result, (compressedDataUrl) => {
+                        editingCharacter.value.avatarUrl = compressedDataUrl;
+                    });
                 };
                 reader.readAsDataURL(file);
             }
@@ -1009,7 +1167,28 @@ export function setupApp() {
         };
 
         const openDossier = (character) => {
-            const copy = JSON.parse(JSON.stringify(character));
+            // 确保角色对象有效
+            if (!character) {
+                console.error('openDossier: character is null or undefined');
+                return;
+            }
+            
+            // 深拷贝角色对象，避免直接修改原对象
+            let copy;
+            try {
+                copy = JSON.parse(JSON.stringify(character));
+            } catch (e) {
+                console.error('openDossier: failed to clone character', e);
+                return;
+            }
+            
+            // 确保必要的字段存在
+            if (!copy.id) {
+                copy.id = Date.now().toString();
+                console.warn('openDossier: character missing id, generated new id:', copy.id);
+            }
+            
+            // 初始化所有必要字段
             if (!copy.tags) copy.tags = [];
             if (!copy.kvData) copy.kvData = [];
             if (!copy.worldbookIds) copy.worldbookIds = [];
@@ -1017,14 +1196,22 @@ export function setupApp() {
             if (!copy.nickname) copy.nickname = copy.name || '未命名';
             if (!copy.userPersona) copy.userPersona = '';
             if (!copy.selectedPresetId) copy.selectedPresetId = null;
+            if (!copy.summary) copy.summary = '';
+            if (!copy.avatarUrl) copy.avatarUrl = '';
+            if (!copy.creator) copy.creator = '';
+            if (!copy.version) copy.version = '1.0';
             
             // 兼容旧数据：将 openingLine (string) 转换为 openingLines (array)
-            if (copy.openingLine && (!copy.openingLines || copy.openingLines.length === 0)) {
+            if (copy.openingLine && typeof copy.openingLine === 'string' && (!copy.openingLines || copy.openingLines.length === 0)) {
                 copy.openingLines = copy.openingLine.split('\n\n').filter(l => l.trim());
             }
-            if (!copy.openingLines || copy.openingLines.length === 0) {
+            if (!copy.openingLines || !Array.isArray(copy.openingLines) || copy.openingLines.length === 0) {
                 copy.openingLines = [''];
             }
+            
+            // 确保所有开场白都是字符串
+            copy.openingLines = copy.openingLines.map(line => String(line || ''));
+            
             editingCharacter.value = copy;
         };
 
@@ -1041,18 +1228,45 @@ export function setupApp() {
         };
 
         const saveDossier = () => {
-            if (!editingCharacter.value) return;
+            if (!editingCharacter.value) {
+                console.error('saveDossier: editingCharacter is null');
+                return;
+            }
+            
+            // 确保角色有有效的 id
+            if (!editingCharacter.value.id) {
+                editingCharacter.value.id = Date.now().toString();
+                console.warn('saveDossier: character missing id, generated new id:', editingCharacter.value.id);
+            }
             
             // 将 openingLines 合并回 openingLine 以保持兼容性
-            editingCharacter.value.openingLine = editingCharacter.value.openingLines
-                .filter(l => l.trim())
-                .join('\n\n');
-                
-            editingCharacter.value.name = editingCharacter.value.nickname || editingCharacter.value.internalName || '未命名角色';
-            const index = characters.value.findIndex(c => c.id === editingCharacter.value.id);
-            if (index !== -1) {
-                characters.value[index] = editingCharacter.value;
+            if (editingCharacter.value.openingLines && Array.isArray(editingCharacter.value.openingLines)) {
+                editingCharacter.value.openingLine = editingCharacter.value.openingLines
+                    .filter(l => l && l.trim())
+                    .join('\n\n');
             }
+            
+            // 更新角色名称
+            editingCharacter.value.name = editingCharacter.value.nickname || editingCharacter.value.internalName || '未命名角色';
+            
+            // 确保所有必要字段都存在
+            if (!editingCharacter.value.tags) editingCharacter.value.tags = [];
+            if (!editingCharacter.value.kvData) editingCharacter.value.kvData = [];
+            if (!editingCharacter.value.worldbookIds) editingCharacter.value.worldbookIds = [];
+            
+            // 查找角色在列表中的位置
+            const index = characters.value.findIndex(c => c && c.id === editingCharacter.value.id);
+            
+            if (index !== -1) {
+                // 更新现有角色
+                characters.value[index] = { ...editingCharacter.value };
+                console.log('saveDossier: updated existing character:', editingCharacter.value.id);
+            } else {
+                // 如果角色不在列表中，添加它（处理导入的角色）
+                characters.value.push({ ...editingCharacter.value });
+                console.log('saveDossier: added new character to list:', editingCharacter.value.id);
+            }
+            
             editingCharacter.value = null;
         };
 
@@ -1068,6 +1282,7 @@ export function setupApp() {
         onMounted(() => {
             loadWorldbooks();
             loadPresets();
+            applyTheme();
         });
 
         // --- COMPUTED PROPERTIES ---
@@ -1112,28 +1327,31 @@ export function setupApp() {
             }
         };
         
-       const applyTheme = () => {
-           const root = document.documentElement;
-           // 设置主题模式类
-           if (themeMode.value === 'dark') {
-               root.classList.add('theme-dark');
-           } else if (themeMode.value === 'light') {
-               root.classList.remove('theme-dark');
-           } else if (themeMode.value === 'system') {
-               const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-               if (prefersDark) {
-                   root.classList.add('theme-dark');
-               } else {
-                   root.classList.remove('theme-dark');
-               }
-           }
-       
-           // 设置壁纸（直接应用到 #app 的背景）
-           const appElement = document.getElementById('app');
-           if (appElement) {
-               appElement.style.background = themeWallpaper.value;
-           }
-       };
+        const applyTheme = () => {
+            const root = document.documentElement;
+            // 设置主题模式类
+            if (themeMode.value === 'dark') {
+                root.classList.add('theme-dark');
+            } else if (themeMode.value === 'light') {
+                root.classList.remove('theme-dark');
+            } else if (themeMode.value === 'system') {
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                if (prefersDark) {
+                    root.classList.add('theme-dark');
+                } else {
+                    root.classList.remove('theme-dark');
+                }
+            }
+        
+            // 设置壁纸（直接应用到 #app 的背景）
+            const appElement = document.getElementById('app');
+            if (appElement) {
+                appElement.style.background = themeWallpaper.value;
+                appElement.style.backgroundSize = 'cover';
+                appElement.style.backgroundPosition = 'center';
+                appElement.style.backgroundRepeat = 'no-repeat';
+            }
+        };
 
         // 监听系统主题变化
         const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -1176,9 +1394,9 @@ export function setupApp() {
             
             if (normalizedName === 'console') {
                 loadProfiles();
-            } else if (normalizedName === 'soullink') {
-                if (!['ch_list', 'msg', 'feed', 'id'].includes(soulLinkTab.value)) {
-                    soulLinkTab.value = 'ch_list';
+            } else if (normalizedName === 'soullink' || normalizedName === 'chat') {
+                if (!['msg', 'group', 'feed', 'id'].includes(soulLinkTab.value)) {
+                    soulLinkTab.value = 'msg';
                 }
                 console.log(`[SoulLink] Tab: ${soulLinkTab.value}, Characters: ${characters.value.length}`);
                 if (characters.value.length === 0) {
@@ -1194,6 +1412,162 @@ export function setupApp() {
 
         const closeApp = () => {
             openedApp.value = null;
+        };
+
+        const goBack = () => {
+            openedApp.value = null;
+        };
+
+        const playerName = ref('');
+        const currentPlayerName = ref('');
+
+        const openGame = (gameId) => {
+            const game = games.startGame(gameId);
+            if (game) {
+                console.log('Opening game:', game.name);
+                // 重置玩家名字
+                playerName.value = '';
+                currentPlayerName.value = '';
+            }
+        };
+
+        const joinGame = () => {
+            if (playerName.value.trim()) {
+                const success = games.joinGame(playerName.value.trim());
+                if (success) {
+                    currentPlayerName.value = playerName.value.trim();
+                    playerName.value = '';
+                    console.log('Player joined:', currentPlayerName.value);
+                }
+            }
+        };
+
+        const startGameSession = () => {
+            const success = games.startGameSession();
+            if (success) {
+                console.log('Game started');
+            }
+        };
+
+        const castVote = (voterName, targetName) => {
+            const success = games.castVote(voterName, targetName);
+            if (success) {
+                console.log(`${voterName} voted for ${targetName}`);
+            }
+        };
+
+        const endDay = () => {
+            games.endDay();
+            console.log('Day ended');
+        };
+
+        const closeGame = () => {
+            games.currentGame = null;
+            console.log('Game closed');
+        };
+
+        // 新游戏相关状态
+        const showRules = ref(false);
+        const chatExpanded = ref(false);
+        const wheelRotation = ref(0);
+        const playerMessage = ref('');
+        const playerWord = ref('');
+        
+        // AI玩家状态
+        const aiPlayers = ref([
+            { status: '等待中' },
+            { status: '等待中' },
+            { status: '等待中' }
+        ]);
+        
+        // 聊天消息
+        const chatMessages = ref([]);
+        const undercoverMessages = ref([]);
+        
+        // 真心话大冒险历史记录
+        const todHistory = ref([]);
+
+        // 新游戏相关函数
+        const toggleSound = () => {
+            console.log('Toggle sound');
+        };
+
+        const playRPS = (choice) => {
+            const result = games.playRPS(choice);
+            console.log('RPS result:', result);
+            // 添加聊天消息
+            chatMessages.value.push({ sender: 'AI', content: `我出${result.aiChoice === 'rock' ? '石头' : result.aiChoice === 'paper' ? '布' : '剪刀'}！`, type: 'ai' });
+        };
+
+        const spinTOD = () => {
+            // 随机旋转角度
+            wheelRotation.value = Math.floor(Math.random() * 360) + 720; // 至少转两圈
+            
+            // 延迟执行，模拟转盘转动
+            setTimeout(() => {
+                const result = games.spinTruthOrDare();
+                console.log('TOD result:', result);
+                
+                // 添加到历史记录
+                todHistory.value.unshift({
+                    type: result.choice === 'truth' ? '真心话' : '大冒险',
+                    content: result.truth || result.dare
+                });
+                
+                // 限制历史记录数量
+                if (todHistory.value.length > 3) {
+                    todHistory.value = todHistory.value.slice(0, 3);
+                }
+                
+                // 添加聊天消息
+                chatMessages.value.push({ sender: 'AI', content: result.choice === 'truth' ? '真心话！快回答吧～' : '大冒险！挑战来了！', type: 'ai' });
+            }, 1500);
+        };
+
+        const nextTOD = () => {
+            games.gameState.truthOrDare = null;
+            games.gameState.currentTruth = null;
+            games.gameState.currentDare = null;
+        };
+
+        const startUNOGame = () => {
+            games.startUNOGame();
+            console.log('UNO game started');
+        };
+
+        const drawCard = () => {
+            console.log('Draw card');
+        };
+
+        const playCard = (index) => {
+            console.log('Play card:', index);
+        };
+
+        const sayUNO = () => {
+            console.log('UNO!');
+            chatMessages.value.push({ sender: '我', content: 'UNO!', type: 'player' });
+        };
+
+        const startLudoGame = () => {
+            games.startLudoGame();
+            console.log('Ludo game started');
+        };
+
+        const rollDice = () => {
+            const dice = games.rollDice();
+            console.log('Rolled dice:', dice);
+            chatMessages.value.push({ sender: '系统', content: `掷出了${dice}点`, type: 'system' });
+        };
+
+        const toggleAutoPlay = () => {
+            console.log('Toggle auto play');
+        };
+
+        const sendMessage = () => {
+            if (playerMessage.value.trim()) {
+                chatMessages.value.push({ sender: '我', content: playerMessage.value.trim(), type: 'player' });
+                playerMessage.value = '';
+            }
         };
 
         const switchWorkshopTab = (tabName) => {
@@ -1216,6 +1590,11 @@ export function setupApp() {
             const timestamp = new Date().toLocaleTimeString('en-GB');
             consoleLogs.value.unshift({ id: Date.now(), timestamp, message, type });
             if (consoleLogs.value.length > 50) consoleLogs.value.pop();
+        };
+
+        const clearConsole = () => {
+            consoleLogs.value = [];
+            addConsoleLog('日志已清空', 'system');
         };
 
         const loadProfiles = () => {
@@ -1364,14 +1743,43 @@ export function setupApp() {
 
             updateTime();
             setInterval(updateTime, 1000);
+            generateRandomHex();
+            setInterval(generateRandomHex, 500);
             loadCharacters();
-            loadSoulLinkMessages();
-            loadSoulLinkGroups();
-            loadSoulLinkPet();
-            initDeviceStatus();
-            applyTheme(); 
-            loadChatMenuSettings();
-            loadArchivedChats();
+            
+            initDB().then(async () => {
+                await feed.initFeedDB();
+                await loadSoulLinkMessages();
+                loadChatOfflineModes();
+                await loadSoulLinkGroups();
+                loadSoulLinkPet();
+                initDeviceStatus();
+                applyTheme(); 
+                
+                const savedUserAvatar = loadFromStorage('soulos_user_avatar');
+                if (savedUserAvatar) {
+                    userAvatar.value = savedUserAvatar;
+                }
+                
+                loadChatMenuSettings();
+                await loadArchivedChats();
+            }).catch(err => {
+                console.error('数据库初始化失败:', err);
+                loadSoulLinkMessages();
+                loadChatOfflineModes();
+                loadSoulLinkGroups();
+                loadSoulLinkPet();
+                initDeviceStatus();
+                applyTheme(); 
+                
+                const savedUserAvatar = loadFromStorage('soulos_user_avatar');
+                if (savedUserAvatar) {
+                    userAvatar.value = savedUserAvatar;
+                }
+                
+                loadChatMenuSettings();
+                loadArchivedChats();
+            });
         });
         
         watch(characters, saveCharacters, { deep: true });
@@ -1391,20 +1799,53 @@ export function setupApp() {
         // ==========================================================
         // --- SoulLink App State & Logic ---
         // ==========================================================
-        const soulLinkTab = ref('ch_list');
+        const soulLinkTab = ref('msg');
         const soulLinkActiveChat = ref(null);
         const soulLinkActiveChatType = ref('character');
         const soulLinkInput = ref('');
         const soulLinkReplyTarget = ref(null);
         const soulLinkMessages = ref({});
         const novelMode = ref(localStorage.getItem('soulos_novel_mode') === 'true');
+        const chatOfflineModes = ref({});
         
         watch(novelMode, (val) => localStorage.setItem('soulos_novel_mode', val));
+        
+        const isOfflineMode = computed(() => {
+            if (!soulLinkActiveChat.value) return false;
+            return chatOfflineModes.value[soulLinkActiveChat.value] || false;
+        });
+        
+        const setChatOfflineMode = (chatId, isOffline) => {
+            chatOfflineModes.value[chatId] = isOffline;
+            saveChatOfflineModes();
+        };
+        
+        const saveChatOfflineModes = () => {
+            try {
+                localStorage.setItem('soulos_chat_offline_modes', JSON.stringify(chatOfflineModes.value));
+            } catch (e) {
+                console.error('Failed to save chat offline modes:', e);
+            }
+        };
+        
+        const loadChatOfflineModes = () => {
+            try {
+                const saved = localStorage.getItem('soulos_chat_offline_modes');
+                if (saved) {
+                    chatOfflineModes.value = JSON.parse(saved);
+                }
+            } catch (e) {
+                console.error('Failed to load chat offline modes:', e);
+                chatOfflineModes.value = {};
+            }
+        };
 
         // Initialize App Hooks with Dependencies
-        const hub = reactive(useHub(activeProfile));
+        const hub = reactive(useHub({ activeProfile, characters }));
         const mate = reactive(useMate(soulLinkMessages, characters, activeProfile));
-        const feed = reactive(useFeed(activeProfile, characters));
+        const feed = reactive(useFeed(profiles, activeProfile));
+        const notice = reactive(useNotice());
+        const games = reactive(useGames());
 
         const soulLinkGroups = ref([]);
         const soulLinkPet = ref({
@@ -1421,7 +1862,11 @@ export function setupApp() {
         const showLocationPanel = ref(false);
         const showTransferPanel = ref(false);
         const showChatSettings = ref(false);
-        const isOfflineMode = ref(false);
+        const showPhotoSelectPanel = ref(false);
+        const showTextImagePanel = ref(false);
+        const textImageText = ref('');
+        const textImageBgColor = ref('#ffffff');
+        const textImageColors = ['#ffffff', '#f8f5f0', '#fef3c7', '#dbeafe', '#f3e8ff', '#fce7f3', '#dcfce7'];
         const showGreetingSelect = ref(false);
         const availableGreetings = ref([]);
         const selectedGreeting = ref(null);
@@ -1431,6 +1876,23 @@ export function setupApp() {
         const archivedChats = ref([]);
         const archiveName = ref('');
         const archiveDescription = ref('');
+        const showCreateGroupDialog = ref(false);
+        const newGroupName = ref('');
+        const newGroupMembers = ref('');
+        const newGroupAvatar = ref('');
+        const selectedGroupMembers = ref([]);
+        const groupAvatarInput = ref(null);
+        const showAddMemberDialog = ref(false);
+        const selectedAddMembers = ref([]);
+        const addMemberMode = ref('existing');
+        const customMemberAvatar = ref('');
+        const customMemberName = ref('');
+        const customMemberPersona = ref('');
+        const customMemberAvatarInput = ref(null);
+        const showRenameGroupDialog = ref(false);
+        const newGroupNameInput = ref('');
+        const tempGroupAvatar = ref('');
+        const renameGroupAvatarInput = ref(null);
         
 
         
@@ -1469,37 +1931,83 @@ export function setupApp() {
             '👁', '👀', '🧠', '🫀', '🫁', '🩸', '🦠', '💐',
             '🌸', '💮', '🏵', '🌹', '🥀', '🌺', '🌻', '🌼'
         ]);
-        const saveSoulLinkMessages = () => {
+        const saveSoulLinkMessages = async () => {
             try {
-                localStorage.setItem('soulos_soullink_messages', JSON.stringify(soulLinkMessages.value));
+                const dataToSave = JSON.parse(JSON.stringify(soulLinkMessages.value));
+                await dbPut('soulLinkMessages', { id: 'messages', data: dataToSave });
             } catch (e) {
                 console.error('Failed to save SoulLink messages:', e);
             }
         };
-        const loadSoulLinkMessages = () => {
+        
+        const clearChatHistory = () => {
+            if (!soulLinkActiveChat.value) return;
+            
+            if (confirm('确定要清空当前聊天记录吗？')) {
+                soulLinkMessages.value[soulLinkActiveChat.value] = [];
+                saveSoulLinkMessages();
+            }
+        };
+        
+        const exportChatHistory = () => {
+            if (!soulLinkActiveChat.value) return;
+            
+            const messages = soulLinkMessages.value[soulLinkActiveChat.value] || [];
+            if (messages.length === 0) {
+                alert('没有聊天记录可导出');
+                return;
+            }
+            
+            let content = '';
+            messages.forEach(msg => {
+                const time = msg.time || '';
+                const sender = msg.sender === 'ai' ? currentChatName.value || 'AI' : '我';
+                const text = msg.text || '';
+                content += `[${time}] ${sender}：${text}\n\n`;
+            });
+            
+            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `聊天记录_${new Date().toLocaleDateString()}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+        };
+        const loadSoulLinkMessages = async () => {
             try {
-                const saved = localStorage.getItem('soulos_soullink_messages');
-                if (saved) {
-                    soulLinkMessages.value = JSON.parse(saved);
+                const saved = await dbGet('soulLinkMessages', 'messages');
+                if (saved && saved.data) {
+                    soulLinkMessages.value = saved.data;
                 }
             } catch (e) {
                 console.error('Failed to load SoulLink messages:', e);
                 soulLinkMessages.value = {};
             }
         };
-        const saveSoulLinkGroups = () => {
+        const saveSoulLinkGroups = async () => {
             try {
-                localStorage.setItem('soulos_soullink_groups', JSON.stringify(soulLinkGroups.value));
+                const dataToSave = JSON.parse(JSON.stringify(soulLinkGroups.value));
+                await dbPut('soulLinkGroups', { id: 'groups', data: dataToSave });
             } catch (e) {
                 console.error('Failed to save SoulLink groups:', e);
             }
         };
-        const loadSoulLinkGroups = () => {
+        const loadSoulLinkGroups = async () => {
             try {
-                const saved = localStorage.getItem('soulos_soullink_groups');
-                if (saved) {
-                    const parsed = JSON.parse(saved);
+                const saved = await dbGet('soulLinkGroups', 'groups');
+                if (saved && saved.data) {
+                    const parsed = saved.data;
                     soulLinkGroups.value = Array.isArray(parsed) ? parsed : [];
+                    soulLinkGroups.value.forEach(group => {
+                        if (group.members && Array.isArray(group.members)) {
+                            group.members.forEach(member => {
+                                if (member.relation === undefined) {
+                                    member.relation = '';
+                                }
+                            });
+                        }
+                    });
                 }
             } catch (e) {
                 console.error('Failed to load SoulLink groups:', e);
@@ -1580,7 +2088,7 @@ export function setupApp() {
 
         const getActiveChatPronoun = () => {
             if (soulLinkActiveChatType.value !== 'character') return 'TA';
-            const char = characters.value.find(c => c.id === soulLinkActiveChat.value);
+            const char = characters.value.find(c => String(c.id) === String(soulLinkActiveChat.value));
             const source = char ? getCharacterGender(char) : '';
             if (!source) return 'TA';
             const femaleHints = ['女', '女生', '女性', '她', '小姐姐', '少女', '妹妹', '姐姐', '母亲', '女友', 'wife', 'female', 'girl', 'woman'];
@@ -1777,11 +2285,44 @@ export function setupApp() {
             soulLinkTab.value = 'msg';
             if (!soulLinkMessages.value[charId]) {
                 soulLinkMessages.value[charId] = [];
-                // 不再自动发送开场白，只有在线下模式下才会发送
+                // 在线上模式下自动发送开场白
+                sendOnlineModeGreeting();
             }
             // 加载当前角色的聊天设置
             loadChatMenuSettings();
             scrollToBottom();
+        };
+        
+        // 发送线上模式开场白
+        const sendOnlineModeGreeting = () => {
+            if (!soulLinkActiveChat.value) return;
+
+            const activeCharacter = characters.value.find(c => String(c.id) === String(soulLinkActiveChat.value));
+            if (activeCharacter) {
+                // 支持 openingLine 和 openingLines 两种格式
+                let greetings = [];
+                if (activeCharacter.openingLines && activeCharacter.openingLines.length > 0) {
+                    greetings = activeCharacter.openingLines;
+                } else if (activeCharacter.openingLine) {
+                    greetings = activeCharacter.openingLine.split('\n\n').filter(g => g.trim());
+                }
+                
+                if (greetings.length > 0) {
+                    // 随机选择一个开场白
+                    const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
+                    
+                    // 创建开场白消息
+                    const newMsg = {
+                        id: Date.now(),
+                        sender: 'ai',
+                        text: randomGreeting,
+                        timestamp: Date.now()
+                    };
+                    
+                    // 添加到聊天记录
+                    pushMessageToActiveChat(newMsg);
+                }
+            }
         };
 
         const openSoulLinkGroupChat = (groupId) => {
@@ -1854,6 +2395,32 @@ export function setupApp() {
             return new Date(lastMsg.timestamp || Date.now()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
         };
 
+        const formatMessageDate = (timestamp) => {
+            const date = new Date(timestamp || Date.now());
+            return date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }) + ' ' + 
+                   date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        };
+
+        // 获取当前聊天框的存档（过滤显示）
+        const filteredArchivedChats = computed(() => {
+            if (!soulLinkActiveChat.value) {
+                return archivedChats.value;
+            }
+            const currentChatType = soulLinkActiveChatType.value;
+            const currentChatId = soulLinkActiveChat.value;
+            
+            return archivedChats.value.filter(archive => {
+                const archiveChatId = archive.chatId || archive.characterId;
+                const archiveChatType = archive.chatType || 'character';
+                return archiveChatType === currentChatType && archiveChatId == currentChatId;
+            });
+        });
+
+        // 存档按时间倒序排列
+        const sortedArchivedChats = computed(() => {
+            return [...filteredArchivedChats.value].sort((a, b) => b.timestamp - a.timestamp);
+        });
+
         const closeAllPanels = () => {
             showAttachmentPanel.value = false;
             showImageSubmenu.value = false;
@@ -1861,25 +2428,28 @@ export function setupApp() {
             showTransferPanel.value = false;
             showEmojiPanel.value = false;
             showVirtualCamera.value = false;
+            showPhotoSelectPanel.value = false;
+            showTextImagePanel.value = false;
             showChatSettings.value = false;
             showArchiveDialog.value = false;
             showArchivedChats.value = false;
         };
 
         // 存档相关函数
-        const saveArchivedChats = () => {
+        const saveArchivedChats = async () => {
             try {
-                localStorage.setItem('soulos_archived_chats', JSON.stringify(archivedChats.value));
+                const dataToSave = JSON.parse(JSON.stringify(archivedChats.value));
+                await dbPut('archivedChats', { id: 'archives', data: dataToSave });
             } catch (e) {
                 console.error('Failed to save archived chats:', e);
             }
         };
 
-        const loadArchivedChats = () => {
+        const loadArchivedChats = async () => {
             try {
-                const saved = localStorage.getItem('soulos_archived_chats');
-                if (saved) {
-                    archivedChats.value = JSON.parse(saved);
+                const saved = await dbGet('archivedChats', 'archives');
+                if (saved && saved.data) {
+                    archivedChats.value = saved.data;
                 }
             } catch (e) {
                 console.error('Failed to load archived chats:', e);
@@ -1890,13 +2460,33 @@ export function setupApp() {
         const archiveCurrentChat = () => {
             if (!soulLinkActiveChat.value || !archiveName.value.trim()) return;
 
-            const currentMessages = soulLinkMessages.value[soulLinkActiveChat.value] || [];
+            let currentMessages = [];
+            let chatType = soulLinkActiveChatType.value;
+            let chatId = soulLinkActiveChat.value;
+            
+            if (chatType === 'group' && activeGroupChat.value) {
+                currentMessages = activeGroupChat.value.history || [];
+            } else {
+                currentMessages = soulLinkMessages.value[chatId] || [];
+            }
+            
             if (currentMessages.length === 0) return;
+
+            // 获取聊天名称
+            let chatName = '';
+            if (chatType === 'group' && activeGroupChat.value) {
+                chatName = activeGroupChat.value.name;
+            } else {
+                const char = characters.value.find(c => String(c.id) === String(chatId));
+                chatName = char ? (char.nickname || char.name) : '未知';
+            }
 
             // 创建存档
             const archive = {
                 id: `archive_${Date.now()}`,
-                characterId: soulLinkActiveChat.value,
+                chatType: chatType,
+                chatId: chatId,
+                chatName: chatName,
                 name: archiveName.value.trim(),
                 description: archiveDescription.value.trim(),
                 timestamp: Date.now(),
@@ -1904,37 +2494,346 @@ export function setupApp() {
                 preview: currentMessages[currentMessages.length - 1]?.text || '无消息'
             };
 
-            // 添加到存档列表
-            archivedChats.value.push(archive);
+            // 添加到存档列表最前面
+            archivedChats.value.unshift(archive);
             saveArchivedChats();
 
             // 清空当前对话
-            soulLinkMessages.value[soulLinkActiveChat.value] = [];
+            if (chatType === 'group' && activeGroupChat.value) {
+                activeGroupChat.value.history = [];
+                activeGroupChat.value.lastMessage = '';
+                activeGroupChat.value.lastTime = '';
+            } else {
+                soulLinkMessages.value[chatId] = [];
+            }
             saveSoulLinkMessages();
+            saveSoulLinkGroups();
 
             // 关闭存档对话框
             showArchiveDialog.value = false;
             archiveName.value = '';
             archiveDescription.value = '';
+            
+            // 提示已存档
+            alert('已存档');
         };
 
         const restoreArchivedChat = (archive) => {
             if (!archive) return;
 
-            // 切换到对应角色的聊天
-            soulLinkActiveChat.value = archive.characterId;
-            soulLinkActiveChatType.value = 'character';
-            soulLinkTab.value = 'msg';
+            const chatType = archive.chatType || 'character';
+            const chatId = archive.chatId || archive.characterId;
 
-            // 恢复消息
-            soulLinkMessages.value[archive.characterId] = [...archive.messages];
-            saveSoulLinkMessages();
+            if (chatType === 'group') {
+                // 恢复群聊
+                const group = soulLinkGroups.value.find(g => g.id == chatId);
+                if (group) {
+                    activeGroupChat.value = group;
+                    soulLinkActiveChat.value = chatId;
+                    soulLinkActiveChatType.value = 'group';
+                    soulLinkTab.value = 'msg';
+                    
+                    // 恢复消息
+                    group.history = [...archive.messages];
+                    if (archive.messages.length > 0) {
+                        const lastMsg = archive.messages[archive.messages.length - 1];
+                        group.lastMessage = lastMsg.text || '';
+                        group.lastTime = new Date(lastMsg.timestamp || Date.now()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    }
+                    saveSoulLinkGroups();
+                }
+            } else {
+                // 恢复单聊
+                soulLinkActiveChat.value = chatId;
+                soulLinkActiveChatType.value = 'character';
+                soulLinkTab.value = 'msg';
+
+                // 恢复消息
+                soulLinkMessages.value[chatId] = [...archive.messages];
+                saveSoulLinkMessages();
+            }
 
             // 关闭存档管理界面
             showArchivedChats.value = false;
 
             // 滚动到底部
             scrollToBottom();
+        };
+
+        const triggerGroupAvatarUpload = () => {
+            if (groupAvatarInput.value) {
+                groupAvatarInput.value.click();
+            }
+        };
+
+        const handleGroupAvatarUpload = (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('图片大小不能超过5MB');
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    compressAvatarImage(e.target.result, (compressedUrl) => {
+                        newGroupAvatar.value = compressedUrl;
+                    });
+                };
+                reader.readAsDataURL(file);
+            }
+        };
+
+        const triggerRenameGroupAvatarUpload = () => {
+            if (renameGroupAvatarInput.value) {
+                renameGroupAvatarInput.value.click();
+            }
+        };
+
+        const handleRenameGroupAvatarUpload = (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('图片大小不能超过5MB');
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    compressAvatarImage(e.target.result, (compressedUrl) => {
+                        tempGroupAvatar.value = compressedUrl;
+                    });
+                };
+                reader.readAsDataURL(file);
+            }
+        };
+
+        const triggerCustomMemberAvatarUpload = () => {
+            if (customMemberAvatarInput.value) {
+                customMemberAvatarInput.value.click();
+            }
+        };
+
+        const handleCustomMemberAvatarUpload = (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('图片大小不能超过5MB');
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    compressAvatarImage(e.target.result, (compressedUrl) => {
+                        customMemberAvatar.value = compressedUrl;
+                    });
+                };
+                reader.readAsDataURL(file);
+            }
+        };
+
+        const addCustomMember = () => {
+            if (!activeGroupChat.value || !customMemberName.value.trim()) return;
+
+            const newMember = {
+                id: 'custom_' + Date.now(),
+                name: customMemberName.value.trim(),
+                avatarUrl: customMemberAvatar.value || '',
+                relation: '',
+                persona: customMemberPersona.value.trim(),
+                isCustom: true
+            };
+
+            activeGroupChat.value.members.push(newMember);
+            saveSoulLinkGroups();
+            
+            showAddMemberDialog.value = false;
+            addMemberMode.value = 'existing';
+            customMemberAvatar.value = '';
+            customMemberName.value = '';
+            customMemberPersona.value = '';
+            
+            alert('自定义成员添加成功！');
+        };
+
+        // 重命名群聊
+        const renameGroup = () => {
+            if (!activeGroupChat.value || !newGroupNameInput.value.trim()) return;
+            
+            activeGroupChat.value.name = newGroupNameInput.value.trim();
+            if (tempGroupAvatar.value) {
+                activeGroupChat.value.avatarUrl = tempGroupAvatar.value;
+            }
+            saveSoulLinkGroups();
+            
+            showRenameGroupDialog.value = false;
+            newGroupNameInput.value = '';
+            tempGroupAvatar.value = '';
+        };
+
+        // 单聊拍一拍
+        const shakeCharacter = () => {
+            if (!soulLinkActiveChat.value) return;
+            
+            const char = characters.value.find(c => String(c.id) === String(soulLinkActiveChat.value));
+            if (!char) return;
+            
+            const msg = {
+                id: `msg_${Date.now()}`,
+                sender: 'system',
+                isUser: false,
+                text: `[拍一拍] 你拍了拍${char.nickname || char.name}`,
+                timestamp: Date.now(),
+                messageType: 'text',
+                isSystem: true,
+                time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+            };
+            
+            if (soulLinkActiveChatType.value === 'group' && activeGroupChat.value) {
+                if (!Array.isArray(activeGroupChat.value.history)) activeGroupChat.value.history = [];
+                activeGroupChat.value.history.push(msg);
+                activeGroupChat.value.lastMessage = msg.text;
+                activeGroupChat.value.lastTime = msg.time;
+            } else {
+                if (!Array.isArray(soulLinkMessages.value[soulLinkActiveChat.value])) {
+                    soulLinkMessages.value[soulLinkActiveChat.value] = [];
+                }
+                soulLinkMessages.value[soulLinkActiveChat.value].push(msg);
+            }
+            saveSoulLinkMessages();
+            saveSoulLinkGroups();
+            scrollToBottom();
+        };
+
+        // 群聊成员拍一拍
+        const shakeGroupMember = (member, index) => {
+            if (!activeGroupChat.value) return;
+            
+            const msg = {
+                id: `msg_${Date.now()}`,
+                sender: 'system',
+                isUser: false,
+                text: `[拍一拍] 你拍了拍${member.name}`,
+                timestamp: Date.now(),
+                messageType: 'text',
+                isSystem: true,
+                time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+            };
+            
+            if (!Array.isArray(activeGroupChat.value.history)) activeGroupChat.value.history = [];
+            activeGroupChat.value.history.push(msg);
+            activeGroupChat.value.lastMessage = msg.text;
+            activeGroupChat.value.lastTime = msg.time;
+            
+            saveSoulLinkGroups();
+            scrollToBottom();
+        };
+
+        const toggleGroupMember = (charId) => {
+            const index = selectedGroupMembers.value.indexOf(charId);
+            if (index > -1) {
+                selectedGroupMembers.value.splice(index, 1);
+            } else {
+                selectedGroupMembers.value.push(charId);
+            }
+        };
+
+        const createNewGroup = () => {
+            if (!newGroupName.value.trim()) return;
+
+            const members = [];
+            selectedGroupMembers.value.forEach(charId => {
+                const char = characters.value.find(c => c.id === charId);
+                if (char) {
+                    members.push({
+                        id: char.id,
+                        name: char.nickname || char.name,
+                        avatarUrl: char.avatarUrl,
+                        relation: ''
+                    });
+                }
+            });
+
+            if (members.length === 0) {
+                members.push(
+                    { id: 'default1', name: '成员A', avatarUrl: '', relation: '' },
+                    { id: 'default2', name: '成员B', avatarUrl: '', relation: '' },
+                    { id: 'default3', name: '成员C', avatarUrl: '', relation: '' }
+                );
+            }
+
+            const newGroup = {
+                id: Date.now(),
+                name: newGroupName.value.trim(),
+                avatarUrl: newGroupAvatar.value,
+                members: members,
+                history: [],
+                createdAt: Date.now()
+            };
+
+            soulLinkGroups.value.unshift(newGroup);
+            saveSoulLinkGroups();
+
+            showCreateGroupDialog.value = false;
+            newGroupName.value = '';
+            newGroupMembers.value = '';
+            newGroupAvatar.value = '';
+            selectedGroupMembers.value = [];
+
+            alert('群聊创建成功！');
+        };
+
+        // 获取可添加的角色（排除已在群中的）
+        const getAvailableCharactersForAdd = computed(() => {
+            if (!activeGroupChat.value || !Array.isArray(activeGroupChat.value.members)) {
+                return characters.value;
+            }
+            const existingMemberIds = activeGroupChat.value.members.map(m => m.id);
+            return characters.value.filter(c => !existingMemberIds.includes(c.id));
+        });
+
+        // 切换选择要添加的成员
+        const toggleAddMember = (charId) => {
+            const index = selectedAddMembers.value.indexOf(charId);
+            if (index > -1) {
+                selectedAddMembers.value.splice(index, 1);
+            } else {
+                selectedAddMembers.value.push(charId);
+            }
+        };
+
+        // 添加成员到群聊
+        const addMembersToGroup = () => {
+            if (!activeGroupChat.value || selectedAddMembers.value.length === 0) return;
+
+            selectedAddMembers.value.forEach(charId => {
+                const char = characters.value.find(c => c.id === charId);
+                if (char) {
+                    activeGroupChat.value.members.push({
+                        id: char.id,
+                        name: char.nickname || char.name,
+                        avatarUrl: char.avatarUrl,
+                        relation: ''
+                    });
+                }
+            });
+
+            saveSoulLinkGroups();
+            showAddMemberDialog.value = false;
+            selectedAddMembers.value = [];
+            alert('成员添加成功！');
+        };
+
+        // 删除群成员
+        const removeGroupMember = (index) => {
+            if (!activeGroupChat.value) return;
+            
+            if (activeGroupChat.value.members.length <= 1) {
+                alert('群聊至少需要1个成员！');
+                return;
+            }
+            
+            if (confirm('确定要删除这个成员吗？')) {
+                activeGroupChat.value.members.splice(index, 1);
+                saveSoulLinkGroups();
+            }
         };
 
         const deleteArchivedChat = (archiveId) => {
@@ -2027,306 +2926,60 @@ export function setupApp() {
             onSendOrCall();
         };
 
-        const sendSoulLinkMessage = async (triggerApi) => {
-            const shouldTriggerApi = triggerApi === true;
+        const sendSoulLinkMessage = async () => {
             const text = soulLinkInput.value.trim();
             if (!soulLinkActiveChat.value) return;
-            if (!text) {
-                addSystemMessageToActiveChat('请输入消息');
-                return;
-            }
-            if (editingMessageId.value) {
-                const chatMsgs = getActiveChatHistory();
-                const editIndex = chatMsgs.findIndex(m => m.id === editingMessageId.value);
-                if (editIndex !== -1) {
-                    const target = chatMsgs[editIndex];
-                    if (target.sender === 'user' && !target.isRecalled) {
-                        chatMsgs[editIndex] = {
-                            ...target,
-                            text,
-                            editedAt: Date.now()
-                        };
-                        syncActiveChatState();
-                        persistActiveChat();
-                        scrollToBottom();
+            
+            // 如果有文字，发送用户消息
+            if (text) {
+                if (editingMessageId.value) {
+                    const chatMsgs = getActiveChatHistory();
+                    const editIndex = chatMsgs.findIndex(m => m.id === editingMessageId.value);
+                    if (editIndex !== -1) {
+                        const target = chatMsgs[editIndex];
+                        if (!target.isRecalled) {
+                            chatMsgs[editIndex] = {
+                                ...target,
+                                text,
+                                editedAt: Date.now()
+                            };
+                            syncActiveChatState();
+                            persistActiveChat();
+                            scrollToBottom();
+                        }
                     }
+                    editingMessageId.value = null;
+                    soulLinkInput.value = '';
+                    soulLinkReplyTarget.value = null;
+                    return;
                 }
-                editingMessageId.value = null;
+
+                const replyContextForPrompt = soulLinkReplyTarget.value ? { ...soulLinkReplyTarget.value } : null;
+                const isGroupChat = soulLinkActiveChatType.value === 'group';
+                const activeGroup = isGroupChat ? activeGroupChat.value : null;
+                if (isGroupChat && !activeGroup) return;
+
+                const newMsg = {
+                    id: Date.now(),
+                    sender: 'user',
+                    text: text,
+                    timestamp: Date.now(),
+                    isLogOnly: false,
+                    isReplied: false
+                };
+
+                if (replyContextForPrompt) {
+                    newMsg.replyTo = replyContextForPrompt;
+                }
+                if (isGroupChat) {
+                    newMsg.senderName = '我';
+                    newMsg.senderAvatar = userAvatar;
+                }
+                pushMessageToActiveChat(newMsg);
+                
                 soulLinkInput.value = '';
                 soulLinkReplyTarget.value = null;
-                return;
             }
-
-            const replyContextForPrompt = soulLinkReplyTarget.value ? { ...soulLinkReplyTarget.value } : null;
-            const isGroupChat = soulLinkActiveChatType.value === 'group';
-            const activeGroup = isGroupChat ? activeGroupChat.value : null;
-            if (isGroupChat && !activeGroup) return;
-            const char = isGroupChat ? null : characters.value.find(c => c.id === soulLinkActiveChat.value);
-
-            const newMsg = {
-                id: Date.now(),
-                sender: 'user',
-                text: text,
-                timestamp: Date.now(),
-                isLogOnly: !shouldTriggerApi,
-                isReplied: false
-            };
-
-            if (replyContextForPrompt) {
-                newMsg.replyTo = replyContextForPrompt;
-            }
-            if (isGroupChat) {
-                newMsg.senderName = '我';
-            }
-            pushMessageToActiveChat(newMsg);
-            
-            soulLinkInput.value = '';
-            soulLinkReplyTarget.value = null;
-
-            if (shouldTriggerApi) {
-                if (!activeProfile.value) {
-                    pushMessageToActiveChat({
-                        id: Date.now() + 1,
-                        sender: 'system',
-                        text: '未检测到任何 API 配置，请先在 Console 中创建并选择一个配置。',
-                        timestamp: Date.now(),
-                        isSystem: true
-                    });
-                    return;
-                }
-
-                const profile = activeProfile.value;
-                const endpoint = (profile.endpoint || '').trim();
-                const key = (profile.key || '').trim();
-
-                if (!endpoint || !key) {
-                    pushMessageToActiveChat({
-                        id: Date.now() + 2,
-                        sender: 'system',
-                        text: '当前配置缺少 API 地址或密钥，请在 Console 中补全后重试。',
-                        timestamp: Date.now(),
-                        isSystem: true
-                    });
-                    return;
-                }
-
-                let modelId = profile.model;
-                if (!modelId && availableModels.value.length > 0) {
-                    modelId = availableModels.value[0].id;
-                    profile.model = modelId;
-                }
-
-                const history = isGroupChat ? (activeGroup.history || []) : (soulLinkMessages.value[soulLinkActiveChat.value] || []);
-                const pendingUserMessages = getPendingUserMessages(history);
-
-                const messagesPayload = [];
-
-                let systemPrompt = '';
-                
-                if (isGroupChat) {
-                    const groupName = activeGroup && activeGroup.name ? activeGroup.name : '群聊';
-                    const members = activeGroup && Array.isArray(activeGroup.members) && activeGroup.members.length > 0 ? activeGroup.members : ['成员A', '成员B', '成员C'];
-                    systemPrompt = `你正在群聊【${groupName}】中与用户对话。\n\n`;
-                    systemPrompt += `# 群成员\n${members.join('、')}\n\n`;
-                    systemPrompt += `# 行为规则\n1. 回复要简短自然，像真实群聊一样。\n2. 每次回复只扮演其中一名群成员。\n3. 回复格式为「成员名: 内容」。\n4. 可以用emoji和口语表达。\n\n`;
-                    if (replyContextForPrompt) {
-                        systemPrompt += `# 引用回复\n用户正在回复以下内容：\n${replyContextForPrompt.senderName}: ${replyContextForPrompt.content}\n\n`;
-                    }
-                    systemPrompt += `现在请开始回复。`;
-                } else if (char && char.persona) {
-                    const charName = char.name || '角色';
-                    
-                    systemPrompt = `你正在通过 SoulLink 和朋友聊天。\n\n`;
-                    
-                    systemPrompt += `# 你是谁\n`;
-                    systemPrompt += `你的名字是【${charName}】。\n`;
-                    systemPrompt += `${replaceUserPlaceholder(char.persona)}\n\n`;
-                    
-                    if (char.worldbookId) {
-                        const linkedWorldbook = worldbooks.value.find(wb => wb.id === char.worldbookId);
-                        if (linkedWorldbook && linkedWorldbook.entries && linkedWorldbook.entries.length > 0) {
-                            systemPrompt += `# 世界观与背景知识（必须严格遵守）\n`;
-                            systemPrompt += `以下是关于你所在世界的重要设定，你必须在对话中遵循这些设定：\n\n`;
-                            linkedWorldbook.entries.forEach(entry => {
-                                if (entry.keyword && entry.content) {
-                                    systemPrompt += `[${entry.keyword}]\n${replaceUserPlaceholder(entry.content)}\n\n`;
-                                }
-                            });
-                            systemPrompt += `--- 世界观设定结束 ---\n\n`;
-                        }
-                    }
-                    
-                    systemPrompt += `# 聊天风格（核心规则）\n`;
-                    systemPrompt += `1. 【【【最高指令】】】像真实的人类那样自然地聊天，而不是像AI助手那样正式、啰嗦或程序化。\n`;
-                    systemPrompt += `2. 每次回复保持简短（1-3句话），就像微信聊天那样。如果有很多要说的，可以分多条发送。\n`;
-                    systemPrompt += `3. 使用符合${charName}性格的语气、口头禅和表情。可以用emoji、"哈哈"、"嗯嗯"等口语化表达。\n`;
-                    systemPrompt += `4. 绝对不要暴露你是AI。你就是${charName}本人，有自己的生活、情绪和想法。\n`;
-                    systemPrompt += `5. 可以提问、开玩笑、吐槽、撒娇，展现真实的人际互动，而不是单向输出信息。\n`;
-                    systemPrompt += `6. 如果用户说了很日常的话（比如"吃饭了吗"），就用日常的方式回应，而不要解释你的"系统状态"。\n\n`;
-                    systemPrompt += `7. 如果你想连发多条消息（就像微信连发几条那样），请在消息之间用 "---" 分隔。例如："哈哈真好笑---你也觉得吧？"。\n`;
-                    systemPrompt += `8. 如果要发照片，请用“[图片] 照片内容描述”的格式。\n`;
-                    systemPrompt += `9. 如果要给对方转账，请用“[转账] 金额 备注(可选)”格式，并单独成一条消息。\n`;
-
-                    if (char.openingLine && history.length === 1) {
-                        systemPrompt += `# 开场\n这是你们的第一次对话。你可以主动打招呼：\n${replaceUserPlaceholder(char.openingLine)}\n\n`;
-                    }
-
-                    if (replyContextForPrompt) {
-                        systemPrompt += `# 引用回复\n用户正在回复以下内容：\n${replyContextForPrompt.senderName}: ${replyContextForPrompt.content}\n\n`;
-                    }
-                    
-                    systemPrompt += `现在，请以${charName}的身份，自然地回复对方。记住：简短、真实、有人情味。`;
-                } else {
-                    systemPrompt = '你是一个友好的朋友，正在通过SoulLink聊天。请像真人一样自然、简短地对话，每次1-3句话即可。可以用emoji和口语化表达。';
-                    if (replyContextForPrompt) {
-                        systemPrompt += `\n\n用户正在回复以下内容：\n${replyContextForPrompt.senderName}: ${replyContextForPrompt.content}`;
-                    }
-                    systemPrompt += `\n如果要发照片，请用“[图片] 照片内容描述”的格式。`;
-                    systemPrompt += `\n如果要给对方转账，请用“[转账] 金额 备注(可选)”格式，并单独成一条消息。`;
-                }
-
-                messagesPayload.push({
-                    role: 'system',
-                    content: systemPrompt
-                });
-                
-                history.forEach(m => {
-                    if (m.isSystem || m.isHidden) return;
-                    const ctx = buildSoulLinkReplyContext(m);
-                    const raw = ctx.content || (m.text || '');
-                    if (m.sender === 'user') {
-                        messagesPayload.push({ role: 'user', content: raw });
-                    } else if (m.sender === 'ai') {
-                        messagesPayload.push({ role: 'assistant', content: raw });
-                    }
-                });
-
-                messagesPayload.push({ role: 'user', content: isGroupChat ? `我: ${text}` : text });
-
-                isAiTyping.value = true;
-                scrollToBottom();
-
-                try {
-                    const response = await fetch(endpoint.replace(/\/+$/, '') + '/chat/completions', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${key}`
-                        },
-                        body: JSON.stringify({
-                            model: modelId || '',
-                            messages: messagesPayload,
-                            temperature: profile.temperature ?? 0.7,
-                            stream: false
-                        })
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(`接口返回状态码 ${response.status}`);
-                    }
-
-                    const data = await response.json();
-                    let reply = '';
-
-                    if (data && Array.isArray(data.choices) && data.choices.length > 0) {
-                        const msg = data.choices[0].message || data.choices[0].delta;
-                        if (msg && msg.content) reply = msg.content;
-                    }
-
-                    if (!reply && data && data.message && data.message.content) {
-                        reply = data.message.content;
-                    }
-
-                    if (!reply) {
-                        reply = '模型已响应，但未返回可显示的内容。';
-                    }
-                    
-                    isAiTyping.value = false; 
-                    
-                    const separator = '---';
-                    const appendAiMessage = (rawText, index = 0) => {
-                        const trimmedText = rawText.trim();
-                        if (!trimmedText) return;
-                        if (isGroupChat) {
-                            const parsed = parseGroupReply(trimmedText);
-                            if (!parsed.content) return;
-                            const imageDesc = extractAiImageDescription(parsed.content);
-                            if (imageDesc) {
-                                pushMessageToActiveChat({
-                                    id: Date.now() + index,
-                                    sender: 'ai',
-                                    senderName: parsed.senderName,
-                                    messageType: 'image',
-                                    imageUrl: null,
-                                    text: formatAiImageText(imageDesc, 'TA'),
-                                    timestamp: Date.now()
-                                });
-                                return;
-                            }
-                            pushMessageToActiveChat({
-                                id: Date.now() + index,
-                                sender: 'ai',
-                                senderName: parsed.senderName,
-                                text: parsed.content,
-                                timestamp: Date.now()
-                            });
-                        } else {
-                            const imageDesc = extractAiImageDescription(trimmedText);
-                            if (imageDesc) {
-                                pushMessageToActiveChat({
-                                    id: Date.now() + index,
-                                    sender: 'ai',
-                                    messageType: 'image',
-                                    imageUrl: null,
-                                    text: formatAiImageText(imageDesc, getActiveChatPronoun()),
-                                    timestamp: Date.now()
-                                });
-                            } else {
-                                pushMessageToActiveChat({
-                                    id: Date.now() + index,
-                                    sender: 'ai',
-                                    text: trimmedText,
-                                    timestamp: Date.now()
-                                });
-                            }
-                        }
-                    };
-                    
-                    if (reply.includes(separator)) {
-                        const parts = reply.split(separator);
-                        parts.forEach((part, index) => {
-                            if (part.trim()) {
-                                setTimeout(() => {
-                                    appendAiMessage(part, index);
-                                }, index * 800);
-                            }
-                        });
-                    } else {
-                        appendAiMessage(reply, 0);
-                    }
-                    if (pendingUserMessages.length > 0) {
-                        markMessagesReplied(history, pendingUserMessages.map(m => m.id));
-                    }
-                    addConsoleLog('SoulLink 会话：已成功从模型获取回复。', 'success');
-
-                } catch (error) {
-                    isAiTyping.value = false;
-                    pushMessageToActiveChat({
-                        id: Date.now() + 5,
-                        sender: 'system',
-                        text: `请求模型时出错：${error.message}`,
-                        timestamp: Date.now(),
-                        isSystem: true
-                    });
-                    addConsoleLog('SoulLink 会话错误：' + error.message, 'error');
-                }
-            }
-        };
-        
-        const replaceUserPlaceholder = (text) => {
-            if (!text) return '';
-            const name = userIdentity.value || '用户';
-            return text.replace(/\{\{user\}\}/g, name);
         };
 
         const triggerSoulLinkAiReply = async () => {
@@ -2352,10 +3005,6 @@ export function setupApp() {
             
             const history = isGroupChat ? (activeGroup.history || []) : (soulLinkMessages.value[soulLinkActiveChat.value] || []);
             const pendingUserMessages = getPendingUserMessages(history);
-            if (pendingUserMessages.length === 0) {
-                addSystemMessageToActiveChat('没有需要回复的消息');
-                return;
-            }
             const profile = activeProfile.value;
             const endpoint = (profile.endpoint || '').trim();
             const key = (profile.key || '').trim();
@@ -2378,10 +3027,23 @@ export function setupApp() {
             let systemPrompt = '';
             if (isGroupChat) {
                 const groupName = activeGroup && activeGroup.name ? activeGroup.name : '群聊';
-                const members = activeGroup && Array.isArray(activeGroup.members) && activeGroup.members.length > 0 ? activeGroup.members : ['成员A', '成员B', '成员C'];
+                const members = activeGroup && Array.isArray(activeGroup.members) && activeGroup.members.length > 0 ? activeGroup.members : [];
                 systemPrompt = `你正在群聊【${groupName}】中与用户对话。\n\n`;
-                systemPrompt += `# 群成员\n${members.join('、')}\n\n`;
-                systemPrompt += `# 行为规则\n1. 回复要简短自然，像真实群聊一样。\n2. 每次回复只扮演其中一名群成员。\n3. 回复格式为「成员名: 内容」。\n4. 可以用emoji和口语表达。\n\n`;
+                systemPrompt += `# 群成员\n`;
+                if (members.length > 0) {
+                    members.forEach((member, idx) => {
+                        const memberName = typeof member === 'string' ? member : (member.name || member);
+                        const memberPersona = typeof member !== 'string' && member.persona ? member.persona : '';
+                        systemPrompt += `${idx + 1}. ${memberName}`;
+                        if (memberPersona) {
+                            systemPrompt += ` - ${memberPersona}`;
+                        }
+                        systemPrompt += `\n`;
+                    });
+                } else {
+                    systemPrompt += `成员A、成员B、成员C\n`;
+                }
+                systemPrompt += `\n# 行为规则\n1. 回复要简短自然，像真实群聊一样。\n2. 每次回复只扮演其中一名群成员。\n3. 回复格式为「成员名: 内容」。\n4. 可以用emoji和口语表达。\n5. 根据每个成员的人设来扮演他们的说话风格和性格特点。\n\n`;
                 systemPrompt += `现在请开始回复。`;
             } else if (char && char.persona) {
                 const charName = char.name || '角色';
@@ -2464,8 +3126,14 @@ export function setupApp() {
                     messagesPayload.push({ role: 'assistant', content: raw });
                 }
             });
+            
             isAiTyping.value = true;
             scrollToBottom();
+            
+            // 保存当前聊天ID，防止用户切换聊天窗口后消息发送到错误的窗口
+            const currentChatId = soulLinkActiveChat.value;
+            const currentChatType = soulLinkActiveChatType.value;
+
             try {
                 const response = await fetch(endpoint.replace(/\/+$/, '') + '/chat/completions', {
                     method: 'POST',
@@ -2498,11 +3166,27 @@ export function setupApp() {
                 isAiTyping.value = false;
                 const separator = '---';
                 const appendAiMessage = (rawText, index = 0) => {
+                    // 检查当前聊天ID是否与发送请求时的聊天ID一致
+                    if (soulLinkActiveChat.value !== currentChatId || soulLinkActiveChatType.value !== currentChatType) {
+                        console.log('聊天窗口已切换，消息将不会发送到当前窗口');
+                        return;
+                    }
+                    
                     const trimmedText = rawText.trim();
                     if (!trimmedText) return;
                     if (isGroupChat) {
                         const parsed = parseGroupReply(trimmedText);
                         if (!parsed.content) return;
+                        
+                        const activeGroup = activeGroupChat.value;
+                        let senderAvatar = '';
+                        if (activeGroup && Array.isArray(activeGroup.members)) {
+                            const member = activeGroup.members.find(m => m.name === parsed.senderName);
+                            if (member && member.avatarUrl) {
+                                senderAvatar = member.avatarUrl;
+                            }
+                        }
+                        
                         const transferSegments = splitAiTransferSegments(parsed.content);
                         if (transferSegments) {
                             transferSegments.forEach((segment, offset) => {
@@ -2511,6 +3195,7 @@ export function setupApp() {
                                         id: Date.now() + index + offset,
                                         sender: 'ai',
                                         senderName: parsed.senderName,
+                                        senderAvatar: senderAvatar,
                                         messageType: 'transfer',
                                         amount: segment.amount,
                                         note: segment.note,
@@ -2523,6 +3208,7 @@ export function setupApp() {
                                         id: Date.now() + index + offset,
                                         sender: 'ai',
                                         senderName: parsed.senderName,
+                                        senderAvatar: senderAvatar,
                                         text: segment.content,
                                         timestamp: Date.now()
                                     });
@@ -2536,6 +3222,7 @@ export function setupApp() {
                                 id: Date.now() + index,
                                 sender: 'ai',
                                 senderName: parsed.senderName,
+                                senderAvatar: senderAvatar,
                                 messageType: 'transfer',
                                 amount: transfer.amount,
                                 note: transfer.note,
@@ -2553,6 +3240,7 @@ export function setupApp() {
                                         id: Date.now() + index + offset,
                                         sender: 'ai',
                                         senderName: parsed.senderName,
+                                        senderAvatar: senderAvatar,
                                         messageType: 'image',
                                         imageUrl: null,
                                         text: formatAiImageText(segment.content, 'TA'),
@@ -2563,6 +3251,7 @@ export function setupApp() {
                                         id: Date.now() + index + offset,
                                         sender: 'ai',
                                         senderName: parsed.senderName,
+                                        senderAvatar: senderAvatar,
                                         text: segment.content,
                                         timestamp: Date.now()
                                     });
@@ -2576,6 +3265,7 @@ export function setupApp() {
                                 id: Date.now() + index,
                                 sender: 'ai',
                                 senderName: parsed.senderName,
+                                senderAvatar: senderAvatar,
                                 messageType: 'image',
                                 imageUrl: null,
                                 text: formatAiImageText(imageDesc, 'TA'),
@@ -2587,6 +3277,7 @@ export function setupApp() {
                             id: Date.now() + index,
                             sender: 'ai',
                             senderName: parsed.senderName,
+                            senderAvatar: senderAvatar,
                             text: parsed.content,
                             timestamp: Date.now()
                         });
@@ -2685,7 +3376,9 @@ export function setupApp() {
                 } else {
                     appendAiMessage(reply, 0);
                 }
-                markMessagesReplied(history, pendingUserMessages.map(m => m.id));
+                if (pendingUserMessages.length > 0) {
+                    markMessagesReplied(history, pendingUserMessages.map(m => m.id));
+                }
                 addConsoleLog('SoulLink 会话：已成功从模型获取回复。', 'success');
             } catch (error) {
                 isAiTyping.value = false;
@@ -2704,7 +3397,7 @@ export function setupApp() {
             if (!soulLinkActiveChat.value) return;
             if (!activeProfile.value) return;
             const isGroupChat = soulLinkActiveChatType.value === 'group';
-            const char = characters.value.find(c => c.id === soulLinkActiveChat.value);
+            const char = characters.value.find(c => String(c.id) === String(soulLinkActiveChat.value));
             const activeGroup = isGroupChat ? activeGroupChat.value : null;
             if (!isGroupChat && !char) return;
             const profile = activeProfile.value;
@@ -2803,8 +3496,9 @@ export function setupApp() {
                     const postContent = postMatch[1].trim();
                     if (postContent) {
                         console.log('Extracted post content:', postContent);
-                        const activeChar = characters.value.find(c => c.id === soulLinkActiveChat.value);
+                        const activeChar = characters.value.find(c => String(c.id) === String(soulLinkActiveChat.value));
                         if (activeChar) {
+                            console.log('Found active character for feed post:', activeChar.nickname || activeChar.name, 'avatar:', activeChar.avatarUrl ? 'yes' : 'no');
                             feed.roleAction('post', {
                                 author: activeChar.nickname || activeChar.name,
                                 avatar: activeChar.avatarUrl,
@@ -2812,7 +3506,7 @@ export function setupApp() {
                                 images: [] // TODO: Support images in future
                             });
                         } else {
-                            console.warn('No active character found for role post');
+                            console.warn('No active character found for role post. Chat ID:', soulLinkActiveChat.value, 'Available IDs:', characters.value.map(c => c.id));
                         }
                     }
                 }
@@ -3016,10 +3710,28 @@ export function setupApp() {
         // --- Advanced Interactions ---
         const onMessageContextMenu = (event, msg) => {
             event.preventDefault();
+            
+            let x = event.clientX;
+            let y = event.clientY;
+            
+            const menuWidth = 160;
+            const menuHeight = 240;
+            
+            if (msg.sender === 'user') {
+                x = x - menuWidth;
+            }
+            
+            if (x + menuWidth > window.innerWidth) {
+                x = window.innerWidth - menuWidth - 10;
+            }
+            if (y + menuHeight > window.innerHeight) {
+                y = window.innerHeight - menuHeight - 10;
+            }
+            
             contextMenu.value = {
                 visible: true,
-                x: event.clientX,
-                y: event.clientY,
+                x: Math.max(10, x),
+                y: Math.max(10, y),
                 msg: msg
             };
         };
@@ -3064,16 +3776,15 @@ export function setupApp() {
         };
 
         const buildSoulLinkReplyContext = (msg) => {
-            const senderName = msg.senderName || (msg.sender === 'user' ? '我' : getActiveChatName());
-            let content = '';
+            let text = '';
             if (msg.messageType === 'image') {
-                content = msg.text || '[图片]';
+                text = msg.text || '[图片]';
             } else if (msg.messageType === 'voice') {
-                content = msg.text || '[语音]';
+                text = msg.text || '[语音]';
             } else if (msg.messageType === 'transfer') {
                 const amount = msg.amount ? `¥${msg.amount}` : '';
                 const note = msg.note ? ` ${msg.note}` : '';
-                content = `转账 ${amount}${note}`.trim();
+                text = `转账 ${amount}${note}`.trim();
             } else if (msg.messageType === 'location') {
                 const parts = [];
                 if (msg.userLocation) parts.push(`我的位置: ${msg.userLocation}`);
@@ -3083,22 +3794,22 @@ export function setupApp() {
                     const names = msg.trajectoryPoints.map(point => point.name || point).filter(Boolean).join(', ');
                     if (names) parts.push(`途经点: ${names}`);
                 }
-                content = parts.length > 0 ? `定位 ${parts.join(' | ')}` : '定位';
+                text = parts.length > 0 ? `定位 ${parts.join(' | ')}` : '定位';
             } else {
-                content = msg.text || '';
+                text = msg.text || '';
             }
             return {
                 id: msg.id,
-                senderName,
-                content
+                sender: msg.sender,
+                text
             };
         };
 
         const buildSoulLinkReplyPreview = (msg, context) => {
             if (msg.messageType && msg.messageType !== 'text') {
-                return context.content || '';
+                return context.text || '';
             }
-            const raw = context.content || '';
+            const raw = context.text || '';
             return raw.length > 50 ? `${raw.slice(0, 50)}...` : raw;
         };
 
@@ -3141,22 +3852,13 @@ export function setupApp() {
                         };
                         
                         chatMsgs[index] = {
-                            ...chatMsgs[index],
-                            messageType: 'text',
+                            id: Date.now(),
+                            sender: 'system',
                             text: '你撤回了一条消息',
-                            recalledData: recalledData,
-                            isRecalled: true,
-                            isSystem: true
+                            timestamp: Date.now(),
+                            isSystem: true,
+                            recalledData: recalledData
                         };
-                        
-                        delete chatMsgs[index].imageUrl;
-                        delete chatMsgs[index].amount;
-                        delete chatMsgs[index].note;
-                        delete chatMsgs[index].duration;
-                        delete chatMsgs[index].userLocation;
-                        delete chatMsgs[index].aiLocation;
-                        delete chatMsgs[index].distance;
-                        delete chatMsgs[index].trajectoryPoints;
                         
                         chatMsgs.push({
                             id: Date.now() + 1,
@@ -3182,7 +3884,7 @@ export function setupApp() {
                     break;
                     
                 case 'edit':
-                    if (msg.sender === 'user' && !msg.isRecalled) {
+                    if (!msg.isRecalled) {
                         soulLinkInput.value = msg.text;
                         editingMessageId.value = msg.id;
                         soulLinkReplyTarget.value = null;
@@ -3200,8 +3902,14 @@ export function setupApp() {
                     if (!msg.isRecalled) {
                         const replyContext = buildSoulLinkReplyContext(msg);
                         soulLinkReplyTarget.value = replyContext;
-                        const previewText = buildSoulLinkReplyPreview(msg, replyContext);
-                        soulLinkInput.value = previewText ? `> ${previewText}\n` : '';
+                        soulLinkInput.value = '';
+                    }
+                    break;
+                    
+                case 'like':
+                    if (index !== -1) {
+                        chatMsgs[index].isLiked = !chatMsgs[index].isLiked;
+                        persistActiveChat();
                     }
                     break;
             }
@@ -3231,6 +3939,35 @@ export function setupApp() {
         watch(soulLinkMessages, saveSoulLinkMessages, { deep: true });
         watch(soulLinkGroups, saveSoulLinkGroups, { deep: true });
         watch(soulLinkPet, saveSoulLinkPet, { deep: true });
+        
+        // 重置创建群聊表单
+        watch(showCreateGroupDialog, (val) => {
+            if (val) {
+                newGroupName.value = '';
+                newGroupMembers.value = '';
+                newGroupAvatar.value = '';
+                selectedGroupMembers.value = [];
+            }
+        });
+
+        // 重置添加成员表单
+        watch(showAddMemberDialog, (val) => {
+            if (val) {
+                selectedAddMembers.value = [];
+                addMemberMode.value = 'existing';
+                customMemberAvatar.value = '';
+                customMemberName.value = '';
+                customMemberPersona.value = '';
+            }
+        });
+
+        // 初始化重命名群聊表单
+        watch(showRenameGroupDialog, (val) => {
+            if (val && activeGroupChat.value) {
+                newGroupNameInput.value = activeGroupChat.value.name || '';
+                tempGroupAvatar.value = activeGroupChat.value.avatarUrl || '';
+            }
+        });
 
         // ==========================================================
         // --- NEW FEATURES (Chat Menu, Calls, Virtual Camera) ---
@@ -3239,11 +3976,45 @@ export function setupApp() {
         // --- Chat Menu Logic ---        
         const userIdentity = ref('');
         const userRelation = ref('');
+        const userAvatar = ref('');
         const bubbleStyle = ref('default');
         const customBubbleCSS = ref('');
         const showChatMenu = ref(false);
         const showProfile = ref(false);
         const profileChar = ref(null);
+        
+        const uploadUserAvatar = () => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const maxSize = 5 * 1024 * 1024;
+                    if (file.size > maxSize) {
+                        alert('图片大小不能超过5MB，请选择小一点的图片');
+                        return;
+                    }
+                    
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        compressAvatarImage(e.target.result, (compressedDataUrl) => {
+                            userAvatar.value = compressedDataUrl;
+                            saveToStorage('soulos_user_avatar', userAvatar.value);
+                        });
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+            input.click();
+        };
+        
+        const resetUserAvatar = () => {
+            if (confirm('确定要重置头像吗？')) {
+                userAvatar.value = '';
+                localStorage.removeItem('soulos_user_avatar');
+            }
+        };
         
         // --- Chat Archive Logic ---        
         // showArchiveDialog 已在作用域外声明，这里仅作初始化，避免重复声明
@@ -3303,7 +4074,7 @@ export function setupApp() {
         const saveChatMenuSettings = () => {
             if (!soulLinkActiveChat.value) return;
             
-            // 为每个角色保存单独的设置
+            // 为每个角色保存单独的设置（不保存头像，避免localStorage配额超出）
             const settingsKey = `soulos_chat_menu_${soulLinkActiveChat.value}`;
             saveToStorage(settingsKey, {
                 userIdentity: userIdentity.value,
@@ -3311,6 +4082,8 @@ export function setupApp() {
                 bubbleStyle: bubbleStyle.value,
                 customBubbleCSS: customBubbleCSS.value
             });
+            
+            showChatSettings.value = false;
         };
         const loadChatMenuSettings = () => {
             if (!soulLinkActiveChat.value) return;
@@ -3352,23 +4125,239 @@ export function setupApp() {
         const callInput = ref('');
         const callMessages = ref([]);
         const isCallAiTyping = ref(false);
+        const showCallInput = ref(false);
+        const callInputText = ref('');
+        const isMuted = ref(false);
+        const isSpeakerOn = ref(true);
+        const isCameraOn = ref(true);
+        
+        const toggleMute = () => {
+            isMuted.value = !isMuted.value;
+        };
+        
+        const toggleSpeaker = () => {
+            isSpeakerOn.value = !isSpeakerOn.value;
+        };
+        
+        const toggleCamera = () => {
+            isCameraOn.value = !isCameraOn.value;
+        };
         let callInterval = null;
+
+        // 视频通话小窗口位置 (使用left定位，全屏范围)
+        const videoSelfPosition = ref({ x: window.innerWidth - 90, y: 100 });
+        const isVideoAvatarSwapped = ref(false);
+        let isDraggingVideoSelf = false;
+        let dragStartPos = { x: 0, y: 0 };
+        let dragStartMouse = { x: 0, y: 0 };
+        let hasDragged = false;
+
+        // 交换视频通话头像位置
+        const swapVideoAvatars = () => {
+            if (hasDragged) {
+                hasDragged = false;
+                return;
+            }
+            isVideoAvatarSwapped.value = !isVideoAvatarSwapped.value;
+        };
+
+        const startDragVideoSelf = (e) => {
+            isDraggingVideoSelf = true;
+            dragStartPos = { ...videoSelfPosition.value };
+            const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+            const clientY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+            dragStartMouse = { x: clientX, y: clientY };
+            
+            document.addEventListener('mousemove', onDragVideoSelf);
+            document.addEventListener('mouseup', stopDragVideoSelf);
+            document.addEventListener('touchmove', onDragVideoSelf);
+            document.addEventListener('touchend', stopDragVideoSelf);
+        };
+
+        const onDragVideoSelf = (e) => {
+            if (!isDraggingVideoSelf) return;
+            e.preventDefault();
+            hasDragged = true;
+            
+            const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+            const clientY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+            
+            const deltaX = clientX - dragStartMouse.x;
+            const deltaY = clientY - dragStartMouse.y;
+            
+            videoSelfPosition.value = {
+                x: Math.max(0, Math.min(window.innerWidth - 85, dragStartPos.x + deltaX)),
+                y: Math.max(0, Math.min(window.innerHeight - 105, dragStartPos.y + deltaY))
+            };
+        };
+
+        const stopDragVideoSelf = () => {
+            isDraggingVideoSelf = false;
+            document.removeEventListener('mousemove', onDragVideoSelf);
+            document.removeEventListener('mouseup', stopDragVideoSelf);
+            document.removeEventListener('touchmove', onDragVideoSelf);
+            document.removeEventListener('touchend', stopDragVideoSelf);
+        };
+
+        const toggleCallInput = () => {
+            showCallInput.value = !showCallInput.value;
+            if (showCallInput.value) {
+                nextTick(() => {
+                    const inputRef = document.querySelector('.call-input-panel input');
+                    if (inputRef) inputRef.focus();
+                });
+            }
+        };
+
+        const sendCallText = () => {
+            if (!callInputText.value.trim()) return;
+            
+            // 添加到通话消息
+            callMessages.value.push({
+                sender: 'user',
+                text: callInputText.value,
+                time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+            });
+            
+            const input = callInputText.value;
+            callInputText.value = '';
+            
+            // 调用AI回复
+            isCallAiTyping.value = true;
+            
+            if (!activeProfile.value) {
+                callMessages.value.push({
+                    sender: 'ai',
+                    text: '未检测到任何 API 配置，请先在 Console 中创建并选择一个配置。',
+                    time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+                });
+                isCallAiTyping.value = false;
+                return;
+            }
+            
+            const profile = activeProfile.value;
+            const endpoint = (profile.endpoint || '').trim();
+            const key = (profile.key || '').trim();
+            
+            if (!endpoint || !key) {
+                callMessages.value.push({
+                    sender: 'ai',
+                    text: '当前配置缺少 API 地址或密钥，请在 Console 中补全后重试。',
+                    time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+                });
+                isCallAiTyping.value = false;
+                return;
+            }
+            
+            const char = characters.value.find(c => String(c.id) === String(soulLinkActiveChat.value));
+            const history = soulLinkMessages.value[soulLinkActiveChat.value] || [];
+            const messagesPayload = [];
+            
+            let systemPrompt = '';
+            if (char && char.persona) {
+                const charName = char.name || '角色';
+                systemPrompt = `你正在通过语音通话与对方交流。\n\n`;
+                systemPrompt += `你的名字是【${charName}】。\n`;
+                systemPrompt += `${char.persona}\n\n`;
+                systemPrompt += `1. 像真实的人类那样自然通话。\n`;
+                systemPrompt += `2. 每次回复保持简短（1-2句话）。\n`;
+                systemPrompt += `3. 使用符合${charName}性格的语气、口头禅和口语表达。\n`;
+                systemPrompt += `4. 不要暴露你是AI。\n`;
+                systemPrompt += `5. 对方通过文字输入与你交流，请自然回应。`;
+            } else {
+                systemPrompt = '你正在和朋友语音通话。请自然、简短地对话，每次1-2句话。对方通过文字输入与你交流。';
+            }
+            
+            messagesPayload.push({ role: 'system', content: systemPrompt });
+            
+            history.forEach(m => {
+                if (m.isSystem || m.isHidden) return;
+                const ctx = buildSoulLinkReplyContext(m);
+                const raw = ctx.content || (m.text || '');
+                if (m.sender === 'user') {
+                    messagesPayload.push({ role: 'user', content: raw });
+                } else if (m.sender === 'ai') {
+                    messagesPayload.push({ role: 'assistant', content: raw });
+                }
+            });
+            
+            callMessages.value.forEach(m => {
+                if (!m || !m.text) return;
+                if (m.sender === 'user') {
+                    messagesPayload.push({ role: 'user', content: m.text });
+                } else {
+                    messagesPayload.push({ role: 'assistant', content: m.text });
+                }
+            });
+            
+            messagesPayload.push({ role: 'user', content: input });
+            
+            const modelId = profile.model || (availableModels.value[0] && availableModels.value[0].id) || '';
+            
+            fetch(endpoint.replace(/\/+$/, '') + '/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${key}`
+                },
+                body: JSON.stringify({
+                    model: modelId,
+                    messages: messagesPayload,
+                    temperature: profile.temperature ?? 0.7,
+                    stream: false
+                })
+            }).then(async response => {
+                if (!response.ok) throw new Error(`接口返回状态码 ${response.status}`);
+                const data = await response.json();
+                let reply = '';
+                if (data && Array.isArray(data.choices) && data.choices.length > 0) {
+                    const msg = data.choices[0].message || data.choices[0].delta;
+                    if (msg && msg.content) reply = msg.content;
+                }
+                if (!reply && data && data.message && data.message.content) {
+                    reply = data.message.content;
+                }
+                if (!reply) reply = '...';
+                
+                isCallAiTyping.value = false;
+                
+                const aiReply = reply.trim();
+                callMessages.value.push({
+                    sender: 'ai',
+                    text: aiReply,
+                    time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+                });
+            }).catch(error => {
+                isCallAiTyping.value = false;
+                callMessages.value.push({
+                    sender: 'ai',
+                    text: '抱歉，发生了一些错误，请稍后再试。',
+                    time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+                });
+            });
+        };
 
         const currentChatName = computed(() => {
             if (!soulLinkActiveChat.value) return '聊天';
-            const char = characters.value.find(c => c.id === soulLinkActiveChat.value);
+            if (soulLinkActiveChatType.value === 'group' && activeGroupChat.value) {
+                return activeGroupChat.value.name;
+            }
+            const char = characters.value.find(c => String(c.id) === String(soulLinkActiveChat.value));
             return char ? (char.nickname || char.name) : '未知用户';
         });
 
         const currentChatAvatar = computed(() => {
              if (!soulLinkActiveChat.value) return 'https://placehold.co/100x100?text=No+Avatar';
-             const char = characters.value.find(c => c.id === soulLinkActiveChat.value);
+             if (soulLinkActiveChatType.value === 'group' && activeGroupChat.value) {
+                 return activeGroupChat.value.avatarUrl || 'https://placehold.co/100x100?text=Group';
+             }
+             const char = characters.value.find(c => String(c.id) === String(soulLinkActiveChat.value));
              return char ? (char.avatarUrl || 'https://placehold.co/100x100?text=No+Avatar') : 'https://placehold.co/100x100?text=No+Avatar';
         });
 
         const viewCharacterProfile = () => {
-            if (soulLinkActiveChat.value) {
-                const char = characters.value.find(c => c.id === soulLinkActiveChat.value);
+            if (soulLinkActiveChat.value && soulLinkActiveChatType.value !== 'group') {
+                const char = characters.value.find(c => String(c.id) === String(soulLinkActiveChat.value));
                 if (char) {
                     profileChar.value = char;
                     showProfile.value = true;
@@ -3466,7 +4455,7 @@ export function setupApp() {
             isCallAiTyping.value = true;
             const isGroupChat = soulLinkActiveChatType.value === 'group';
             const activeGroup = isGroupChat ? activeGroupChat.value : null;
-            const char = isGroupChat ? null : characters.value.find(c => c.id === soulLinkActiveChat.value);
+            const char = isGroupChat ? null : characters.value.find(c => String(c.id) === String(soulLinkActiveChat.value));
             const history = isGroupChat ? (activeGroup.history || []) : (soulLinkMessages.value[soulLinkActiveChat.value] || []);
             const messagesPayload = [];
             let systemPrompt = '';
@@ -3582,6 +4571,10 @@ export function setupApp() {
             console.log('toggleChatSettings called, current value:', showChatSettings.value);
             showChatSettings.value = !showChatSettings.value;
             console.log('toggleChatSettings new value:', showChatSettings.value);
+            
+            if (showChatSettings.value) {
+                loadChatMenuSettings();
+            }
             // 不调用closeAllPanels，因为它会关闭聊天设置面板
         };
 
@@ -3590,7 +4583,20 @@ export function setupApp() {
             if (!soulLinkActiveChat.value) return;
 
             // 自动存档当前对话
-            const currentMessages = soulLinkMessages.value[soulLinkActiveChat.value] || [];
+            let currentMessages = [];
+            let chatType = soulLinkActiveChatType.value;
+            let chatId = soulLinkActiveChat.value;
+            let chatName = '';
+            
+            if (chatType === 'group' && activeGroupChat.value) {
+                currentMessages = activeGroupChat.value.history || [];
+                chatName = activeGroupChat.value.name;
+            } else {
+                currentMessages = soulLinkMessages.value[chatId] || [];
+                const char = characters.value.find(c => String(c.id) === String(chatId));
+                chatName = char ? (char.nickname || char.name) : '未知';
+            }
+            
             if (currentMessages.length > 0) {
                 // 创建自动存档
                 const modeText = isOfflineMode.value ? '线下' : '线上';
@@ -3598,7 +4604,9 @@ export function setupApp() {
                 
                 const archive = {
                     id: `archive_${Date.now()}`,
-                    characterId: soulLinkActiveChat.value,
+                    chatType: chatType,
+                    chatId: chatId,
+                    chatName: chatName,
                     name: archiveNameText,
                     description: `从${modeText}模式切换时自动创建的存档`,
                     timestamp: Date.now(),
@@ -3611,15 +4619,25 @@ export function setupApp() {
                 saveArchivedChats();
 
                 // 清空当前对话
-                soulLinkMessages.value[soulLinkActiveChat.value] = [];
-                saveSoulLinkMessages();
+                if (chatType === 'group' && activeGroupChat.value) {
+                    activeGroupChat.value.history = [];
+                    activeGroupChat.value.lastMessage = '';
+                    activeGroupChat.value.lastTime = '';
+                    saveSoulLinkGroups();
+                } else {
+                    soulLinkMessages.value[chatId] = [];
+                    saveSoulLinkMessages();
+                }
             }
 
             if (isOfflineMode.value) {
-                // 退出线下模式
-                isOfflineMode.value = false;
+                // 退出线下模式，进入线上模式
+                setChatOfflineMode(soulLinkActiveChat.value, false);
+                // 发送线上模式开场白
+                sendOnlineModeGreeting();
             } else {
                 // 进入线下模式，显示开场白选择
+                setChatOfflineMode(soulLinkActiveChat.value, true);
                 prepareGreetingsForSelection();
                 showGreetingSelect.value = true;
             }
@@ -3629,7 +4647,7 @@ export function setupApp() {
         const prepareGreetingsForSelection = () => {
             if (!soulLinkActiveChat.value) return;
 
-            const activeCharacter = characters.value.find(c => c.id === soulLinkActiveChat.value);
+            const activeCharacter = characters.value.find(c => String(c.id) === String(soulLinkActiveChat.value));
             if (activeCharacter) {
                 // 如果没有 openingLines 但有 openingLine，进行迁移
                 if (activeCharacter.openingLine && (!activeCharacter.openingLines || activeCharacter.openingLines.length === 0)) {
@@ -3654,7 +4672,7 @@ export function setupApp() {
             if (!greeting) return;
 
             // 进入线下模式
-            isOfflineMode.value = true;
+            setChatOfflineMode(soulLinkActiveChat.value, true);
             selectedGreeting.value = greeting;
             
             // 创建开场白消息
@@ -3712,7 +4730,7 @@ export function setupApp() {
         const sendOfflineModeGreeting = () => {
             if (!soulLinkActiveChat.value) return;
 
-            const activeCharacter = characters.value.find(c => c.id === soulLinkActiveChat.value);
+            const activeCharacter = characters.value.find(c => String(c.id) === String(soulLinkActiveChat.value));
             if (activeCharacter && activeCharacter.openingLine) {
                 // 解析开场白，支持多个开场白
                 const greetings = activeCharacter.openingLine.split('\n\n').filter(g => g.trim());
@@ -3815,6 +4833,7 @@ export function setupApp() {
         const calculatedDistance = ref('');
 
         const openLocationPanel = async () => {
+            showAttachmentPanel.value = false;
             showLocationPanel.value = true;
             if (!userAddress.value) {
                 userAddress.value = locationUser.value || '当前位置';
@@ -3868,6 +4887,7 @@ export function setupApp() {
                 userLocation,
                 aiLocation,
                 address: userLocation,
+                locationName: userLocation || aiLocation,
                 distance,
                 trajectoryPoints,
                 text: contentString,
@@ -3900,7 +4920,7 @@ export function setupApp() {
             }
             const isGroupChat = soulLinkActiveChatType.value === 'group';
             const activeGroup = isGroupChat ? activeGroupChat.value : null;
-            const char = isGroupChat ? null : characters.value.find(c => c.id === soulLinkActiveChat.value);
+            const char = isGroupChat ? null : characters.value.find(c => String(c.id) === String(soulLinkActiveChat.value));
             const history = getActiveChatHistory();
             let modelId = profile.model;
             if (!modelId && availableModels.value.length > 0) {
@@ -3988,7 +5008,7 @@ export function setupApp() {
             }
             const isGroupChat = soulLinkActiveChatType.value === 'group';
             const activeGroup = isGroupChat ? activeGroupChat.value : null;
-            const char = isGroupChat ? null : characters.value.find(c => c.id === soulLinkActiveChat.value);
+            const char = isGroupChat ? null : characters.value.find(c => String(c.id) === String(soulLinkActiveChat.value));
             const history = getActiveChatHistory();
             let modelId = profile.model;
             if (!modelId && availableModels.value.length > 0) {
@@ -4088,6 +5108,7 @@ export function setupApp() {
         // --- Transfer Panel Logic ---
         const openTransferPanel = () => {
             console.log('openTransferPanel called');
+            showAttachmentPanel.value = false;
             showTransferPanel.value = true;
             console.log('showTransferPanel value:', showTransferPanel.value);
             transferAmount.value = 0;
@@ -4111,8 +5132,10 @@ export function setupApp() {
                 sender: 'user',
                 messageType: 'transfer',
                 amount: transferAmount.value,
+                transferAmount: transferAmount.value.toFixed(2),
                 note: transferNote.value.trim(),
                 transferStatus: 'pending',
+                text: `转账 ¥${transferAmount.value.toFixed(2)}`,
                 timestamp: Date.now(),
                 isReplied: false
             };
@@ -4130,18 +5153,22 @@ export function setupApp() {
                 addConsoleLog(`转账已接受: ¥${msg.amount}`, 'success');
                 pushMessageToActiveChat({
                     id: Date.now(),
-                    sender: 'ai',
-                    text: '已收款~ 谢谢',
-                    timestamp: Date.now()
+                    sender: 'system',
+                    text: `已收款 ¥${msg.amount.toFixed(2)}`,
+                    timestamp: Date.now(),
+                    isSystem: true,
+                    time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
                 });
             } else if (action === 'reject') {
                 msg.transferStatus = 'rejected';
                 addConsoleLog(`转账已拒绝: ¥${msg.amount}`, 'info');
                 pushMessageToActiveChat({
                     id: Date.now(),
-                    sender: 'ai',
-                    text: '这次不收哦',
-                    timestamp: Date.now()
+                    sender: 'system',
+                    text: `已退回转账 ¥${msg.amount.toFixed(2)}`,
+                    timestamp: Date.now(),
+                    isSystem: true,
+                    time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
                 });
             }
             syncActiveChatState();
@@ -4161,6 +5188,21 @@ export function setupApp() {
         // --- Input & Panel Logic ---
         const moodValue = ref('HAPPY');
         const bedTiming = ref('22:00');
+        
+        // AI状态色调过渡
+        const aiStateColors = {
+            'HAPPY': 'linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
+            'SAD': 'linear-gradient(180deg, #2d1a2e 0%, #2a162e 50%, #230f60 100%)',
+            'ANGRY': 'linear-gradient(180deg, #2e1a1a 0%, #2e1616 50%, #600f0f 100%)',
+            'CALM': 'linear-gradient(180deg, #1a2e1a 0%, #162e16 50%, #0f600f 100%)'
+        };
+        
+        // 监听情绪变化，更新背景色调
+        watch(moodValue, (newMood) => {
+            const body = document.body;
+            const color = aiStateColors[newMood] || aiStateColors['HAPPY'];
+            body.style.background = color;
+        });
 
         const toggleEmojiPanel = () => {
             showEmojiPanel.value = !showEmojiPanel.value;
@@ -4188,7 +5230,7 @@ export function setupApp() {
 
         const onSendOrCall = () => {
             if (soulLinkInput.value && soulLinkInput.value.trim()) {
-                sendSoulLinkMessage('text');
+                sendSoulLinkMessage();
             } else {
                 triggerSoulLinkAiReply();
             }
@@ -4203,25 +5245,78 @@ export function setupApp() {
                 if (file) {
                     const reader = new FileReader();
                     reader.onload = (e) => {
-                         const msg = {
-                             id: Date.now(),
-                             sender: 'user',
-                             messageType: 'image',
-                             imageUrl: e.target.result,
-                             text: '图片',
-                             timestamp: Date.now(),
-                             isReplied: false
-                         };
-                         if (!soulLinkMessages.value[soulLinkActiveChat.value]) {
-                             soulLinkMessages.value[soulLinkActiveChat.value] = [];
-                         }
-                         soulLinkMessages.value[soulLinkActiveChat.value].push(msg);
-                         saveSoulLinkMessages();
+                        compressAvatarImage(e.target.result, (compressedDataUrl) => {
+                            const msg = {
+                                id: Date.now(),
+                                sender: 'user',
+                                messageType: 'image',
+                                imageUrl: compressedDataUrl,
+                                text: '图片',
+                                timestamp: Date.now(),
+                                isReplied: false,
+                                time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+                            };
+                            
+                            if (soulLinkActiveChatType.value === 'group' && activeGroupChat.value) {
+                                if (!Array.isArray(activeGroupChat.value.history)) {
+                                    activeGroupChat.value.history = [];
+                                }
+                                activeGroupChat.value.history.push(msg);
+                                activeGroupChat.value.lastMessage = msg.text;
+                                activeGroupChat.value.lastTime = msg.time;
+                                saveSoulLinkGroups();
+                            } else {
+                                if (!soulLinkMessages.value[soulLinkActiveChat.value]) {
+                                    soulLinkMessages.value[soulLinkActiveChat.value] = [];
+                                }
+                                soulLinkMessages.value[soulLinkActiveChat.value].push(msg);
+                                saveSoulLinkMessages();
+                            }
+                            
+                            scrollToBottom();
+                        });
                     };
                     reader.readAsDataURL(file);
                 }
+                showPhotoSelectPanel.value = false;
             };
             input.click();
+        };
+
+        const sendTextImage = () => {
+            if (!textImageText.value.trim()) return;
+            
+            const msg = {
+                id: Date.now(),
+                sender: 'user',
+                messageType: 'textImage',
+                textImageText: textImageText.value,
+                textImageBgColor: textImageBgColor.value,
+                text: '文字图',
+                timestamp: Date.now(),
+                isReplied: false,
+                time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+            };
+            
+            if (soulLinkActiveChatType.value === 'group' && activeGroupChat.value) {
+                if (!Array.isArray(activeGroupChat.value.history)) {
+                    activeGroupChat.value.history = [];
+                }
+                activeGroupChat.value.history.push(msg);
+                activeGroupChat.value.lastMessage = msg.text;
+                activeGroupChat.value.lastTime = msg.time;
+                saveSoulLinkGroups();
+            } else {
+                if (!soulLinkMessages.value[soulLinkActiveChat.value]) {
+                    soulLinkMessages.value[soulLinkActiveChat.value] = [];
+                }
+                soulLinkMessages.value[soulLinkActiveChat.value].push(msg);
+                saveSoulLinkMessages();
+            }
+            
+            textImageText.value = '';
+            showTextImagePanel.value = false;
+            scrollToBottom();
         };
 
         const insertEmoji = (emoji) => {
@@ -4257,12 +5352,12 @@ export function setupApp() {
         
         // 构造返回对象
         const returnObject = {
-            // SoulLink
-            soulLinkTab, soulLinkActiveChat, soulLinkActiveChatType, soulLinkInput,
-            soulLinkMessages, soulLinkGroups, activeChatMessages, currentChatMessages, recentChats,
-            formatLastMsgTime, getLastMessage, closeAllPanels,
+            // SoulLink / Chat
+            soulLinkTab, soulLinkActiveChat, soulLinkActiveChatType, soulLinkInput, soulLinkReplyTarget,
+            soulLinkMessages, soulLinkGroups, activeGroupChat, activeChatMessages, currentChatMessages, recentChats,
+            formatLastMsgTime, getLastMessage, formatMessageDate, closeAllPanels,
             emojiList, previewImage, formatTime, onInputChange, onEnterPress,
-            contextMenu,
+            contextMenu, editingMessageId,
             startSoulLinkChat, openSoulLinkGroupChat, exitSoulLinkChat, sendSoulLinkMessage,
             switchSoulLinkTab, onMessageContextMenu, onMessageTouchStart, onMessageTouchMove, onMessageTouchEnd, handleContextAction, closeContextMenu,
             getCharacterName, getCharacterAvatar, getActiveChatName, getActiveChatAvatar, getActiveChatStatus,
@@ -4277,13 +5372,23 @@ export function setupApp() {
             novelMode,
             showGreetingSelect,
             availableGreetings,
+            // Chat别名（兼容新UI）
+            chatActiveChat: soulLinkActiveChat,
+            chatInput: soulLinkInput,
+            chatCharacters: characters,
+            isChatAiTyping: isAiTyping,
+            startChat: startSoulLinkChat,
+            sendChatMessage: onSendOrCall,
+            goBackInChat: exitSoulLinkChat,
 
             // Core
-            currentTime, currentDate, openedApp, currentScreen, deviceBatteryText, deviceSignalText,
+            currentTime, currentDate, randomHexCode, openedApp, currentScreen, deviceBatteryText, deviceSignalText,
             isHomeScreenVisible,
             // New Features (Chat Menu, Call, Virtual Camera, Panels)
-            userIdentity, userRelation, bubbleStyle, customBubbleCSS, setBubbleStyle, applyCustomCSS, saveAndCloseSettings, confirmChatMenu, showArchiveDialog, showArchivedChats, archiveName, archiveDescription, archivedChats, archiveCurrentChat, restoreArchivedChat, deleteArchivedChat,
-            callActive, callType, callTimer, callInput, callMessages, isCallAiTyping, currentChatName, currentChatAvatar,
+            userIdentity, userRelation, userAvatar, uploadUserAvatar, resetUserAvatar, bubbleStyle, customBubbleCSS, setBubbleStyle, applyCustomCSS, saveAndCloseSettings, confirmChatMenu, showArchiveDialog, showArchivedChats, archiveName, archiveDescription, archivedChats, filteredArchivedChats, sortedArchivedChats, archiveCurrentChat, restoreArchivedChat, deleteArchivedChat, saveChatMenuSettings, loadChatMenuSettings, clearChatHistory, exportChatHistory, showCreateGroupDialog, newGroupName, newGroupMembers, createNewGroup, newGroupAvatar, selectedGroupMembers, groupAvatarInput, triggerGroupAvatarUpload, handleGroupAvatarUpload, toggleGroupMember, showAddMemberDialog, selectedAddMembers, getAvailableCharactersForAdd, toggleAddMember, addMembersToGroup, removeGroupMember, addMemberMode, customMemberAvatar, customMemberName, customMemberPersona, customMemberAvatarInput, triggerCustomMemberAvatarUpload, handleCustomMemberAvatarUpload, addCustomMember, showRenameGroupDialog, newGroupNameInput, tempGroupAvatar, renameGroupAvatarInput, triggerRenameGroupAvatarUpload, handleRenameGroupAvatarUpload, renameGroup, shakeCharacter, shakeGroupMember,
+            callActive, callType, callTimer, callInput, callMessages, isCallAiTyping, isMuted, toggleMute, isSpeakerOn, toggleSpeaker, isCameraOn, toggleCamera, currentChatName, currentChatAvatar,
+            showCallInput, callInputText, toggleCallInput, sendCallText,
+            videoSelfPosition, isVideoAvatarSwapped, startDragVideoSelf, swapVideoAvatars,
             startVoiceCall, startVideoCall, endCall, sendCallMessage,
             showVirtualCamera, virtualImageDesc, openVirtualCamera, sendVirtualImage,
             openLocationPanel, closeLocationPanel, sendLocation,
@@ -4297,14 +5402,15 @@ export function setupApp() {
             // New Input Logic
             moodValue, bedTiming, showLocationPanel, showTransferPanel, showChatSettings,
             showAttachmentPanel, showImageSubmenu, toggleEmojiPanel, toggleAttachmentPanel, toggleOfflineMode, selectGreeting, addDefaultGreeting, addCustomGreeting,
-            startVoiceInput, onSendOrCall, selectFromAlbum,
+            startVoiceInput, onSendOrCall, selectFromAlbum, sendTextImage,
+            showPhotoSelectPanel, showTextImagePanel, textImageText, textImageBgColor, textImageColors,
             // App Launch
-            openApp, closeApp, getAppIcon,
+            openApp, closeApp, goBack, openGame, joinGame, startGameSession, castVote, endDay, closeGame, getAppIcon,
             // Console
             profiles, activeProfileId, activeProfile, apiStatus,
             availableModels, fetchingModels, consoleLogs,
             saveProfiles, createNewProfile, deleteActiveProfile, setActiveProfile, deleteProfile,
-            onProfileSelect, fetchModels,
+            onProfileSelect, fetchModels, clearConsole,
             // Workshop App
             activeWorkshopTab,
             switchWorkshopTab,
@@ -4360,6 +5466,35 @@ export function setupApp() {
             hub,
             // mate
             mate,
+            // notice
+            notice,
+            // games
+            games,
+            playerName,
+            currentPlayerName,
+            // 新游戏相关状态
+            showRules,
+            chatExpanded,
+            wheelRotation,
+            playerMessage,
+            playerWord,
+            aiPlayers,
+            chatMessages,
+            undercoverMessages,
+            todHistory,
+            // 新游戏相关函数
+            toggleSound,
+            playRPS,
+            spinTOD,
+            nextTOD,
+            startUNOGame,
+            drawCard,
+            playCard,
+            sayUNO,
+            startLudoGame,
+            rollDice,
+            toggleAutoPlay,
+            sendMessage,
             // touch events
             startY, handleTouchMove, handleTouchEnd,
         };

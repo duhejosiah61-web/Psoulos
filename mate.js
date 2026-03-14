@@ -51,17 +51,55 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
     const currentSleepDiary = ref(null);
 
     // 经期追踪
-    const lastPeriodDate = ref(localStorage.getItem('mate_last_period') ? new Date(localStorage.getItem('mate_last_period')) : null);
+    const lastPeriodDate = ref(localStorage.getItem('mate_last_period') ? new Date(localStorage.getItem('mate_last_period')) : new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)); // 默认值：14天前
     const cycleLength = ref(Number(localStorage.getItem('mate_cycle_length')) || 28);
     const periodLength = ref(Number(localStorage.getItem('mate_period_days')) || 5);
     const showPeriodSettings = ref(false);
+    
+    // 经期记录（流量、心情、症状）
+    const periodLogs = ref(JSON.parse(localStorage.getItem('mate_period_logs') || '[]'));
+    const showPeriodLogModal = ref(false);
+    const newPeriodLog = ref({
+        date: new Date().toISOString().split('T')[0],
+        flow: 'medium',
+        mood: 'normal',
+        symptoms: []
+    });
+    
+    // 历史预测展开状态
+    const showHistoryPrediction = ref(false);
+    // 历史记录展开状态
+    const showPeriodLogs = ref(false);
+    // 经期关心消息
+    const periodCareMessage = ref(localStorage.getItem('mate_period_care_message') || '');
+    const isGeneratingCare = ref(false);
+    // 运动鼓励消息
+    const exerciseEncouragement = ref(localStorage.getItem('mate_exercise_encouragement') || '');
+    const isGeneratingEncouragement = ref(false);
+    // 学习鼓励消息
+    const studyEncouragement = ref(localStorage.getItem('mate_study_encouragement') || '');
+    const isGeneratingStudyEncouragement = ref(false);
+    // 睡眠鼓励消息
+    const sleepEncouragement = ref(localStorage.getItem('mate_sleep_encouragement') || '');
+    const isGeneratingSleepEncouragement = ref(false);
+    // 目标睡眠时长
+    const targetSleepDuration = ref(Number(localStorage.getItem('mate_target_sleep_duration')) || 8);
 
+    // 收入记录
+    const incomes = ref(JSON.parse(localStorage.getItem('mate_incomes') || '[]'));
+    // 存款目标
+    const monthlySavingGoal = ref(Number(localStorage.getItem('mate_saving_goal')) || 1000);
+    // 初始金额设置
+    const initialBalance = ref(Number(localStorage.getItem('mate_initial_balance')) || 0);
+    
     // 初始化默认数据（如果为空）
     if (expenses.value.length === 0 && !localStorage.getItem('mate_expenses')) {
-        expenses.value = [
-            { id: 1, amount: 20, category: '餐饮', date: new Date(), description: '午餐' },
-            { id: 2, amount: 15, category: '交通', date: new Date(), description: '打车' }
-        ];
+        expenses.value = [];
+    }
+    
+    // 初始化收入数据
+    if (incomes.value.length === 0 && !localStorage.getItem('mate_incomes')) {
+        incomes.value = [];
     }
     
     // 计算已发生的月度支出
@@ -75,6 +113,51 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
             })
             .reduce((sum, e) => sum + e.amount, 0);
     };
+    
+    // 计算已发生的月度收入
+    const monthlyIncome = computed(() => {
+        const viewYear = currentViewDate.value.getFullYear();
+        const viewMonth = currentViewDate.value.getMonth();
+        return incomes.value
+            .filter(i => {
+                const d = new Date(i.date);
+                return d.getFullYear() === viewYear && d.getMonth() === viewMonth;
+            })
+            .reduce((sum, i) => sum + i.amount, 0);
+    });
+    
+    // 计算月度余额
+    const monthlyBalance = computed(() => {
+        return initialBalance.value + monthlyIncome.value - monthlyExpenses.value;
+    });
+    
+    // 计算月度存款进度
+    const savingProgress = computed(() => {
+        const balance = monthlyBalance.value;
+        return Math.min(Math.round((balance / monthlySavingGoal.value) * 100), 100);
+    });
+    
+    // 计算上个月支出
+    const lastMonthExpenses = computed(() => {
+        const lastMonth = new Date(currentViewDate.value);
+        lastMonth.setMonth(lastMonth.getMonth() - 1);
+        const lastYear = lastMonth.getFullYear();
+        const lastMonthNum = lastMonth.getMonth();
+        
+        return expenses.value
+            .filter(e => {
+                const d = new Date(e.date);
+                return d.getFullYear() === lastYear && d.getMonth() === lastMonthNum;
+            })
+            .reduce((sum, e) => sum + e.amount, 0);
+    });
+    
+    // 计算支出变化百分比
+    const expenseChangePercent = computed(() => {
+        if (lastMonthExpenses.value === 0) return 0;
+        const change = ((monthlyExpenses.value - lastMonthExpenses.value) / lastMonthExpenses.value) * 100;
+        return Math.round(change);
+    });
     calculateMonthlyExpenses();
 
     // 监听查看日期变化，重新计算
@@ -104,6 +187,8 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
     
     // UI 状态
     const showAddExpenseModal = ref(false);
+    const showAddIncomeModal = ref(false);
+    const showIncomeCategoryDetailModal = ref(false);
     const showAddTodoModal = ref(false);
     const showAddEventModal = ref(false);
     const newExpense = ref({ 
@@ -125,6 +210,9 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
         localStorage.setItem('mate_focus_history', JSON.stringify(focusHistory.value));
         localStorage.setItem('mate_budget', monthlyBudget.value.toString());
         localStorage.setItem('mate_expenses', JSON.stringify(expenses.value));
+        localStorage.setItem('mate_incomes', JSON.stringify(incomes.value));
+        localStorage.setItem('mate_saving_goal', monthlySavingGoal.value.toString());
+        localStorage.setItem('mate_initial_balance', initialBalance.value.toString());
         localStorage.setItem('mate_events', JSON.stringify(events.value));
         localStorage.setItem('mate_todos', JSON.stringify(todos.value));
         localStorage.setItem('mate_steps', steps.value.toString());
@@ -137,6 +225,12 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
         if (lastPeriodDate.value) localStorage.setItem('mate_last_period', lastPeriodDate.value.toISOString());
         localStorage.setItem('mate_cycle_length', cycleLength.value.toString());
         localStorage.setItem('mate_period_days', periodLength.value.toString());
+        localStorage.setItem('mate_period_logs', JSON.stringify(periodLogs.value));
+        localStorage.setItem('mate_period_care_message', periodCareMessage.value);
+        localStorage.setItem('mate_exercise_encouragement', exerciseEncouragement.value);
+        localStorage.setItem('mate_study_encouragement', studyEncouragement.value);
+        localStorage.setItem('mate_sleep_encouragement', sleepEncouragement.value);
+        localStorage.setItem('mate_target_sleep_duration', targetSleepDuration.value);
     };
 
     // --- 计算属性 ---
@@ -188,6 +282,74 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
         return '暂无经期记录';
     });
 
+    // 计算当前周期天数
+    const currentCycleDay = computed(() => {
+        if (!lastPeriodDate.value) return 0;
+        const now = new Date();
+        const diff = Math.floor((now - lastPeriodDate.value) / (1000 * 60 * 60 * 24));
+        return diff % cycleLength.value + 1;
+    });
+
+    // 计算周期阶段
+    const periodPhase = computed(() => {
+        if (!lastPeriodDate.value) return 'unknown';
+        const day = currentCycleDay.value;
+        const cycle = cycleLength.value;
+        
+        if (day >= 1 && day <= periodLength.value) {
+            return 'menstrual';
+        } else if (day > periodLength.value && day <= Math.floor(cycle * 0.5)) {
+            return 'follicular';
+        } else if (day > Math.floor(cycle * 0.5) && day <= Math.floor(cycle * 0.6)) {
+            return 'ovulation';
+        } else {
+            return 'luteal';
+        }
+    });
+
+    // 计算月相环位置（角度）
+    const moonRingAngle = computed(() => {
+        if (!lastPeriodDate.value) return 0;
+        const day = currentCycleDay.value;
+        const cycle = cycleLength.value;
+        return (day / cycle) * 360;
+    });
+
+    // 计算排卵日
+    const ovulationDay = computed(() => {
+        if (!lastPeriodDate.value) return null;
+        return Math.floor(cycleLength.value * 0.5);
+    });
+
+    // 历史预测数据
+    const historyPrediction = computed(() => {
+        if (!lastPeriodDate.value) return [];
+        const predictions = [];
+        const baseDate = new Date(lastPeriodDate.value);
+        
+        for (let i = 0; i < 3; i++) {
+            const monthDate = new Date(baseDate);
+            monthDate.setMonth(monthDate.getMonth() + i);
+            
+            const startDate = new Date(monthDate);
+            const endDate = new Date(startDate);
+            endDate.setDate(startDate.getDate() + periodLength.value);
+            
+            predictions.push({
+                month: startDate.getMonth() + 1,
+                startDate: startDate,
+                endDate: endDate,
+                ovulationDate: new Date(startDate)
+            });
+            
+            predictions[predictions.length - 1].ovulationDate.setDate(
+                startDate.getDate() + Math.floor(cycleLength.value * 0.5)
+            );
+        }
+        
+        return predictions;
+    });
+
     const periodDialogMessage = computed(() => {
         if (!selectedCharacter.value) return null;
         if (isPeriodToday.value) {
@@ -208,8 +370,6 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
         const seconds = focusTime.value % 60;
         return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     });
-    
-    const monthlyBalance = computed(() => monthlyBudget.value - monthlyExpenses.value);
     
     const groupedExpenses = computed(() => {
         const viewYear = currentViewDate.value.getFullYear();
@@ -236,6 +396,32 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
         return Object.values(groups).sort((a, b) => b.amount - a.amount);
     });
 
+    // 收入分类统计
+    const groupedIncomes = computed(() => {
+        const viewYear = currentViewDate.value.getFullYear();
+        const viewMonth = currentViewDate.value.getMonth();
+        
+        const filteredIncomes = incomes.value.filter(i => {
+            const d = new Date(i.date);
+            return d.getFullYear() === viewYear && d.getMonth() === viewMonth;
+        });
+        
+        const groups = {};
+        filteredIncomes.forEach(i => {
+            if (!groups[i.category]) {
+                groups[i.category] = {
+                    category: i.category,
+                    amount: 0,
+                    count: 0
+                };
+            }
+            groups[i.category].amount += i.amount;
+            groups[i.category].count += 1;
+        });
+        
+        return Object.values(groups).sort((a, b) => b.amount - a.amount);
+    });
+
     const categoryDetails = computed(() => {
         if (!selectedCategoryDetail.value) return [];
         const viewYear = currentViewDate.value.getFullYear();
@@ -247,6 +433,21 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
                 return d.getFullYear() === viewYear && 
                        d.getMonth() === viewMonth && 
                        e.category === selectedCategoryDetail.value;
+            })
+            .sort((a, b) => b.date - a.date);
+    });
+
+    const incomeCategoryDetails = computed(() => {
+        if (!selectedCategoryDetail.value) return [];
+        const viewYear = currentViewDate.value.getFullYear();
+        const viewMonth = currentViewDate.value.getMonth();
+        
+        return incomes.value
+            .filter(i => {
+                const d = new Date(i.date);
+                return d.getFullYear() === viewYear && 
+                       d.getMonth() === viewMonth && 
+                       i.category === selectedCategoryDetail.value;
             })
             .sort((a, b) => b.date - a.date);
     });
@@ -464,6 +665,367 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
         saveToLocal();
     };
 
+    const submitPeriodLog = () => {
+        const log = {
+            id: Date.now(),
+            date: new Date(newPeriodLog.value.date),
+            flow: newPeriodLog.value.flow,
+            mood: newPeriodLog.value.mood,
+            symptoms: newPeriodLog.value.symptoms
+        };
+        periodLogs.value.push(log);
+        saveToLocal();
+        showPeriodLogModal.value = false;
+        newPeriodLog.value = {
+            date: new Date().toISOString().split('T')[0],
+            flow: 'medium',
+            mood: 'normal',
+            symptoms: []
+        };
+    };
+
+    const deletePeriodLog = (id) => {
+        periodLogs.value = periodLogs.value.filter(log => log.id !== id);
+        saveToLocal();
+    };
+
+    const cycleCharacter = () => {
+        if (!characters.value || characters.value.length === 0) return;
+        
+        const currentIndex = characters.value.findIndex(c => c.id === selectedMateCharacterId.value);
+        const nextIndex = (currentIndex + 1) % characters.value.length;
+        selectedMateCharacterId.value = characters.value[nextIndex].id;
+        saveToLocal();
+        periodCareMessage.value = '';
+    };
+
+    const generatePeriodCare = async () => {
+        if (!selectedCharacter.value || !activeProfile.value) {
+            alert('请先选择角色并配置AI');
+            return;
+        }
+        
+        isGeneratingCare.value = true;
+        try {
+            const phase = periodPhase.value;
+            const phaseText = phase === 'menstrual' ? '经期' : 
+                           phase === 'follicular' ? '滤泡期' : 
+                           phase === 'ovulation' ? '排卵期' : 
+                           phase === 'luteal' ? '黄体期' : '未知';
+            
+            const day = currentCycleDay.value;
+            
+            const prompt = `你现在要扮演角色：${selectedCharacter.value.name}。
+角色人设：${selectedCharacter.value.persona || selectedCharacter.value.summary}
+
+你的朋友现在处于月经周期的${phaseText}，第${day}天。
+请根据你的性格，写一句贴心、温暖的话来关心ta。
+要求：
+1. 语气要符合你的人设
+2. 要体现出对ta的关心和理解
+3. 不要太长，1-2句话即可
+4. 要自然、真诚，不要过于夸张
+
+直接返回关心的话，不要有任何多余文字。`;
+
+            const response = await fetch(`${activeProfile.value.endpoint}/chat/completions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${activeProfile.value.key}`
+                },
+                body: JSON.stringify({
+                    model: activeProfile.value.model,
+                    messages: [
+                        { role: 'system', content: `你正在扮演角色：${selectedCharacter.value.name}。你只返回关心的话。` },
+                        { role: 'user', content: prompt }
+                    ],
+                    temperature: 0.8
+                })
+            });
+
+            const data = await response.json();
+            periodCareMessage.value = data.choices[0].message.content.trim();
+            saveToLocal();
+        } catch (error) {
+            console.error('生成关心失败:', error);
+            alert('生成关心失败，请稍后重试');
+        } finally {
+            isGeneratingCare.value = false;
+        }
+    };
+
+    const setExerciseType = (type) => {
+        exerciseType.value = type;
+        saveToLocal();
+    };
+
+    const generateExerciseEncouragement = async () => {
+        if (!selectedCharacter.value || !activeProfile.value) {
+            alert('请先选择角色并配置AI');
+            return;
+        }
+        
+        isGeneratingEncouragement.value = true;
+        try {
+            const type = exerciseTypes.find(t => t.id === exerciseType.value);
+            const typeLabel = type ? type.label : '运动';
+            
+            const progress = Math.min(100, Math.round((steps.value / targetSteps.value) * 100));
+            
+            const prompt = `你现在要扮演角色：${selectedCharacter.value.name}。
+角色人设：${selectedCharacter.value.persona || selectedCharacter.value.summary}
+
+你的朋友正在进行${typeLabel}运动，当前步数：${steps.value}步，目标：${targetSteps.value}步，完成进度：${progress}%。
+请根据你的性格，写一句鼓励的话来激励ta继续运动。
+要求：
+1. 语气要符合你的人设
+2. 要体现出对ta的鼓励和支持
+3. 要积极向上，充满正能量
+4. 不要太长，1-2句话即可
+5. 可以根据进度给出不同的鼓励
+
+直接返回鼓励的话，不要有任何多余文字。`;
+
+            const response = await fetch(`${activeProfile.value.endpoint}/chat/completions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${activeProfile.value.key}`
+                },
+                body: JSON.stringify({
+                    model: activeProfile.value.model,
+                    messages: [
+                        { role: 'system', content: `你正在扮演角色：${selectedCharacter.value.name}。你只返回鼓励的话。` },
+                        { role: 'user', content: prompt }
+                    ],
+                    temperature: 0.8
+                })
+            });
+
+            const data = await response.json();
+            exerciseEncouragement.value = data.choices[0].message.content.trim();
+            saveToLocal();
+        } catch (error) {
+            console.error('生成鼓励失败:', error);
+            alert('生成鼓励失败，请稍后重试');
+        } finally {
+            isGeneratingEncouragement.value = false;
+        }
+    };
+
+    const resetExerciseData = () => {
+        steps.value = 0;
+        heartRate.value = 70;
+        exerciseEncouragement.value = '';
+        saveToLocal();
+    };
+
+    const setStudyDuration = (minutes) => {
+        focusTime.value = minutes * 60;
+        saveToLocal();
+    };
+
+    const generateStudyEncouragement = async () => {
+        if (!selectedCharacter.value || !activeProfile.value) {
+            alert('请先选择角色并配置AI');
+            return;
+        }
+        
+        isGeneratingStudyEncouragement.value = true;
+        try {
+            const todaySessions = focusHistory.value.filter(h => new Date(h.date).toDateString() === new Date().toDateString());
+            const sessionCount = todaySessions.length;
+            const remainingTime = focusTime.value;
+            const remainingMinutes = Math.floor(remainingTime / 60);
+            
+            const prompt = `你现在要扮演角色：${selectedCharacter.value.name}。
+角色人设：${selectedCharacter.value.persona || selectedCharacter.value.summary}
+
+你的朋友正在学习，剩余时间：${remainingMinutes}分钟，今日已完成${sessionCount}次专注学习。
+请根据你的性格，写一句鼓励的话来激励ta继续学习。
+要求：
+1. 语气要符合你的人设
+2. 要体现出对ta的鼓励和支持
+3. 要积极向上，充满正能量
+4. 不要太长，1-2句话即可
+5. 可以根据剩余时间给出不同的鼓励
+
+直接返回鼓励的话，不要有任何多余文字。`;
+
+            const response = await fetch(`${activeProfile.value.endpoint}/chat/completions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${activeProfile.value.key}`
+                },
+                body: JSON.stringify({
+                    model: activeProfile.value.model,
+                    messages: [
+                        { role: 'system', content: `你正在扮演角色：${selectedCharacter.value.name}。你只返回鼓励的话。` },
+                        { role: 'user', content: prompt }
+                    ],
+                    temperature: 0.8
+                })
+            });
+
+            const data = await response.json();
+            studyEncouragement.value = data.choices[0].message.content.trim();
+            saveToLocal();
+        } catch (error) {
+            console.error('生成鼓励失败:', error);
+            alert('生成鼓励失败，请稍后重试');
+        } finally {
+            isGeneratingStudyEncouragement.value = false;
+        }
+    };
+
+    const setTargetSleepDuration = (hours) => {
+        targetSleepDuration.value = hours;
+        saveToLocal();
+    };
+
+    const generateSleepEncouragement = async () => {
+        if (!selectedCharacter.value || !activeProfile.value) {
+            alert('请先选择角色并配置AI');
+            return;
+        }
+        
+        isGeneratingSleepEncouragement.value = true;
+        try {
+            const todayDiaries = sleepDiaries.value.filter(d => new Date(d.date).toDateString() === new Date().toDateString());
+            const diaryCount = todayDiaries.length;
+            
+            const prompt = `你现在要扮演角色：${selectedCharacter.value.name}。
+角色人设：${selectedCharacter.value.persona || selectedCharacter.value.summary}
+
+你的朋友准备入睡，今日已完成${diaryCount}次睡眠记录，目标睡眠时长：${targetSleepDuration.value}小时。
+请根据你的性格，写一句温馨的晚安祝福或睡眠建议。
+要求：
+1. 语气要符合你的人设
+2. 要体现出对ta的关心和温暖
+3. 要温馨、柔和，有助于放松
+4. 不要太长，1-2句话即可
+5. 可以包含一些助眠建议
+
+直接返回晚安祝福或建议，不要有任何多余文字。`;
+
+            const response = await fetch(`${activeProfile.value.endpoint}/chat/completions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${activeProfile.value.key}`
+                },
+                body: JSON.stringify({
+                    model: activeProfile.value.model,
+                    messages: [
+                        { role: 'system', content: `你正在扮演角色：${selectedCharacter.value.name}。你只返回晚安祝福或建议。` },
+                        { role: 'user', content: prompt }
+                    ],
+                    temperature: 0.8
+                })
+            });
+
+            const data = await response.json();
+            sleepEncouragement.value = data.choices[0].message.content.trim();
+            saveToLocal();
+        } catch (error) {
+            console.error('生成晚安祝福失败:', error);
+            alert('生成晚安祝福失败，请稍后重试');
+        } finally {
+            isGeneratingSleepEncouragement.value = false;
+        }
+    };
+
+    const generateCharacterReply = async (type) => {
+        if (!selectedCharacter.value || !activeProfile.value) {
+            alert('请先选择角色并配置AI');
+            return;
+        }
+        
+        let isGeneratingRef;
+        let encouragementRef;
+        
+        switch (type) {
+            case 'study':
+                isGeneratingRef = isGeneratingStudyEncouragement;
+                encouragementRef = studyEncouragement;
+                break;
+            case 'exercise':
+                isGeneratingRef = isGeneratingEncouragement;
+                encouragementRef = exerciseEncouragement;
+                break;
+            case 'sleep':
+                isGeneratingRef = isGeneratingSleepEncouragement;
+                encouragementRef = sleepEncouragement;
+                break;
+            default:
+                return;
+        }
+        
+        isGeneratingRef.value = true;
+        try {
+            let activity = '';
+            let context = '';
+            
+            switch (type) {
+                case 'study':
+                    activity = '学习';
+                    const todaySessions = focusHistory.value.filter(h => new Date(h.date).toDateString() === new Date().toDateString());
+                    context = `当前正在${isFocusing.value ? '专注学习中' : '准备学习'}，今日已完成${todaySessions.length}次专注`;
+                    break;
+                case 'exercise':
+                    activity = '运动';
+                    const typeName = exerciseTypes.find(t => t.id === exerciseType.value)?.label || '运动';
+                    context = `当前正在进行${typeName}，已走${steps.value}步，目标${targetSteps.value}步`;
+                    break;
+                case 'sleep':
+                    activity = '睡眠';
+                    context = `准备入睡，目标睡眠时长${targetSleepDuration.value}小时`;
+                    break;
+            }
+            
+            const prompt = `你现在要扮演角色：${selectedCharacter.value.name}。
+角色人设：${selectedCharacter.value.persona || selectedCharacter.value.summary}
+
+你的朋友正在进行${activity}，${context}。
+他们点击了你的头像，希望得到你的回应。
+请根据你的性格，说一句简短的话，提醒他们不要开小差，专注于当前的${activity}。
+要求：
+1. 语气要符合你的人设
+2. 要体现出对ta的关心和鼓励
+3. 要简短有力，1-2句话即可
+4. 可以带一点幽默或个性化的表达
+
+直接返回回复内容，不要有任何多余文字。`;
+
+            const response = await fetch(`${activeProfile.value.endpoint}/chat/completions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${activeProfile.value.key}`
+                },
+                body: JSON.stringify({
+                    model: activeProfile.value.model,
+                    messages: [
+                        { role: 'system', content: `你正在扮演角色：${selectedCharacter.value.name}。你只返回简短的回复。` },
+                        { role: 'user', content: prompt }
+                    ],
+                    temperature: 0.8
+                })
+            });
+
+            const data = await response.json();
+            encouragementRef.value = data.choices[0].message.content.trim();
+            saveToLocal();
+        } catch (error) {
+            console.error('生成角色回复失败:', error);
+            alert('生成角色回复失败，请稍后重试');
+        } finally {
+            isGeneratingRef.value = false;
+        }
+    };
+
     const changeViewMonth = (offset) => {
         const d = new Date(currentViewDate.value);
         d.setMonth(d.getMonth() + offset);
@@ -473,6 +1035,11 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
     const viewCategoryDetail = (category) => {
         selectedCategoryDetail.value = category;
         showCategoryDetailModal.value = true;
+    };
+
+    const viewIncomeCategoryDetail = (category) => {
+        selectedCategoryDetail.value = category;
+        showIncomeCategoryDetailModal.value = true;
     };
 
     const submitExpense = async (allCharacters, activeProfileObj) => {
@@ -571,6 +1138,66 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
         expenses.value = expenses.value.filter(e => e.id !== id);
         calculateMonthlyExpenses();
         saveToLocal();
+    };
+
+    // 收入管理
+    const newIncome = ref({ 
+        amount: '', 
+        category: '工资', 
+        description: '', 
+        date: new Date().toISOString().split('T')[0] 
+    });
+    
+    const submitIncome = () => {
+        if (!newIncome.value.amount) return;
+        
+        const incomeId = Date.now();
+        const income = {
+            id: incomeId,
+            amount: Number(newIncome.value.amount),
+            category: newIncome.value.category,
+            date: new Date(newIncome.value.date),
+            description: newIncome.value.description
+        };
+
+        incomes.value.push(income);
+        saveToLocal();
+        showAddIncomeModal.value = false;
+        newIncome.value = { 
+            amount: '', 
+            category: '工资', 
+            description: '', 
+            date: new Date().toISOString().split('T')[0] 
+        };
+    };
+    
+    const deleteIncome = (id) => {
+        incomes.value = incomes.value.filter(i => i.id !== id);
+        saveToLocal();
+    };
+
+    // 初始金额设置
+    const updateInitialBalance = (newAmount) => {
+        if (newAmount === null || isNaN(newAmount)) return;
+        initialBalance.value = Number(newAmount);
+        saveToLocal();
+    };
+
+    const promptUpdateInitialBalance = () => {
+        const b = window.prompt('请输入初始金额：', initialBalance.value);
+        if (b) updateInitialBalance(b);
+    };
+
+    // 存款目标设置
+    const updateSavingGoal = (newAmount) => {
+        if (newAmount === null || isNaN(newAmount) || newAmount <= 0) return;
+        monthlySavingGoal.value = Number(newAmount);
+        saveToLocal();
+    };
+
+    const promptUpdateSavingGoal = () => {
+        const b = window.prompt('请输入本月存款目标：', monthlySavingGoal.value);
+        if (b) updateSavingGoal(b);
     };
 
     const updateBudget = (newAmount) => {
@@ -839,6 +1466,7 @@ ${recentMessages || '最近没有聊天。'}
         focusTime,
         isFocusing,
         isPaused,
+        focusHistory,
         isGeneratingComment,
         focusTimeFormatted,
         monthlyBudget,
@@ -848,9 +1476,12 @@ ${recentMessages || '最近没有聊天。'}
         currentViewDate,
         selectedCategoryDetail,
         showCategoryDetailModal,
+        showIncomeCategoryDetailModal,
         categoryDetails,
+        incomeCategoryDetails,
         comparisonChartData,
         expenses,
+        incomes,
         events,
         todos,
         steps,
@@ -871,6 +1502,7 @@ ${recentMessages || '最近没有聊天。'}
         currentEvent,
         containerClass,
         showAddExpenseModal,
+        showAddIncomeModal,
         showAddTodoModal,
         showAddEventModal,
         showPeriodSettings,
@@ -882,27 +1514,61 @@ ${recentMessages || '最近没有聊天。'}
         daysUntilNextPeriod,
         periodStatusText,
         periodDialogMessage,
+        currentCycleDay,
+        periodPhase,
+        moonRingAngle,
+        ovulationDay,
+        historyPrediction,
+        showHistoryPrediction,
+        showPeriodLogs,
+        periodCareMessage,
+        isGeneratingCare,
+        exerciseEncouragement,
+        isGeneratingEncouragement,
+        studyEncouragement,
+        isGeneratingStudyEncouragement,
+        sleepEncouragement,
+        isGeneratingSleepEncouragement,
+        targetSleepDuration,
+        periodLogs,
+        showPeriodLogModal,
+        newPeriodLog,
         newExpense,
+        newIncome,
         newTodo,
         newEvent,
+        monthlyIncome,
+        groupedIncomes,
+        monthlySavingGoal,
+        initialBalance,
+        savingProgress,
+        lastMonthExpenses,
+        expenseChangePercent,
         
         // 方法
         startFocus,
         pauseFocus,
         cancelFocus,
         submitExpense,
+        submitIncome,
         submitTodo,
         submitEvent,
         deleteTodo,
         deleteEvent,
         deleteExpense,
+        deleteIncome,
         toggleTodo,
         updateBudget,
         promptUpdateBudget,
+        updateInitialBalance,
+        promptUpdateInitialBalance,
+        updateSavingGoal,
+        promptUpdateSavingGoal,
         promptAiBookkeep,
         setPeriodStartDate,
         changeViewMonth,
         viewCategoryDetail,
+        viewIncomeCategoryDetail,
         getCurrentStatus,
         getGreeting,
         setMode,
@@ -910,6 +1576,18 @@ ${recentMessages || '最近没有聊天。'}
         wakeUp,
         aiBookkeep,
         generatePeriodicAIComment,
-        generateSleepDiary
+        generateSleepDiary,
+        submitPeriodLog,
+        deletePeriodLog,
+        cycleCharacter,
+        generatePeriodCare,
+        setExerciseType,
+        generateExerciseEncouragement,
+        resetExerciseData,
+        setStudyDuration,
+        generateStudyEncouragement,
+        setTargetSleepDuration,
+        generateSleepEncouragement,
+        generateCharacterReply
     };
 }
