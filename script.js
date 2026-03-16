@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿// =========================================================================
+// =========================================================================
 // == SOUL OS SCRIPT (FIXED VERSION)
 // =========================================================================
 import { ref, computed, onMounted, watch, reactive } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
@@ -1867,6 +1867,8 @@ export function setupApp() {
         const textImageText = ref('');
         const textImageBgColor = ref('#ffffff');
         const textImageColors = ['#ffffff', '#f8f5f0', '#fef3c7', '#dbeafe', '#f3e8ff', '#fce7f3', '#dcfce7'];
+        const showVoiceInputPanel = ref(false);
+        const voiceInputText = ref('');
         const showGreetingSelect = ref(false);
         const availableGreetings = ref([]);
         const selectedGreeting = ref(null);
@@ -1883,6 +1885,19 @@ export function setupApp() {
         const activeVote = ref(null);
         const newGroupName = ref('');
         const newGroupMembers = ref('');
+        
+        // Shopping
+        const showTaobaoPanel = ref(false);
+        const taobaoSearchTerm = ref('');
+        const taobaoProducts = ref([]);
+        const taobaoLoading = ref(false);
+        
+        // Share
+        const showSharePanel = ref(false);
+        const shareSource = ref('');
+        const shareContent = ref('');
+        const shareSources = ['B站', '小红书', '知乎', '微博', '抖音', '浏览器', '微信公众号', '其他'];
+        
         const newGroupAvatar = ref('');
         const selectedGroupMembers = ref([]);
         const groupAvatarInput = ref(null);
@@ -1935,6 +1950,13 @@ export function setupApp() {
             '👁', '👀', '🧠', '🫀', '🫁', '🩸', '🦠', '💐',
             '🌸', '💮', '🏵', '🌹', '🥀', '🌺', '🌻', '🌼'
         ]);
+        const stickerPacks = ref(JSON.parse(localStorage.getItem('stickerPacks') || '[]'));
+        const showStickerImportPanel = ref(false);
+        const stickerImportText = ref('');
+        const newPackName = ref('');
+        const favoriteStickers = ref(JSON.parse(localStorage.getItem('favoriteStickers') || '[]'));
+        const activeStickerTab = ref('favorite');
+        let stickerTouchTimer = null;
         const saveSoulLinkMessages = async () => {
             try {
                 const dataToSave = JSON.parse(JSON.stringify(soulLinkMessages.value));
@@ -2171,6 +2193,93 @@ export function setupApp() {
             return segments.length ? segments : null;
         };
 
+        const extractStickersFromText = (rawText) => {
+            const text = (rawText || '').trim();
+            if (!text) return null;
+            
+            let availableStickers = [];
+            stickerPacks.value.forEach(pack => {
+                pack.stickers.forEach(s => {
+                    availableStickers.push(s);
+                });
+            });
+            
+            if (availableStickers.length === 0) return null;
+            
+            const stickerPattern = /\[(?:表情[:：])?([^\]]+)\]/g;
+            const matches = [...text.matchAll(stickerPattern)];
+            
+            const validMatches = matches.filter(match => {
+                const content = match[1].trim();
+                return availableStickers.some(s => 
+                    s.name === content || 
+                    s.name.includes(content) || 
+                    content.includes(s.name)
+                );
+            });
+            
+            if (validMatches.length === 0) return null;
+            
+            const segments = [];
+            let lastIndex = 0;
+            
+            validMatches.forEach(match => {
+                const beforeText = text.slice(lastIndex, match.index).trim();
+                if (beforeText) {
+                    segments.push({ type: 'text', content: beforeText });
+                }
+                
+                const stickerName = match[1].trim();
+                const foundSticker = availableStickers.find(s => 
+                    s.name === stickerName || 
+                    s.name.includes(stickerName) || 
+                    stickerName.includes(s.name)
+                );
+                
+                if (foundSticker) {
+                    segments.push({ type: 'sticker', sticker: foundSticker });
+                }
+                
+                lastIndex = match.index + match[0].length;
+            });
+            
+            const remainingText = text.slice(lastIndex).trim();
+            if (remainingText) {
+                segments.push({ type: 'text', content: remainingText });
+            }
+            
+            return segments.length ? segments : null;
+        };
+
+        const extractAiShoppingCard = (rawText) => {
+            const text = (rawText || '').trim();
+            if (!text) return null;
+            
+            // 匹配 [购买:商品名:价格] 或 [帮买请求:商品名:价格]
+            const buyPattern = /\[购买:([^:]+):([\d.]+)\]/;
+            const helpBuyPattern = /\[帮买请求:([^:]+):([\d.]+)\]/;
+            
+            const buyMatch = text.match(buyPattern);
+            if (buyMatch) {
+                return {
+                    type: 'buy',
+                    item: buyMatch[1].trim(),
+                    price: parseFloat(buyMatch[2])
+                };
+            }
+            
+            const helpBuyMatch = text.match(helpBuyPattern);
+            if (helpBuyMatch) {
+                return {
+                    type: 'helpBuy',
+                    item: helpBuyMatch[1].trim(),
+                    price: parseFloat(helpBuyMatch[2])
+                };
+            }
+            
+            return null;
+        };
+
         const extractAiTransfer = (rawText) => {
             const text = (rawText || '').trim();
             if (!text) return null;
@@ -2214,6 +2323,47 @@ export function setupApp() {
             const segments = [];
             if (before) segments.push({ type: 'text', content: before });
             segments.push({ type: 'transfer', amount: amount.toFixed(2), note: (transferMatch[3] || '').trim() });
+            if (tail) segments.push({ type: 'text', content: tail });
+            return segments;
+        };
+
+        const extractAiVoice = (rawText) => {
+            const text = (rawText || '').trim();
+            if (!text) return null;
+            const patterns = [
+                /^\[语音\]\s*(.+)$/i,
+                /^语音[:：]?\s*(.+)$/i
+            ];
+            for (const pattern of patterns) {
+                const match = text.match(pattern);
+                if (match && match[1]) {
+                    return {
+                        transcription: match[1].trim()
+                    };
+                }
+            }
+            return null;
+        };
+
+        const splitAiVoiceSegments = (rawText) => {
+            const text = (rawText || '').trim();
+            if (!text) return null;
+            const tagPattern = /(\[语音\]|语音[:：])/i;
+            const match = text.match(tagPattern);
+            if (!match || match.index == null) return null;
+            const before = text.slice(0, match.index).trim();
+            const after = text.slice(match.index + match[0].length).trim();
+            let voiceRaw = after;
+            let tail = '';
+            const lineBreakIndex = after.indexOf('\n');
+            if (lineBreakIndex >= 0) {
+                voiceRaw = after.slice(0, lineBreakIndex).trim();
+                tail = after.slice(lineBreakIndex + 1).trim();
+            }
+            if (!voiceRaw) return null;
+            const segments = [];
+            if (before) segments.push({ type: 'text', content: before });
+            segments.push({ type: 'voice', transcription: voiceRaw });
             if (tail) segments.push({ type: 'text', content: tail });
             return segments;
         };
@@ -2386,6 +2536,7 @@ export function setupApp() {
             const lastMsg = msgs[msgs.length - 1];
             if (lastMsg.messageType === 'image') return '[图片]';
             if (lastMsg.messageType === 'voice') return '[语音]';
+            if (lastMsg.messageType === 'sticker') return '[表情]';
             if (lastMsg.messageType === 'transfer') return '[转账]';
             if (lastMsg.messageType === 'location') return '[位置]';
             if (lastMsg.messageType === 'call') return lastMsg.callType === 'video' ? '[视频通话]' : '[语音通话]';
@@ -2986,6 +3137,11 @@ export function setupApp() {
             }
         };
 
+        const replaceUserPlaceholder = (text) => {
+            if (!text) return '';
+            return text.replace(/\{user\}/g, '我').replace(/\$\{user\}/g, '我').replace(/{{user}}/g, '我');
+        };
+
         const triggerSoulLinkAiReply = async () => {
             if (!soulLinkActiveChat.value) return;
 
@@ -3028,6 +3184,12 @@ export function setupApp() {
                 profile.model = modelId;
             }
             const messagesPayload = [];
+            let availableStickers = [];
+            stickerPacks.value.forEach(pack => {
+                pack.stickers.forEach(s => {
+                    availableStickers.push(s);
+                });
+            });
             let systemPrompt = '';
             if (isGroupChat) {
                 const groupName = activeGroup && activeGroup.name ? activeGroup.name : '群聊';
@@ -3048,6 +3210,9 @@ export function setupApp() {
                     systemPrompt += `成员A、成员B、成员C\n`;
                 }
                 systemPrompt += `\n# 行为规则\n1. 回复要简短自然，像真实群聊一样。\n2. 每次回复只扮演其中一名群成员。\n3. 回复格式为「成员名: 内容」。\n4. 可以用emoji和口语表达。\n5. 根据每个成员的人设来扮演他们的说话风格和性格特点。\n\n`;
+                if (availableStickers.length > 0) {
+                    systemPrompt += `你可以发送表情包来表达情感！使用格式：[表情名] 或 [表情:表情名]。可用的表情包有：${availableStickers.map(s => s.name).join('、')}。当情绪适合时自然地发送表情包。\n\n`;
+                }
                 systemPrompt += `现在请开始回复。`;
             } else if (char && char.persona) {
                 const charName = char.name || '角色';
@@ -3112,9 +3277,17 @@ export function setupApp() {
                     systemPrompt += `# 开场\n这是你们的第一次对话。你可以从以下开场白中选择一个打招呼：\n${replacedOpeningLines.join('\n')}\n\n`;
                 }
                 systemPrompt += `现在，请以${charName}的身份，自然地回复对方。记住：简短、真实、有人情味。`;
+                if (availableStickers.length > 0) {
+                    systemPrompt += `\n\n你可以发送表情包来表达情感！使用格式：[表情名] 或 [表情:表情名]。可用的表情包有：${availableStickers.map(s => s.name).join('、')}。当情绪适合时自然地发送表情包，有时可以连续发多个表情包来表达强烈情感。`;
+                }
+                systemPrompt += `\n\n# 购物卡片功能（重要）\n\n## 发送购物卡片\n你可以发送购物卡片给用户，格式如下：\n- 购买卡片：[购买:商品名:价格] - 表示你买了东西送给用户\n- 帮买卡片：[帮买请求:商品名:价格] - 表示你想让用户帮你买东西\n\n例如：\n- [购买:小熊饼干:15] - 你买了小熊饼干送给用户\n- [帮买请求:笔记本:25] - 你想让用户帮你买笔记本\n\n## 接收帮买请求\n当用户发送帮买请求卡片时，如果你愿意帮Ta买，直接回复"好的，我帮你买！"即可。`;
             } else {
                 systemPrompt = '你是一个友好的朋友，正在通过SoulLink聊天。请像真人一样自然、简短地对话，每次1-3句话即可。可以用emoji和口语化表达。';
-                systemPrompt += '\n如果要发照片，请用“[图片] 照片内容描述”的格式。';
+                systemPrompt += '\n如果要发照片，请用"[图片] 照片内容描述"的格式。';
+                if (availableStickers.length > 0) {
+                    systemPrompt += `\n你可以发送表情包来表达情感！使用格式：[表情名] 或 [表情:表情名]。可用的表情包有：${availableStickers.map(s => s.name).join('、')}。当情绪适合时自然地发送表情包，有时可以连续发多个表情包来表达强烈情感。`;
+                }
+                systemPrompt += '\n\n# 购物卡片功能（重要）\n你可以发送购物卡片：\n- [购买:商品名:价格] - 你买了东西送给用户\n- [帮买请求:商品名:价格] - 你想让用户帮你买\n当用户发送帮买请求时，如果愿意帮买，回复"好的，我帮你买！"即可。';
             }
             messagesPayload.push({
                 role: 'system',
@@ -3123,7 +3296,7 @@ export function setupApp() {
             history.forEach(m => {
                 if (m.isSystem || m.isHidden) return;
                 const ctx = buildSoulLinkReplyContext(m);
-                const raw = ctx.content || (m.text || '');
+                const raw = ctx.text || (m.text || '');
                 if (m.sender === 'user') {
                     messagesPayload.push({ role: 'user', content: raw });
                 } else if (m.sender === 'ai') {
@@ -3167,6 +3340,56 @@ export function setupApp() {
                 if (!reply) {
                     reply = '模型已响应，但未返回可显示的内容。';
                 }
+                
+                // 检查AI回复中是否包含帮买标记
+                const helpBuyMatch = reply.match(/\[帮买:([^\]]+)\]/);
+                if (helpBuyMatch) {
+                    const productName = helpBuyMatch[1].trim();
+                    // 找到最近的帮买请求卡片并更新状态（使用模糊匹配）
+                    const history = isGroupChat ? (activeGroupChat.value?.history || []) : (soulLinkMessages.value[soulLinkActiveChat.value] || []);
+                    for (let i = history.length - 1; i >= 0; i--) {
+                        const msg = history[i];
+                        if (msg.messageType === 'helpBuy' && !msg.isPurchased) {
+                            // 模糊匹配：商品名包含关系
+                            if (msg.item.includes(productName) || productName.includes(msg.item) || 
+                                msg.item.replace(/\s/g, '') === productName.replace(/\s/g, '')) {
+                                msg.isPurchased = true;
+                                saveSoulLinkMessages();
+                                break;
+                            }
+                        }
+                    }
+                    // 移除回复中的帮买标记
+                    reply = reply.replace(/\[帮买:[^\]]+\]/g, '').trim();
+                }
+                
+                // 备用方案：检测AI是否用自然语言表示愿意帮买
+                // 检查是否有未处理的帮买请求
+                const history = isGroupChat ? (activeGroupChat.value?.history || []) : (soulLinkMessages.value[soulLinkActiveChat.value] || []);
+                let hasPendingHelpBuy = false;
+                for (let i = history.length - 1; i >= 0; i--) {
+                    if (history[i].messageType === 'helpBuy' && !history[i].isPurchased) {
+                        hasPendingHelpBuy = true;
+                        break;
+                    }
+                }
+                
+                // 如果有未处理的帮买请求，检测AI是否愿意帮买
+                if (hasPendingHelpBuy && !helpBuyMatch) {
+                    const buyKeywords = /帮你买|帮你付|已经买了|买好了|帮你买了|好的.*买|好呀.*买|可以.*买|没问题.*买|我买|给你买|帮你|帮你买|买给你|帮你下单|已买|买了|付款|付钱|转账|发红包|报销|我请|我付|我来买|我去买|帮你购|下单了|已下单/;
+                    if (buyKeywords.test(reply)) {
+                        // 找到最近的未处理帮买请求
+                        for (let i = history.length - 1; i >= 0; i--) {
+                            const msg = history[i];
+                            if (msg.messageType === 'helpBuy' && !msg.isPurchased) {
+                                msg.isPurchased = true;
+                                saveSoulLinkMessages();
+                                break;
+                            }
+                        }
+                    }
+                }
+                
                 isAiTyping.value = false;
                 const separator = '---';
                 const appendAiMessage = (rawText, index = 0) => {
@@ -3277,6 +3500,36 @@ export function setupApp() {
                             });
                             return;
                         }
+                        
+                        const stickerSegments = extractStickersFromText(parsed.content);
+                        if (stickerSegments) {
+                            stickerSegments.forEach((segment, offset) => {
+                                if (segment.type === 'sticker') {
+                                    pushMessageToActiveChat({
+                                        id: Date.now() + index + offset,
+                                        sender: 'ai',
+                                        senderName: parsed.senderName,
+                                        senderAvatar: senderAvatar,
+                                        messageType: 'sticker',
+                                        stickerUrl: segment.sticker.url,
+                                        stickerName: segment.sticker.name,
+                                        text: `[${segment.sticker.name}]`,
+                                        timestamp: Date.now()
+                                    });
+                                } else {
+                                    pushMessageToActiveChat({
+                                        id: Date.now() + index + offset,
+                                        sender: 'ai',
+                                        senderName: parsed.senderName,
+                                        senderAvatar: senderAvatar,
+                                        text: segment.content,
+                                        timestamp: Date.now()
+                                    });
+                                }
+                            });
+                            return;
+                        }
+                        
                         pushMessageToActiveChat({
                             id: Date.now() + index,
                             sender: 'ai',
@@ -3358,14 +3611,121 @@ export function setupApp() {
                                 text: formatAiImageText(imageDesc, getActiveChatPronoun()),
                                 timestamp: Date.now()
                             });
-                        } else {
+                            return;
+                        }
+                        
+                        // 检查购物卡片
+                        const shoppingCard = extractAiShoppingCard(trimmedText);
+                        if (shoppingCard) {
+                            if (shoppingCard.type === 'buy') {
+                                pushMessageToActiveChat({
+                                    id: Date.now() + index,
+                                    sender: 'ai',
+                                    messageType: 'order',
+                                    platform: '购物',
+                                    item: shoppingCard.item,
+                                    price: shoppingCard.price,
+                                    status: '已下单',
+                                    eta: '2-3天',
+                                    timestamp: Date.now()
+                                });
+                            } else if (shoppingCard.type === 'helpBuy') {
+                                pushMessageToActiveChat({
+                                    id: Date.now() + index,
+                                    sender: 'ai',
+                                    messageType: 'helpBuy',
+                                    item: shoppingCard.item,
+                                    price: shoppingCard.price,
+                                    isPurchased: false,
+                                    timestamp: Date.now()
+                                });
+                            }
+                            // 移除购物卡片标记后的剩余文字
+                            const remainingText = trimmedText.replace(/\[(?:购买|帮买请求):[^:]+:[\d.]+\]/g, '').trim();
+                            if (remainingText) {
+                                pushMessageToActiveChat({
+                                    id: Date.now() + index + 1,
+                                    sender: 'ai',
+                                    text: remainingText,
+                                    timestamp: Date.now()
+                                });
+                            }
+                            return;
+                        }
+                        
+                        const stickerSegments = extractStickersFromText(trimmedText);
+                        if (stickerSegments) {
+                            stickerSegments.forEach((segment, offset) => {
+                                if (segment.type === 'sticker') {
+                                    pushMessageToActiveChat({
+                                        id: Date.now() + index + offset,
+                                        sender: 'ai',
+                                        messageType: 'sticker',
+                                        stickerUrl: segment.sticker.url,
+                                        stickerName: segment.sticker.name,
+                                        text: `[${segment.sticker.name}]`,
+                                        timestamp: Date.now()
+                                    });
+                                } else {
+                                    pushMessageToActiveChat({
+                                        id: Date.now() + index + offset,
+                                        sender: 'ai',
+                                        text: segment.content,
+                                        timestamp: Date.now()
+                                    });
+                                }
+                            });
+                            return;
+                        }
+
+                        // 处理主聊天中AI发送的语音消息
+                        const voiceSegments = splitAiVoiceSegments(trimmedText);
+                        if (voiceSegments) {
+                            voiceSegments.forEach((segment, offset) => {
+                                if (segment.type === 'voice') {
+                                    const voiceDuration = Math.max(1, Math.ceil(segment.transcription.length / 4));
+                                    pushMessageToActiveChat({
+                                        id: Date.now() + index + offset,
+                                        sender: 'ai',
+                                        messageType: 'voice',
+                                        transcription: segment.transcription,
+                                        text: segment.transcription,
+                                        voiceDuration: voiceDuration,
+                                        timestamp: Date.now()
+                                    });
+                                } else {
+                                    pushMessageToActiveChat({
+                                        id: Date.now() + index + offset,
+                                        sender: 'ai',
+                                        text: segment.content,
+                                        timestamp: Date.now()
+                                    });
+                                }
+                            });
+                            return;
+                        }
+
+                        const voice = extractAiVoice(trimmedText);
+                        if (voice) {
+                            const voiceDuration = Math.max(1, Math.ceil(voice.transcription.length / 4));
                             pushMessageToActiveChat({
                                 id: Date.now() + index,
                                 sender: 'ai',
-                                text: trimmedText,
+                                messageType: 'voice',
+                                transcription: voice.transcription,
+                                text: voice.transcription,
+                                voiceDuration: voiceDuration,
                                 timestamp: Date.now()
                             });
+                            return;
                         }
+
+                        pushMessageToActiveChat({
+                            id: Date.now() + index,
+                            sender: 'ai',
+                            text: trimmedText,
+                            timestamp: Date.now()
+                        });
                     }
                 };
                 if (reply.includes(separator)) {
@@ -3398,6 +3758,7 @@ export function setupApp() {
         };
 
         const autoAiReplyForAttachment = async (newMsg) => {
+            console.log('autoAiReplyForAttachment called with:', newMsg);
             if (!soulLinkActiveChat.value) return;
             if (!activeProfile.value) return;
             const isGroupChat = soulLinkActiveChatType.value === 'group';
@@ -3418,6 +3779,12 @@ export function setupApp() {
                 : (soulLinkMessages.value[soulLinkActiveChat.value] || []);
             const messagesPayload = [];
             let systemPrompt = '';
+            let availableStickers = [];
+            stickerPacks.value.forEach(pack => {
+                pack.stickers.forEach(s => {
+                    availableStickers.push(s);
+                });
+            });
             if (!isGroupChat && char && char.persona) {
                 const charName = char.name || '角色';
                 systemPrompt = `你正在通过 SoulLink 和朋友聊天。\n\n`;
@@ -3434,7 +3801,7 @@ export function setupApp() {
                         });
                     }
                 }
-                systemPrompt += `1. 像真实的人类那样自然地聊天。\n2. 回复保持简短（1-3句）。\n3. 使用符合角色的语气与口头禅。\n4. 如果要发照片，请用“[图片] 照片内容描述”的格式。\n5. 重要：如果要给对方转账，请用“[转账] 金额 备注(可选)”格式，并单独成一条消息。例如：“[转账] 520 情人节快乐”。\n6. 如果用户让你发朋友圈，请用“[发布朋友圈] 动态内容”的格式。\n7. 请积极主动地与用户互动，包括但不限于发送转账消息、照片和朋友圈动态。`;
+                systemPrompt += `1. 像真实的人类那样自然地聊天。\n2. 回复保持简短（1-3句）。\n3. 使用符合角色的语气与口头禅。\n4. 如果要发照片，请用“[图片] 照片内容描述”的格式。\n5. 重要：如果要给对方转账，请用“[转账] 金额 备注(可选)”格式，并单独成一条消息。例如：“[转账] 520 情人节快乐”。\n6. 如果用户让你发朋友圈，请用“[发布朋友圈] 动态内容”的格式。\n7. 如果要发语音消息，请用"[语音] 语音文字内容"的格式。\n8. 请积极主动地与用户互动，包括但不限于发送转账消息、照片、朋友圈动态和语音消息。`;
             } else if (!isGroupChat) {
                 systemPrompt = '你是一个友好的朋友，正在通过SoulLink聊天。请自然、简短地对话。';
             systemPrompt += '\n如果要发照片，请用“[图片] 照片内容描述”的格式。';
@@ -3449,12 +3816,18 @@ export function setupApp() {
                 systemPrompt += `回复要简短自然。每次回复以其中一名成员口吻，格式为「成员名: 内容」。\n如果要发照片，请用“[图片] 照片内容描述”的格式。`;
             systemPrompt += `\n重要：如果要给对方转账，请用“[转账] 金额 备注(可选)”格式，并单独成一条消息。例如：“[转账] 520 情人节快乐”。`;
             systemPrompt += `\n请积极主动地与用户互动，包括但不限于发送转账消息、照片和朋友圈动态。`;
+            if (availableStickers.length > 0) {
+                systemPrompt += `\n你可以发送表情包来表达情感！使用格式：[表情名] 或 [表情:表情名]。可用的表情包有：${availableStickers.map(s => s.name).join('、')}。当情绪适合时自然地发送表情包。`;
+            }
             }
             messagesPayload.push({ role: 'system', content: systemPrompt });
+            const newMsgId = newMsg.id;
             history.forEach(m => {
                 if (m.isSystem || m.isHidden) return;
+                // 跳过刚刚添加的消息，避免重复
+                if (m.id === newMsgId) return;
                 const ctx = buildSoulLinkReplyContext(m);
-                const raw = ctx.content || (m.text || '');
+                const raw = ctx.text || (m.text || '');
                 if (m.sender === 'user') {
                     messagesPayload.push({ role: 'user', content: raw });
                 } else if (m.sender === 'ai') {
@@ -3462,7 +3835,9 @@ export function setupApp() {
                 }
             });
             const ctxNew = buildSoulLinkReplyContext(newMsg);
-            messagesPayload.push({ role: 'user', content: ctxNew.content || (newMsg.text || '') });
+            const finalContent = ctxNew.text || (newMsg.text || '');
+            console.log('Final message content for AI:', finalContent);
+            messagesPayload.push({ role: 'user', content: finalContent });
             isAiTyping.value = true;
             scrollToBottom();
             try {
@@ -3493,9 +3868,9 @@ export function setupApp() {
                 isAiTyping.value = false;
                 // Process role feed posts
             // Improved regex to handle various bracket types and spacing
-            if (/\[发布朋友圈\]|【发布朋友圈】|\(发布朋友圈\)/.test(rawText)) {
-                console.log('Found role post command in rawText:', rawText);
-                const postMatch = rawText.match(/(?:\[|【|\()发布朋友圈(?:\]|】|\))\s*([\s\S]+?)(?=(\[|【|\(|$))/);
+            if (/\[发布朋友圈\]|【发布朋友圈】|\(发布朋友圈\)/.test(reply)) {
+                console.log('Found role post command in reply:', reply);
+                const postMatch = reply.match(/(?:\[|【|\()发布朋友圈(?:\]|】|\))\s*([\s\S]+?)(?=(\[|【|\(|$))/);
                 if (postMatch) {
                     const postContent = postMatch[1].trim();
                     if (postContent) {
@@ -3591,14 +3966,84 @@ export function setupApp() {
                                     });
                                 }
                             });
-                        } else {
+                            return;
+                        }
+                        
+                        const stickerSegments = extractStickersFromText(trimmedText);
+                        if (stickerSegments) {
+                            stickerSegments.forEach((segment, offset) => {
+                                if (segment.type === 'sticker') {
+                                    pushMessageToActiveChat({
+                                        id: Date.now() + index + offset,
+                                        sender: 'ai',
+                                        messageType: 'sticker',
+                                        stickerUrl: segment.sticker.url,
+                                        stickerName: segment.sticker.name,
+                                        text: `[${segment.sticker.name}]`,
+                                        timestamp: Date.now()
+                                    });
+                                } else {
+                                    pushMessageToActiveChat({
+                                        id: Date.now() + index + offset,
+                                        sender: 'ai',
+                                        text: segment.content,
+                                        timestamp: Date.now()
+                                    });
+                                }
+                            });
+                            return;
+                        }
+
+                        // 处理AI发送的语音消息
+                        const voiceSegments = splitAiVoiceSegments(trimmedText);
+                        if (voiceSegments) {
+                            voiceSegments.forEach((segment, offset) => {
+                                if (segment.type === 'voice') {
+                                    // 根据文字长度计算语音时长（约每秒4个字）
+                                    const voiceDuration = Math.max(1, Math.ceil(segment.transcription.length / 4));
+                                    pushMessageToActiveChat({
+                                        id: Date.now() + index + offset,
+                                        sender: 'ai',
+                                        messageType: 'voice',
+                                        transcription: segment.transcription,
+                                        text: segment.transcription,
+                                        voiceDuration: voiceDuration,
+                                        timestamp: Date.now()
+                                    });
+                                } else {
+                                    pushMessageToActiveChat({
+                                        id: Date.now() + index + offset,
+                                        sender: 'ai',
+                                        text: segment.content,
+                                        timestamp: Date.now()
+                                    });
+                                }
+                            });
+                            return;
+                        }
+
+                        const voice = extractAiVoice(trimmedText);
+                        if (voice) {
+                            // 根据文字长度计算语音时长（约每秒4个字）
+                            const voiceDuration = Math.max(1, Math.ceil(voice.transcription.length / 4));
                             pushMessageToActiveChat({
                                 id: Date.now() + index,
                                 sender: 'ai',
-                                text: trimmedText,
+                                messageType: 'voice',
+                                transcription: voice.transcription,
+                                text: voice.transcription,
+                                voiceDuration: voiceDuration,
                                 timestamp: Date.now()
                             });
+                            return;
                         }
+
+                        pushMessageToActiveChat({
+                            id: Date.now() + index,
+                            sender: 'ai',
+                            text: trimmedText,
+                            timestamp: Date.now()
+                        });
                     } else {
                         const parsed = parseGroupReply(trimmedText);
                         if (!parsed.content) return;
@@ -3667,15 +4112,88 @@ export function setupApp() {
                                     });
                                 }
                             });
-                        } else {
+                            return;
+                        }
+                        
+                        const stickerSegments = extractStickersFromText(parsed.content);
+                        if (stickerSegments) {
+                            stickerSegments.forEach((segment, offset) => {
+                                if (segment.type === 'sticker') {
+                                    pushMessageToActiveChat({
+                                        id: Date.now() + index + offset,
+                                        sender: 'ai',
+                                        senderName: parsed.senderName,
+                                        messageType: 'sticker',
+                                        stickerUrl: segment.sticker.url,
+                                        stickerName: segment.sticker.name,
+                                        text: `[${segment.sticker.name}]`,
+                                        timestamp: Date.now()
+                                    });
+                                } else {
+                                    pushMessageToActiveChat({
+                                        id: Date.now() + index + offset,
+                                        sender: 'ai',
+                                        senderName: parsed.senderName,
+                                        text: segment.content,
+                                        timestamp: Date.now()
+                                    });
+                                }
+                            });
+                            return;
+                        }
+
+                        // 处理群聊中AI发送的语音消息
+                        const voiceSegments = splitAiVoiceSegments(parsed.content);
+                        if (voiceSegments) {
+                            voiceSegments.forEach((segment, offset) => {
+                                if (segment.type === 'voice') {
+                                    const voiceDuration = Math.max(1, Math.ceil(segment.transcription.length / 4));
+                                    pushMessageToActiveChat({
+                                        id: Date.now() + index + offset,
+                                        sender: 'ai',
+                                        senderName: parsed.senderName,
+                                        messageType: 'voice',
+                                        transcription: segment.transcription,
+                                        text: segment.transcription,
+                                        voiceDuration: voiceDuration,
+                                        timestamp: Date.now()
+                                    });
+                                } else {
+                                    pushMessageToActiveChat({
+                                        id: Date.now() + index + offset,
+                                        sender: 'ai',
+                                        senderName: parsed.senderName,
+                                        text: segment.content,
+                                        timestamp: Date.now()
+                                    });
+                                }
+                            });
+                            return;
+                        }
+
+                        const voice = extractAiVoice(parsed.content);
+                        if (voice) {
+                            const voiceDuration = Math.max(1, Math.ceil(voice.transcription.length / 4));
                             pushMessageToActiveChat({
                                 id: Date.now() + index,
                                 sender: 'ai',
                                 senderName: parsed.senderName,
-                                text: parsed.content,
+                                messageType: 'voice',
+                                transcription: voice.transcription,
+                                text: voice.transcription,
+                                voiceDuration: voiceDuration,
                                 timestamp: Date.now()
                             });
+                            return;
                         }
+
+                        pushMessageToActiveChat({
+                            id: Date.now() + index,
+                            sender: 'ai',
+                            senderName: parsed.senderName,
+                            text: parsed.content,
+                            timestamp: Date.now()
+                        });
                     }
                 };
                 if (reply.includes(separator)) {
@@ -3784,7 +4302,16 @@ export function setupApp() {
             if (msg.messageType === 'image') {
                 text = msg.text || '[图片]';
             } else if (msg.messageType === 'voice') {
-                text = msg.text || '[语音]';
+                // 语音消息：如果有转文字内容，显示转文字内容
+                if (msg.transcription) {
+                    text = `[语音消息] "${msg.transcription}"`;
+                } else if (msg.text) {
+                    text = `[语音消息] "${msg.text}"`;
+                } else {
+                    text = '[语音消息]';
+                }
+            } else if (msg.messageType === 'sticker') {
+                text = `[表情: ${msg.stickerName || '表情'}]`;
             } else if (msg.messageType === 'transfer') {
                 const amount = msg.amount ? `¥${msg.amount}` : '';
                 const note = msg.note ? ` ${msg.note}` : '';
@@ -3799,6 +4326,12 @@ export function setupApp() {
                     if (names) parts.push(`途经点: ${names}`);
                 }
                 text = parts.length > 0 ? `定位 ${parts.join(' | ')}` : '定位';
+            } else if (msg.messageType === 'helpBuy') {
+                const status = msg.isPurchased ? '已购买' : '等待中';
+                text = `[帮买请求] 商品: ${msg.item}, 价格: ¥${msg.price}, 状态: ${status}`;
+            } else if (msg.messageType === 'share') {
+                text = `[分享] 来源: ${msg.source}, 内容: ${msg.content}`;
+                console.log('Share card context built:', text);
             } else {
                 text = msg.text || '';
             }
@@ -4277,7 +4810,7 @@ export function setupApp() {
             history.forEach(m => {
                 if (m.isSystem || m.isHidden) return;
                 const ctx = buildSoulLinkReplyContext(m);
-                const raw = ctx.content || (m.text || '');
+                const raw = ctx.text || (m.text || '');
                 if (m.sender === 'user') {
                     messagesPayload.push({ role: 'user', content: raw });
                 } else if (m.sender === 'ai') {
@@ -4462,6 +4995,12 @@ export function setupApp() {
             const char = isGroupChat ? null : characters.value.find(c => String(c.id) === String(soulLinkActiveChat.value));
             const history = isGroupChat ? (activeGroup.history || []) : (soulLinkMessages.value[soulLinkActiveChat.value] || []);
             const messagesPayload = [];
+            let availableStickers = [];
+            stickerPacks.value.forEach(pack => {
+                pack.stickers.forEach(s => {
+                    availableStickers.push(s);
+                });
+            });
             let systemPrompt = '';
             if (isGroupChat) {
                 const groupName = activeGroup && activeGroup.name ? activeGroup.name : '群聊';
@@ -4469,6 +5008,9 @@ export function setupApp() {
                 systemPrompt = `你正在群聊【${groupName}】中与用户语音/视频通话。\n\n`;
                 systemPrompt += `# 群成员\n${members.join('、')}\n\n`;
                 systemPrompt += `# 行为规则\n1. 回复要简短自然，像真实通话一样。\n2. 每次回复只扮演其中一名群成员。\n3. 回复格式为「成员名: 内容」。\n4. 可以用口语和表情。\n\n`;
+                if (availableStickers.length > 0) {
+                    systemPrompt += `你可以发送表情包来表达情感！使用格式：[表情名] 或 [表情:表情名]。可用的表情包有：${availableStickers.map(s => s.name).join('、')}。当情绪适合时自然地发送表情包。\n\n`;
+                }
                 systemPrompt += `现在请开始回复。`;
             } else if (char && char.persona) {
                 const charName = char.name || '角色';
@@ -4476,14 +5018,20 @@ export function setupApp() {
                 systemPrompt += `你的名字是【${charName}】。\n`;
                 systemPrompt += `${char.persona}\n\n`;
                 systemPrompt += `1. 像真实的人类那样自然通话。\n2. 每次回复保持简短（1-2句话）。\n3. 使用符合${charName}性格的语气、口头禅和口语表达。\n4. 不要暴露你是AI。\n`;
+                if (availableStickers.length > 0) {
+                    systemPrompt += `\n你可以发送表情包来表达情感！使用格式：[表情名] 或 [表情:表情名]。可用的表情包有：${availableStickers.map(s => s.name).join('、')}。当情绪适合时自然地发送表情包，有时可以连续发多个表情包来表达强烈情感。`;
+                }
             } else {
                 systemPrompt = '你正在和朋友语音/视频通话。请自然、简短地对话，每次1-2句话。';
+                if (availableStickers.length > 0) {
+                    systemPrompt += `\n你可以发送表情包来表达情感！使用格式：[表情名] 或 [表情:表情名]。可用的表情包有：${availableStickers.map(s => s.name).join('、')}。当情绪适合时自然地发送表情包，有时可以连续发多个表情包来表达强烈情感。`;
+                }
             }
             messagesPayload.push({ role: 'system', content: systemPrompt });
             history.forEach(m => {
                 if (m.isSystem || m.isHidden) return;
                 const ctx = buildSoulLinkReplyContext(m);
-                const raw = ctx.content || (m.text || '');
+                const raw = ctx.text || (m.text || '');
                 if (m.sender === 'user') {
                     messagesPayload.push({ role: 'user', content: raw });
                 } else if (m.sender === 'ai') {
@@ -4937,7 +5485,7 @@ export function setupApp() {
             const historyForPrompt = history.filter(m => m && !m.isSystem && !m.isHidden).slice(-18);
             historyForPrompt.forEach(m => {
                 const ctx = buildSoulLinkReplyContext(m);
-                const raw = ctx.content || (m.text || '');
+                const raw = ctx.text || (m.text || '');
                 if (m.sender === 'user') {
                     messagesPayload.push({ role: 'user', content: raw });
                 } else if (m.sender === 'ai') {
@@ -5025,7 +5573,7 @@ export function setupApp() {
             const historyForPrompt = history.filter(m => m && !m.isSystem && !m.isHidden).slice(-18);
             historyForPrompt.forEach(m => {
                 const ctx = buildSoulLinkReplyContext(m);
-                const raw = ctx.content || (m.text || '');
+                const raw = ctx.text || (m.text || '');
                 if (m.sender === 'user') {
                     messagesPayload.push({ role: 'user', content: raw });
                 } else if (m.sender === 'ai') {
@@ -5086,6 +5634,12 @@ export function setupApp() {
         };
 
         const buildBaseSystemPrompt = (isGroupChat, activeGroup, char, history) => {
+            let availableStickers = [];
+            stickerPacks.value.forEach(pack => {
+                pack.stickers.forEach(s => {
+                    availableStickers.push(s);
+                });
+            });
             let systemPrompt = '';
             if (isGroupChat) {
                 const groupName = activeGroup && activeGroup.name ? activeGroup.name : '群聊';
@@ -5093,6 +5647,9 @@ export function setupApp() {
                 systemPrompt = `你正在群聊【${groupName}】中与用户对话。\n\n`;
                 systemPrompt += `# 群成员\n${members.join('、')}\n\n`;
                 systemPrompt += `# 行为规则\n1. 回复要简短自然，像真实群聊一样。\n2. 每次回复只扮演其中一名群成员。\n3. 回复格式为「成员名: 内容」。\n4. 可以用emoji和口语表达。\n\n`;
+                if (availableStickers.length > 0) {
+                    systemPrompt += `你可以发送表情包来表达情感！使用格式：[表情名] 或 [表情:表情名]。可用的表情包有：${availableStickers.map(s => s.name).join('、')}。当情绪适合时自然地发送表情包。\n\n`;
+                }
                 systemPrompt += `现在请开始回复。`;
             } else if (char && char.persona) {
                 const charName = char.name || '角色';
@@ -5100,11 +5657,17 @@ export function setupApp() {
                 systemPrompt += `你的名字是【${charName}】。\n`;
                 systemPrompt += `${char.persona}\n\n`;
                 systemPrompt += `1. 像真实的人类那样自然地聊天。\n2. 每次回复保持简短（1-3句话）。\n3. 使用符合${charName}性格的语气、口头禅和表情。\n4. 绝对不要暴露你是AI。你就是${charName}本人。\n`;
+                if (availableStickers.length > 0) {
+                    systemPrompt += `\n你可以发送表情包来表达情感！使用格式：[表情名] 或 [表情:表情名]。可用的表情包有：${availableStickers.map(s => s.name).join('、')}。当情绪适合时自然地发送表情包，有时可以连续发多个表情包来表达强烈情感。`;
+                }
                 if (char.openingLine && history.length === 1) {
                     systemPrompt += `这是你们的第一次对话。你可以主动打招呼：\n${char.openingLine}\n\n`;
                 }
             } else {
                 systemPrompt = '你是一个友好的朋友，正在通过SoulLink聊天。请像真人一样自然、简短地对话，每次1-3句话即可。可以用emoji和口语化表达。';
+                if (availableStickers.length > 0) {
+                    systemPrompt += `\n你可以发送表情包来表达情感！使用格式：[表情名] 或 [表情:表情名]。可用的表情包有：${availableStickers.map(s => s.name).join('、')}。当情绪适合时自然地发送表情包，有时可以连续发多个表情包来表达强烈情感。`;
+                }
             }
             return systemPrompt;
         };
@@ -5294,10 +5857,207 @@ export function setupApp() {
             showVotePanel.value = true;
         };
 
+        const openTaobaoPanel = () => {
+            showAttachmentPanel.value = false;
+            showTaobaoPanel.value = true;
+        };
+
+        const searchTaobaoProducts = async () => {
+            const searchTerm = taobaoSearchTerm.value.trim();
+            if (!searchTerm) return;
+
+            if (!activeProfile.value) {
+                alert('请先配置API！');
+                return;
+            }
+
+            taobaoLoading.value = true;
+            taobaoProducts.value = [];
+
+            const profile = activeProfile.value;
+            const endpoint = (profile.endpoint || '').trim();
+            const key = (profile.key || '').trim();
+            let modelId = profile.model;
+
+            if (!endpoint || !key) {
+                alert('当前配置缺少 API 地址或密钥');
+                taobaoLoading.value = false;
+                return;
+            }
+
+            const prompt = `
+# 任务
+你是一个虚拟购物App的搜索引擎。请根据用户提供的【搜索关键词】，为Ta创作一个包含6-8件相关商品的列表。
+
+# 用户搜索的关键词:
+"${searchTerm}"
+
+# 核心规则
+1.  **高度相关**: 所有商品都必须与用户的搜索关键词 "${searchTerm}" 紧密相关。
+2.  **商品多样性**: 即使是同一个主题，也要尽量展示不同款式、功能或角度的商品。
+3.  **格式铁律**: 你的回复【必须且只能】是一个严格的JSON数组，每个对象代表一件商品，【必须】包含以下字段:
+    -   \`"name"\`: 商品名称
+    -   \`"price"\`: 价格 (数字，人民币)
+    -   \`"category"\`: 商品分类
+    -   \`"imagePrompt"\`: 一个详细的、用于文生图AI的【英文提示词】，描述这张商品的【产品展示图 (product shot)】。风格要求【干净、简约、纯色或渐变背景 (clean, minimalist, solid color background)】。
+
+# JSON输出格式示例:
+[
+  {
+    "name": "赛博朋克风发光数据线",
+    "price": 69.9,
+    "category": "数码配件",
+    "imagePrompt": "A glowing cyberpunk style data cable, product shot, on a dark tech background, neon lights, high detail"
+  }
+]`;
+
+            try {
+                const messagesForApi = [{ role: 'user', content: prompt }];
+
+                const response = await fetch(endpoint.replace(/\/+$/, '') + '/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${key}`
+                    },
+                    body: JSON.stringify({
+                        model: modelId || '',
+                        messages: messagesForApi,
+                        temperature: 0.8
+                    })
+                });
+
+                if (!response.ok) throw new Error('API请求失败');
+
+                const data = await response.json();
+                const rawContent = data.choices[0].message.content;
+                const cleanedContent = rawContent.replace(/^```json\s*|```$/g, '').trim();
+                const newProducts = JSON.parse(cleanedContent);
+
+                if (Array.isArray(newProducts) && newProducts.length > 0) {
+                    taobaoProducts.value = newProducts.map(p => ({ ...p, imageUrl: null }));
+                    // 异步加载图片
+                    newProducts.forEach((product, index) => {
+                        loadTaobaoProductImage(product, index);
+                    });
+                } else {
+                    throw new Error('AI没有找到相关的商品。');
+                }
+            } catch (error) {
+                console.error('AI搜索商品失败:', error);
+                alert('搜索失败: ' + error.message);
+            } finally {
+                taobaoLoading.value = false;
+            }
+        };
+
+        const loadTaobaoProductImage = async (product, index) => {
+            try {
+                // 优化提示词，添加更多细节以提高生成成功率
+                const enhancedPrompt = `${product.imagePrompt}, professional product photography, high quality, 4k, detailed, studio lighting, centered composition, no text, no watermark`;
+                
+                // 使用 Pollinations AI 生成图片，添加 seed 参数确保稳定性
+                const seed = Math.floor(Math.random() * 1000000);
+                const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?width=400&height=400&nologo=true&seed=${seed}&negative_prompt=text,watermark,signature,blurry,low quality`;
+                
+                // 预加载图片
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => {
+                    if (taobaoProducts.value[index]) {
+                        taobaoProducts.value[index].imageUrl = imageUrl;
+                    }
+                };
+                img.onerror = () => {
+                    console.error(`商品 ${product.name} 图片加载失败，尝试备用方案`);
+                    // 备用方案：使用占位图
+                    setTimeout(() => {
+                        if (taobaoProducts.value[index] && !taobaoProducts.value[index].imageUrl) {
+                            taobaoProducts.value[index].imageUrl = `https://placehold.co/400x400/F5F5F5/666666?text=${encodeURIComponent(product.name.slice(0, 4))}`;
+                        }
+                    }, 3000);
+                };
+                img.src = imageUrl;
+                
+                // 设置超时，如果5秒内图片没有加载成功，使用占位图
+                setTimeout(() => {
+                    if (taobaoProducts.value[index] && !taobaoProducts.value[index].imageUrl) {
+                        taobaoProducts.value[index].imageUrl = `https://placehold.co/400x400/F5F5F5/666666?text=${encodeURIComponent(product.name.slice(0, 4))}`;
+                    }
+                }, 8000);
+            } catch (error) {
+                console.error('生成图片失败:', error);
+                if (taobaoProducts.value[index]) {
+                    taobaoProducts.value[index].imageUrl = `https://placehold.co/400x400/F5F5F5/666666?text=${encodeURIComponent(product.name.slice(0, 4))}`;
+                }
+            }
+        };
+
+        const buyTaobaoProduct = (product) => {
+            // 发送订单消息到聊天
+            const orderMsg = {
+                id: Date.now(),
+                sender: 'user',
+                messageType: 'order',
+                platform: '购物',
+                item: product.name,
+                price: product.price,
+                status: '已下单',
+                eta: '2-3天',
+                timestamp: Date.now(),
+                time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+            };
+            
+            pushMessageToActiveChat(orderMsg);
+            saveSoulLinkMessages();
+            showTaobaoPanel.value = false;
+            scrollToBottom();
+        };
+
+        const helpBuyTaobaoProduct = (product) => {
+            // 发送帮买请求卡片消息到聊天
+            const helpBuyMsg = {
+                id: Date.now(),
+                sender: 'user',
+                messageType: 'helpBuy',
+                item: product.name,
+                price: product.price,
+                isPurchased: false,
+                timestamp: Date.now(),
+                time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+            };
+            
+            pushMessageToActiveChat(helpBuyMsg);
+            saveSoulLinkMessages();
+            showTaobaoPanel.value = false;
+            scrollToBottom();
+        };
+
         const addVoteOption = () => {
             if (voteOptions.value.length < 6) {
                 voteOptions.value.push('');
             }
+        };
+
+        const confirmHelpBuy = (msg) => {
+            if (msg.sender !== 'ai' || msg.isPurchased) return;
+            
+            // 更新卡片状态
+            msg.isPurchased = true;
+            saveSoulLinkMessages();
+            
+            // 发送确认消息
+            const confirmMsg = {
+                id: Date.now(),
+                sender: 'user',
+                messageType: 'text',
+                text: `好的，我帮你买了「${msg.item}」！`,
+                timestamp: Date.now(),
+                time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+            };
+            
+            pushMessageToActiveChat(confirmMsg);
+            saveSoulLinkMessages();
         };
 
         const removeVoteOption = (index) => {
@@ -5351,15 +6111,40 @@ export function setupApp() {
 
         const handleShare = () => {
             showAttachmentPanel.value = false;
-            if (navigator.share) {
-                navigator.share({
-                    title: '分享',
-                    text: '分享内容',
-                    url: window.location.href
-                }).catch(console.error);
-            } else {
-                alert('分享功能');
+            showSharePanel.value = true;
+        };
+
+        const sendShareCard = () => {
+            if (!shareSource.value || !shareContent.value.trim()) {
+                alert('请选择来源并填写分享内容');
+                return;
             }
+            
+            const shareMsg = {
+                id: Date.now(),
+                sender: 'user',
+                messageType: 'share',
+                source: shareSource.value,
+                content: shareContent.value.trim(),
+                timestamp: Date.now(),
+                time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+            };
+            
+            pushMessageToActiveChat(shareMsg);
+            saveSoulLinkMessages();
+            
+            // 重置并关闭面板
+            shareSource.value = '';
+            shareContent.value = '';
+            showSharePanel.value = false;
+            scrollToBottom();
+            
+            // 触发AI回复
+            console.log('About to trigger AI reply for share card');
+            setTimeout(() => {
+                console.log('Calling autoAiReplyForAttachment');
+                autoAiReplyForAttachment(shareMsg);
+            }, 500);
         };
 
         const handleTarot = () => {
@@ -5480,7 +6265,141 @@ export function setupApp() {
         };
         
         const startVoiceInput = () => {
-            alert('语音输入功能开发中...');
+            showAttachmentPanel.value = false;
+            showVoiceInputPanel.value = true;
+            voiceInputText.value = '';
+        };
+
+        const sendVoiceMessage = () => {
+            if (!voiceInputText.value.trim()) return;
+            
+            const text = voiceInputText.value.trim();
+            const duration = Math.max(1, Math.ceil(text.length / 3)); // 根据文字长度计算语音时长
+            
+            const msg = {
+                id: Date.now(),
+                sender: 'user',
+                messageType: 'voice',
+                voiceText: text,
+                voiceDuration: duration,
+                text: '[语音]',
+                timestamp: Date.now(),
+                isReplied: false,
+                time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+            };
+            
+            pushMessageToActiveChat(msg);
+            saveSoulLinkMessages();
+            
+            voiceInputText.value = '';
+            showVoiceInputPanel.value = false;
+            scrollToBottom();
+            
+            // 触发AI回复
+            setTimeout(() => {
+                autoAiReplyForAttachment(msg);
+            }, 500);
+        };
+
+        const closeVoiceInputPanel = () => {
+            showVoiceInputPanel.value = false;
+            voiceInputText.value = '';
+        };
+
+        const toggleVoicePlayback = (msg) => {
+            // 切换翻译显示
+            const willShowTranslation = !msg.showTranslation;
+            
+            // 先收起其他所有语音消息
+            const messages = soulLinkActiveChatType.value === 'group' 
+                ? (activeGroupChat.value?.history || [])
+                : (soulLinkMessages.value[soulLinkActiveChat.value] || []);
+            
+            messages.forEach(m => {
+                if (m.messageType === 'voice' && m.id !== msg.id) {
+                    m.showTranslation = false;
+                    m.isPlaying = false;
+                    if (m.playbackTimer) {
+                        clearTimeout(m.playbackTimer);
+                        m.playbackTimer = null;
+                    }
+                }
+            });
+            
+            msg.showTranslation = willShowTranslation;
+            
+            // 如果收起翻译，停止播放
+            if (!willShowTranslation && msg.isPlaying) {
+                msg.isPlaying = false;
+                if (msg.playbackTimer) {
+                    clearTimeout(msg.playbackTimer);
+                    msg.playbackTimer = null;
+                }
+                return;
+            }
+            
+            // 如果展开翻译且未播放，开始播放
+            if (willShowTranslation && !msg.isPlaying) {
+                msg.isPlaying = true;
+                
+                // 模拟播放时长（根据语音时长，默认3秒）
+                const duration = Math.max(3, (msg.voiceDuration || 3)) * 1000;
+                msg.playbackTimer = setTimeout(() => {
+                    msg.isPlaying = false;
+                }, duration);
+            }
+        };
+
+        const closeAllVoiceMessages = () => {
+            const messages = soulLinkActiveChatType.value === 'group' 
+                ? (activeGroupChat.value?.history || [])
+                : (soulLinkMessages.value[soulLinkActiveChat.value] || []);
+            
+            messages.forEach(m => {
+                if (m.messageType === 'voice') {
+                    m.showTranslation = false;
+                    m.isPlaying = false;
+                    if (m.playbackTimer) {
+                        clearTimeout(m.playbackTimer);
+                        m.playbackTimer = null;
+                    }
+                }
+            });
+        };
+
+        const onChatBackgroundClick = () => {
+            closeAllVoiceMessages();
+        };
+
+        const handleOrder = () => {
+            showAttachmentPanel.value = false;
+            
+            const orders = [
+                { platform: '美团外卖', item: '黄焖鸡米饭', price: 28, status: '配送中', eta: '15分钟' },
+                { platform: '饿了么', item: '麻辣香锅', price: 45, status: '商家接单', eta: '30分钟' },
+                { platform: '京东', item: '无线蓝牙耳机', price: 199, status: '已发货', eta: '明天送达' },
+                { platform: '购物', item: '手机壳', price: 25, status: '运输中', eta: '2天后' },
+                { platform: '拼多多', item: '零食大礼包', price: 39, status: '已签收', eta: '已送达' }
+            ];
+            
+            const randomOrder = orders[Math.floor(Math.random() * orders.length)];
+            
+            const msg = {
+                id: Date.now(),
+                sender: 'user',
+                messageType: 'order',
+                text: `订单：${randomOrder.platform} - ${randomOrder.item}`,
+                platform: randomOrder.platform,
+                item: randomOrder.item,
+                price: randomOrder.price,
+                status: randomOrder.status,
+                eta: randomOrder.eta,
+                timestamp: Date.now(),
+                time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+            };
+            
+            pushMessageToActiveChat(msg);
+            saveSoulLinkMessages();
         };
 
         const onSendOrCall = () => {
@@ -5579,6 +6498,133 @@ export function setupApp() {
             showEmojiPanel.value = false;
         };
 
+        const parseStickerImport = (text) => {
+            const stickers = [];
+            const lines = text.split('\n');
+            lines.forEach(line => {
+                const match = line.match(/^(.+?)[:：]\s*[`']?(https?:\/\/[^\s`']+)[`']?/);
+                if (match) {
+                    stickers.push({
+                        name: match[1].trim(),
+                        url: match[2].trim()
+                    });
+                }
+            });
+            return stickers;
+        };
+
+        const importStickerPack = () => {
+            if (!stickerImportText.value.trim() || !newPackName.value.trim()) return;
+            
+            const stickers = parseStickerImport(stickerImportText.value);
+            if (stickers.length === 0) {
+                alert('未识别到有效的表情图格式');
+                return;
+            }
+            
+            stickerPacks.value.push({
+                id: Date.now(),
+                name: newPackName.value.trim(),
+                stickers: stickers
+            });
+            
+            localStorage.setItem('stickerPacks', JSON.stringify(stickerPacks.value));
+            stickerImportText.value = '';
+            newPackName.value = '';
+            showStickerImportPanel.value = false;
+        };
+
+        const sendSticker = (sticker) => {
+            const msg = {
+                id: Date.now(),
+                sender: 'user',
+                messageType: 'sticker',
+                stickerUrl: sticker.url,
+                stickerName: sticker.name,
+                text: `[${sticker.name}]`,
+                timestamp: Date.now(),
+                isReplied: false,
+                time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+            };
+
+            pushMessageToActiveChat(msg);
+            saveSoulLinkMessages();
+            showEmojiPanel.value = false;
+            scrollToBottom();
+        };
+
+        const deleteStickerPack = (packId) => {
+            stickerPacks.value = stickerPacks.value.filter(p => p.id !== packId);
+            localStorage.setItem('stickerPacks', JSON.stringify(stickerPacks.value));
+            if (activeStickerTab.value === packId) {
+                activeStickerTab.value = stickerPacks.value.length > 0 ? stickerPacks.value[0].id : 'favorite';
+            }
+        };
+
+        const isFavorite = (sticker) => {
+            return favoriteStickers.value.some(s => s.url === sticker.url);
+        };
+
+        const toggleFavorite = (sticker) => {
+            const index = favoriteStickers.value.findIndex(s => s.url === sticker.url);
+            if (index > -1) {
+                favoriteStickers.value.splice(index, 1);
+            } else {
+                favoriteStickers.value.push(sticker);
+            }
+            localStorage.setItem('favoriteStickers', JSON.stringify(favoriteStickers.value));
+        };
+
+        const counterWithSticker = (msg) => {
+            let allStickers = [];
+            stickerPacks.value.forEach(pack => {
+                pack.stickers.forEach(s => {
+                    allStickers.push(s);
+                });
+            });
+            
+            if (allStickers.length === 0) {
+                return;
+            }
+            
+            const randomIndex = Math.floor(Math.random() * allStickers.length);
+            const randomSticker = allStickers[randomIndex];
+            
+            pushMessageToActiveChat({
+                id: Date.now(),
+                sender: 'user',
+                messageType: 'sticker',
+                stickerUrl: randomSticker.url,
+                stickerName: randomSticker.name,
+                text: `[${randomSticker.name}]`,
+                timestamp: Date.now()
+            });
+            
+            showEmojiPanel.value = false;
+            showAttachmentPanel.value = false;
+        };
+
+        const removeFavorite = (sticker) => {
+            const index = favoriteStickers.value.findIndex(s => s.url === sticker.url);
+            if (index > -1) {
+                favoriteStickers.value.splice(index, 1);
+                localStorage.setItem('favoriteStickers', JSON.stringify(favoriteStickers.value));
+            }
+        };
+
+        const onStickerTouchStart = (event, sticker) => {
+            stickerTouchTimer = setTimeout(() => {
+                toggleFavorite(sticker);
+            }, 500);
+        };
+
+        const onStickerTouchEnd = () => {
+            if (stickerTouchTimer) {
+                clearTimeout(stickerTouchTimer);
+                stickerTouchTimer = null;
+            }
+        };
+
         const pushMessageToActiveChat = (msg) => {
             if (!soulLinkActiveChat.value) return;
             if (soulLinkActiveChatType.value === 'group') {
@@ -5622,6 +6668,8 @@ export function setupApp() {
             showEmojiPanel,
             pixelEmojis,
             insertEmoji,
+            stickerPacks, showStickerImportPanel, stickerImportText, newPackName, parseStickerImport, importStickerPack, sendSticker, deleteStickerPack,
+            favoriteStickers, activeStickerTab, isFavorite, toggleFavorite, removeFavorite, onStickerTouchStart, onStickerTouchEnd, counterWithSticker,
             isAiTyping,
             isOfflineMode,
             novelMode,
@@ -5658,9 +6706,12 @@ export function setupApp() {
             moodValue, bedTiming, showLocationPanel, showTransferPanel, showChatSettings,
             showAttachmentPanel, showImageSubmenu, toggleEmojiPanel, toggleAttachmentPanel, toggleOfflineMode, selectGreeting, addDefaultGreeting, addCustomGreeting,
             startVoiceInput, onSendOrCall, selectFromAlbum, sendTextImage,
-            handleRetry, handleTakeaway, handleVote, handleShare, handleTarot, handlePet,
+            handleRetry, handleTakeaway, handleVote, handleShare, handleTarot, handlePet, handleOrder, startVoiceInput,
             showVotePanel, voteQuestion, voteOptions, addVoteOption, removeVoteOption, createVote, castVoteInChat,
+            showTaobaoPanel, taobaoSearchTerm, taobaoProducts, taobaoLoading, openTaobaoPanel, searchTaobaoProducts, buyTaobaoProduct, helpBuyTaobaoProduct, confirmHelpBuy,
+            showSharePanel, shareSource, shareContent, shareSources, sendShareCard,
             showPhotoSelectPanel, showTextImagePanel, textImageText, textImageBgColor, textImageColors,
+            showVoiceInputPanel, voiceInputText, sendVoiceMessage, closeVoiceInputPanel, toggleVoicePlayback, onChatBackgroundClick,
             // App Launch
             openApp, closeApp, goBack, openGame, joinGame, startGameSession, castVote, endDay, closeGame, getAppIcon,
             // Console

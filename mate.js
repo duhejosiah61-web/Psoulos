@@ -167,7 +167,7 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
     
     // 运动状态
     const steps = ref(Number(localStorage.getItem('mate_steps')) || 5432);
-    const targetSteps = ref(Number(localStorage.getItem('mate_target_steps')) || 10000);
+    const targetSteps = ref(Number(localStorage.getItem('mate_target_steps')) || 67946);
     const heartRate = ref(72);
     const exerciseType = ref(localStorage.getItem('mate_exercise_type') || 'walk'); // walk, run, cycling, fitness
     

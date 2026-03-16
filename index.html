@@ -272,8 +272,8 @@
             <div class="app-header">
                 <button class="back-btn" @click="goBackInSoulLink"><i class="fas fa-chevron-left"></i></button>
                 <div class="header-center">
-                    <span v-if="soulLinkActiveChatType !== 'group'" class="app-title" @click="shakeCharacter" style="cursor: pointer;">{{ soulLinkActiveChat ? currentChatName : '聊天' }}</span>
-                    <span v-else class="app-title" @click="showRenameGroupDialog = true" style="cursor: pointer;">{{ soulLinkActiveChat ? currentChatName : '聊天' }}</span>
+                    <span v-if="soulLinkActiveChatType !== 'group'" class="app-title" @click="shakeCharacter" style="cursor: pointer;">{{ soulLinkActiveChat ? (isAiTyping ? 'TYPING...' : currentChatName) : '聊天' }}</span>
+                    <span v-else class="app-title" @click="showRenameGroupDialog = true" style="cursor: pointer;">{{ soulLinkActiveChat ? (isAiTyping ? 'TYPING...' : currentChatName) : '聊天' }}</span>
                     <div v-if="soulLinkActiveChatType === 'group' && activeGroupChat" class="group-members-bar">
                         <div class="group-member-avatar" v-for="(member, index) in activeGroupChat.members.slice(0, 5)" :key="index" @click="shakeGroupMember(member, index)">
                             <img :src="member.avatarUrl || 'https://placehold.co/100x100?text=No+Avatar'" :style="{ marginLeft: index > 0 ? '-8px' : '0' }">
@@ -539,8 +539,8 @@
 
                 <!-- 普通聊天 -->
                 <template v-else>
-                    <div class="wechat-messages" :class="{ 'novel-mode': isOfflineMode, 'group-chat': soulLinkActiveChatType === 'group' }" ref="chatMessagesContainer">
-                        <div v-for="(msg, index) in currentChatMessages" :key="index" class="message" :class="[msg.sender, { 'novel-message': isOfflineMode, 'call-message': msg.isCallMessage, 'special-card-message': msg.messageType === 'location' || msg.messageType === 'transfer' || msg.messageType === 'textImage' || msg.messageType === 'image' || msg.messageType === 'takeaway' || msg.messageType === 'tarot' || msg.messageType === 'pet' || msg.messageType === 'vote', 'group-message': soulLinkActiveChatType === 'group', 'system-message': msg.isSystem }]" @contextmenu="onMessageContextMenu($event, msg)" @touchstart="onMessageTouchStart($event, msg)" @touchmove="onMessageTouchMove" @touchend="onMessageTouchEnd">
+                    <div class="wechat-messages" :class="{ 'novel-mode': isOfflineMode, 'group-chat': soulLinkActiveChatType === 'group' }" ref="chatMessagesContainer" @click="onChatBackgroundClick">
+                        <div v-for="(msg, index) in currentChatMessages" :key="index" class="message" :class="[msg.sender, { 'novel-message': isOfflineMode, 'call-message': msg.isCallMessage, 'special-card-message': msg.messageType === 'location' || msg.messageType === 'transfer' || msg.messageType === 'textImage' || msg.messageType === 'image' || msg.messageType === 'takeaway' || msg.messageType === 'tarot' || msg.messageType === 'pet' || msg.messageType === 'vote' || msg.messageType === 'order' || msg.messageType === 'helpBuy' || msg.messageType === 'share' || msg.messageType === 'voice' || msg.messageType === 'sticker', 'group-message': soulLinkActiveChatType === 'group', 'system-message': msg.isSystem }]" @contextmenu="onMessageContextMenu($event, msg)" @touchstart="onMessageTouchStart($event, msg)" @touchmove="onMessageTouchMove" @touchend="onMessageTouchEnd" @click.stop>
                             <div class="message-content-wrapper">
                                 <div v-if="soulLinkActiveChatType === 'group' && msg.senderName && !msg.isSystem" class="group-sender-name">{{ msg.senderName }}</div>
                                 <div v-if="!isOfflineMode" class="bubble">
@@ -658,6 +658,56 @@
                                     </div>
                                     <div v-if="msg.hasVoted" class="vote-total">共 {{ msg.totalVotes }} 票</div>
                                 </div>
+                                <div v-else-if="msg.messageType === 'order'" class="special-card order-card">
+                                    <div class="order-header">
+                                        <i class="fas fa-receipt"></i>
+                                        <span>{{ msg.platform }}</span>
+                                    </div>
+                                    <div class="order-item">{{ msg.item }}</div>
+                                    <div class="order-price">{{ msg.price }}</div>
+                                    <div class="order-status" :class="msg.status">
+                                        <span class="status-dot"></span>
+                                        {{ msg.status }}
+                                    </div>
+                                    <div class="order-eta">预计{{ msg.eta }}</div>
+                                </div>
+                                <div v-else-if="msg.messageType === 'helpBuy'" class="special-card help-buy-card" :class="{ 'purchased': msg.isPurchased, 'clickable': msg.sender === 'ai' && !msg.isPurchased }" @click="msg.sender === 'ai' && !msg.isPurchased && confirmHelpBuy(msg)">
+                                    <div class="help-buy-header">
+                                        <i class="fas fa-hand-holding-heart"></i>
+                                        <span>{{ msg.isPurchased ? '已购买' : (msg.sender === 'ai' ? '请帮我买' : '帮买请求') }}</span>
+                                    </div>
+                                    <div class="help-buy-item">{{ msg.item }}</div>
+                                    <div class="help-buy-price">{{ msg.price }}</div>
+                                    <div v-if="msg.isPurchased" class="help-buy-thanks">
+                                        <i class="fas fa-check-circle"></i> {{ msg.sender === 'ai' ? '谢谢！' : '已帮你买！' }}
+                                    </div>
+                                    <div v-else class="help-buy-status">
+                                        <span class="status-dot pending"></span>
+                                        {{ msg.sender === 'ai' ? '点击帮Ta买' : '等待中...' }}
+                                    </div>
+                                </div>
+                                <div v-else-if="msg.messageType === 'share'" class="special-card share-card">
+                                    <div class="share-header">
+                                        <i class="fas fa-share-nodes"></i>
+                                        <span>{{ msg.source }}</span>
+                                    </div>
+                                    <div class="share-content">{{ msg.content }}</div>
+                                </div>
+                                <div v-else-if="msg.messageType === 'voice'" class="voice-message-bubble" :class="{ 'playing': msg.isPlaying }" @click="toggleVoicePlayback(msg)">
+                                    <div class="voice-waveform">
+                                        <span></span><span></span><span></span><span></span><span></span>
+                                        <span></span><span></span><span></span><span></span><span></span>
+                                    </div>
+                                    <span class="voice-length">{{ msg.voiceDuration || 3 }}"</span>
+                                    <div v-if="msg.showTranslation" class="voice-translation">
+                                        <div class="translation-label">转文字</div>
+                                        <div class="translation-text">{{ msg.transcription || msg.voiceText || msg.text }}</div>
+                                    </div>
+                                </div>
+                                <div v-else-if="msg.messageType === 'sticker'" class="sticker-message-wrapper">
+                                    <img :src="msg.stickerUrl" :alt="msg.stickerName" class="sticker-image">
+                                    <button v-if="msg.sender === 'ai'" class="sticker-counter-btn" @click="counterWithSticker(msg)" title="斗图">怼</button>
+                                </div>
                                 <template v-else>
                                     {{ msg.text }}
                                 </template>
@@ -707,12 +757,122 @@
                         </div>
                     </div>
                     
-                    <!-- Emoji Picker -->
-                    <div v-if="showEmojiPanel" class="emoji-picker-overlay" @click.self="showEmojiPanel = false">
-                        <div class="emoji-picker">
-                            <div class="emoji-grid">
-                                <span v-for="emoji in pixelEmojis" :key="emoji" class="emoji-item" @click="insertEmoji(emoji)">{{ emoji }}</span>
+                    <!-- Sticker Panel -->
+                    <div v-if="showEmojiPanel" class="sticker-panel-overlay" @click.self="showEmojiPanel = false">
+                        <div class="sticker-panel">
+                            <div class="sticker-panel-header">
+                                <div class="sticker-tabs-scroll">
+                                    <div class="sticker-tabs-wrapper">
+                                        <div class="sticker-tab-item" :class="{ active: activeStickerTab === 'favorite' }" @click="activeStickerTab = 'favorite'">
+                                            <i class="fas fa-heart"></i>
+                                        </div>
+                                        <div v-for="pack in stickerPacks" :key="pack.id" 
+                                             class="sticker-tab-item" 
+                                             :class="{ active: activeStickerTab === pack.id }" 
+                                             @click="activeStickerTab = pack.id">
+                                            {{ pack.name.slice(0, 4) }}
+                                        </div>
+                                    </div>
+                                </div>
+                                <button class="sticker-import-btn" @click="showStickerImportPanel = true">
+                                    <i class="fas fa-plus"></i>
+                                </button>
                             </div>
+                            
+                            <div class="sticker-content-area">
+                                <div v-if="activeStickerTab === 'favorite'" class="sticker-tab-content">
+                                    <div v-if="favoriteStickers.length === 0" class="sticker-empty-state small">
+                                        <div class="empty-icon-small"><i class="fas fa-heart"></i></div>
+                                        <p>长按表情可收藏</p>
+                                    </div>
+                                    <div v-else class="sticker-grid">
+                                        <div v-for="(sticker, idx) in favoriteStickers" :key="'fav-' + idx" 
+                                             class="sticker-item" 
+                                             @click="sendSticker(sticker)"
+                                             @touchstart="onStickerTouchStart($event, sticker)"
+                                             @touchend="onStickerTouchEnd"
+                                             @contextmenu.prevent="removeFavorite(sticker)">
+                                            <img :src="sticker.url" :alt="sticker.name" @error="$event.target.style.display='none'">
+                                            <div class="favorite-badge"><i class="fas fa-heart"></i></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div v-for="pack in stickerPacks" :key="pack.id" 
+                                     v-show="activeStickerTab === pack.id" 
+                                     class="sticker-tab-content">
+                                    <div class="sticker-pack-header-inline">
+                                        <span class="pack-name">{{ pack.name }}</span>
+                                        <button class="delete-pack-btn" @click="deleteStickerPack(pack.id)">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                    <div class="sticker-grid">
+                                        <div v-for="(sticker, idx) in pack.stickers" :key="idx" 
+                                             class="sticker-item" 
+                                             :class="{ 'is-favorite': isFavorite(sticker) }"
+                                             @click="sendSticker(sticker)"
+                                             @touchstart="onStickerTouchStart($event, sticker)"
+                                             @touchend="onStickerTouchEnd"
+                                             @contextmenu.prevent="toggleFavorite(sticker)">
+                                            <img :src="sticker.url" :alt="sticker.name" @error="$event.target.style.display='none'">
+                                            <div v-if="isFavorite(sticker)" class="favorite-badge"><i class="fas fa-heart"></i></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div v-if="stickerPacks.length === 0 && activeStickerTab !== 'favorite'" class="sticker-empty-state">
+                                    <div class="empty-icon">📦</div>
+                                    <p>暂无表情包</p>
+                                    <button class="add-first-pack-btn" @click="showStickerImportPanel = true">
+                                        <i class="fas fa-plus"></i> 添加表情包
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Sticker Import Panel -->
+                    <div v-if="showStickerImportPanel" class="sticker-import-overlay" @click.self="showStickerImportPanel = false">
+                        <div class="sticker-import-panel">
+                            <div class="sticker-import-header">
+                                <button class="back-btn-small" @click="showStickerImportPanel = false">
+                                    <i class="fas fa-arrow-left"></i>
+                                </button>
+                                <span>导入表情包</span>
+                                <div style="width: 40px;"></div>
+                            </div>
+                            
+                            <div class="sticker-import-content">
+                                <div class="import-field">
+                                    <label>表情包名称</label>
+                                    <input type="text" v-model="newPackName" placeholder="输入表情包名称..." class="pack-name-input">
+                                </div>
+                                
+                                <div class="import-field">
+                                    <label>表情内容</label>
+                                    <textarea v-model="stickerImportText" class="sticker-import-textarea" placeholder="格式示例：
+委屈： https://example.com/1.jpg
+开心： https://example.com/2.jpg"></textarea>
+                                </div>
+                                
+                                <div class="import-preview" v-if="stickerImportText.trim()">
+                                    <label>预览 (识别到 {{ parseStickerImport(stickerImportText).length }} 个表情)</label>
+                                    <div class="preview-grid">
+                                        <div v-for="(sticker, idx) in parseStickerImport(stickerImportText).slice(0, 8)" :key="idx" class="preview-item">
+                                            <img :src="sticker.url" :alt="sticker.name" @error="$event.target.style.display='none'">
+                                            <span>{{ sticker.name }}</span>
+                                        </div>
+                                        <div v-if="parseStickerImport(stickerImportText).length > 8" class="preview-more">
+                                            +{{ parseStickerImport(stickerImportText).length - 8 }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <button class="import-submit-btn" @click="importStickerPack" :disabled="!stickerImportText.trim() || !newPackName.trim()">
+                                导入
+                            </button>
                         </div>
                     </div>
                 </template>
@@ -2621,53 +2781,109 @@
         <div v-if="showAttachmentPanel" class="attachment-panel-overlay" @click.self="showAttachmentPanel = false">
             <div class="attachment-panel">
                 <div class="attachment-grid">
-                    <div class="attachment-item" @click="toggleEmojiPanel; showAttachmentPanel = false">
-                        <i class="fas fa-face-smile"></i>
-                        <span>表情</span>
-                    </div>
-                    <div class="attachment-item" @click="handleRetry">
+                    <!-- 第一行：重新生成、表情、相册 -->
+                    <div class="attachment-item" @click="handleRetry" title="重新生成">
                         <i class="fas fa-rotate-right"></i>
-                        <span>重试</span>
                     </div>
-                    <div class="attachment-item" @click="showPhotoSelectPanel = true; showAttachmentPanel = false">
+                    <div class="attachment-item" @click="showEmojiPanel = true; showAttachmentPanel = false" title="表情">
+                        <i class="fas fa-face-smile"></i>
+                    </div>
+                    <div class="attachment-item" @click="showPhotoSelectPanel = true; showAttachmentPanel = false" title="相册">
                         <i class="fas fa-image"></i>
-                        <span>相册</span>
                     </div>
                     
-                    <div class="attachment-item" @click="openTransferPanel">
-                        <i class="fas fa-yen-sign"></i>
-                        <span>转账</span>
+                    <!-- 第二行：语音输入、定位、转账 -->
+                    <div class="attachment-item" @click="startVoiceInput" title="语音输入">
+                        <i class="fas fa-microphone"></i>
                     </div>
-                    <div class="attachment-item" @click="startVoiceCall">
-                        <i class="fas fa-phone"></i>
-                        <span>语音</span>
-                    </div>
-                    <div class="attachment-item" @click="handleTakeaway">
-                        <i class="fas fa-bowl-food"></i>
-                        <span>外卖</span>
-                    </div>
-                    
-                    <div class="attachment-item" @click="handleVote">
-                        <i class="fas fa-square-poll-vertical"></i>
-                        <span>投票</span>
-                    </div>
-                    <div class="attachment-item" @click="handleShare">
-                        <i class="fas fa-share-nodes"></i>
-                        <span>分享</span>
-                    </div>
-                    <div class="attachment-item" @click="openLocationPanel">
+                    <div class="attachment-item" @click="openLocationPanel" title="定位">
                         <i class="fas fa-location-dot"></i>
-                        <span>定位</span>
+                    </div>
+                    <div class="attachment-item" @click="openTransferPanel" title="转账">
+                        <i class="fas fa-yen-sign"></i>
                     </div>
                     
-                    <div class="attachment-item" @click="handleTarot">
-                        <i class="fas fa-moon"></i>
-                        <span>塔罗</span>
+                    <!-- 第三行：订单、投票、分享 -->
+                    <div class="attachment-item" @click="openTaobaoPanel" title="购物">
+                        <i class="fas fa-shopping-bag"></i>
                     </div>
-                    <div class="attachment-item" @click="handlePet">
-                        <i class="fas fa-paw"></i>
-                        <span>宠物</span>
+                    <div class="attachment-item" @click="handleVote" title="投票">
+                        <i class="fas fa-square-poll-vertical"></i>
                     </div>
+                    <div class="attachment-item" @click="handleShare" title="分享">
+                        <i class="fas fa-share-nodes"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 购物面板 -->
+        <div v-if="showTaobaoPanel" class="modal-overlay" @click.self="showTaobaoPanel = false">
+            <div class="taobao-modal">
+                <div class="taobao-header">
+                    <div class="taobao-search">
+                        <i class="fas fa-search"></i>
+                        <input type="text" v-model="taobaoSearchTerm" placeholder="搜索商品..." @keypress.enter="searchTaobaoProducts">
+                        <button class="taobao-search-btn" @click="searchTaobaoProducts">搜索</button>
+                    </div>
+                    <button class="close-btn" @click="showTaobaoPanel = false"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="taobao-content">
+                    <div v-if="taobaoLoading" class="taobao-loading">
+                        <div class="loading-spinner"></div>
+                        <p>AI正在生成商品...</p>
+                    </div>
+                    <div v-else-if="taobaoProducts.length === 0" class="taobao-empty">
+                        <i class="fas fa-shopping-bag"></i>
+                        <p>搜索商品，发现好物</p>
+                    </div>
+                    <div v-else class="taobao-grid">
+                        <div v-for="(product, index) in taobaoProducts" :key="index" class="taobao-product-card">
+                            <div class="taobao-product-image">
+                                <img v-if="product.imageUrl" :src="product.imageUrl" :alt="product.name">
+                                <div v-else class="taobao-image-loading">
+                                    <div class="loading-spinner"></div>
+                                </div>
+                            </div>
+                            <div class="taobao-product-info">
+                                <div class="taobao-product-name">{{ product.name }}</div>
+                                <div class="taobao-product-price">¥{{ product.price.toFixed(2) }}</div>
+                                <div class="taobao-product-category">{{ product.category }}</div>
+                            </div>
+                            <div class="taobao-action-btns">
+                                <button class="taobao-buy-btn" @click="buyTaobaoProduct(product)">购买</button>
+                                <button class="taobao-help-buy-btn" @click="helpBuyTaobaoProduct(product)">帮买</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 分享面板 -->
+        <div v-if="showSharePanel" class="modal-overlay" @click.self="showSharePanel = false">
+            <div class="share-modal">
+                <div class="modal-header">
+                    <h3>分享内容</h3>
+                    <button class="close-btn" @click="showSharePanel = false"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="modal-content">
+                    <div class="share-input-group">
+                        <label>来源</label>
+                        <div class="share-source-grid">
+                            <div v-for="source in shareSources" :key="source" 
+                                 class="share-source-item" 
+                                 :class="{ active: shareSource === source }" 
+                                 @click="shareSource = source">
+                                {{ source }}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="share-input-group">
+                        <label>分享内容概述</label>
+                        <textarea v-model="shareContent" placeholder="描述你想分享的内容..." rows="4"></textarea>
+                    </div>
+                    <button class="share-send-btn" @click="sendShareCard" :disabled="!shareSource || !shareContent.trim()">发送</button>
                 </div>
             </div>
         </div>
@@ -2757,6 +2973,35 @@
                     </div>
                 </div>
                 <button class="send-text-image-btn" @click="sendTextImage" :disabled="!textImageText.trim()">发送</button>
+            </div>
+        </div>
+
+        <!-- 语音输入面板 -->
+        <div v-if="showVoiceInputPanel" class="voice-input-overlay" @click.self="closeVoiceInputPanel">
+            <div class="voice-input-panel">
+                <div class="voice-input-header">
+                    <button class="back-btn-small" @click="closeVoiceInputPanel"><i class="fas fa-arrow-left"></i></button>
+                    <h3>语音输入</h3>
+                    <div style="width: 40px;"></div>
+                </div>
+                <div class="voice-input-content">
+                    <div class="voice-input-hint">
+                        <i class="fas fa-microphone"></i>
+                        <span>输入文字，将转换为语音消息</span>
+                    </div>
+                    <textarea v-model="voiceInputText" placeholder="输入要转换为语音的文字..." class="voice-textarea" maxlength="200"></textarea>
+                    <div class="voice-preview" v-if="voiceInputText.trim()">
+                        <div class="voice-bubble-preview">
+                            <div class="voice-wave">
+                                <span></span><span></span><span></span><span></span><span></span>
+                            </div>
+                            <span class="voice-duration">{{ Math.max(1, Math.ceil(voiceInputText.length / 3)) }}"</span>
+                        </div>
+                    </div>
+                </div>
+                <button class="send-voice-btn" @click="sendVoiceMessage" :disabled="!voiceInputText.trim()">
+                    <i class="fas fa-paper-plane"></i> 发送语音
+                </button>
             </div>
         </div>
 
