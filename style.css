@@ -3254,7 +3254,7 @@ label {
     max-width: 100%;
     padding: 12px 20px;
     border-radius: 24px;
-    font-size: 15px;
+    font-size: 14px;
     line-height: 1.6;
     position: relative;
     word-wrap: break-word;
@@ -6198,7 +6198,7 @@ label {
 
 .location-card-value {
     font-family: 'Playfair Display', serif;
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 600;
     color: #000000;
     text-align: right;
@@ -6226,7 +6226,7 @@ label {
 
 .transfer-card-amount {
     font-family: 'Playfair Display', serif;
-    font-size: 36px;
+    font-size: 28px;
     font-weight: 700;
     color: #000000;
     margin-bottom: 12px;
@@ -6330,19 +6330,19 @@ label {
 
 .takeaway-restaurant {
     font-family: 'Playfair Display', serif;
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 700;
     color: #000000;
 }
 
 .takeaway-food {
-    font-size: 14px;
+    font-size: 13px;
     color: #666666;
 }
 
 .takeaway-price {
     font-family: 'Inter', sans-serif;
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 700;
     color: #000000;
     margin-top: 8px;
@@ -6359,7 +6359,7 @@ label {
 }
 
 .tarot-emoji {
-    font-size: 48px;
+    font-size: 40px;
     filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.5));
 }
 
@@ -6371,13 +6371,13 @@ label {
 
 .tarot-name {
     font-family: 'Playfair Display', serif;
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 700;
     color: #FFD700;
 }
 
 .tarot-meaning {
-    font-size: 12px;
+    font-size: 11px;
     color: #CCCCCC;
     line-height: 1.4;
 }
@@ -6393,14 +6393,14 @@ label {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 700;
     color: #000000;
     margin-bottom: 8px;
 }
 
 .pet-action {
-    font-size: 14px;
+    font-size: 13px;
     color: #666666;
     margin-bottom: 12px;
 }
@@ -6415,7 +6415,7 @@ label {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 12px;
+    font-size: 11px;
     color: #000000;
 }
 
@@ -6433,7 +6433,7 @@ label {
 
 .vote-question {
     font-family: 'Playfair Display', serif;
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 700;
     color: #000000;
     margin-bottom: 12px;
@@ -6468,7 +6468,7 @@ label {
 .vote-option-text {
     position: relative;
     z-index: 1;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
     color: #000000;
 }
@@ -6487,7 +6487,7 @@ label {
     right: 12px;
     top: 50%;
     transform: translateY(-50%);
-    font-size: 12px;
+    font-size: 11px;
     color: #666666;
 }
 
