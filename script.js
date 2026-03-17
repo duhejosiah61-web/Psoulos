@@ -166,30 +166,16 @@ export function setupApp() {
         input.onchange = (e) => {
             const file = e.target.files[0];
             if (file) {
-                // 检查文件大小，如果超过1MB则压缩
-                if (file.size > 1024 * 1024) {
-                    compressImage(file, 800, 0.7).then(compressedDataUrl => {
-                        photoWidgetPhotos.value[index].url = compressedDataUrl;
-                        try {
-                            localStorage.setItem(`photoWidgetPhoto${index}`, compressedDataUrl);
-                        } catch (e) {
-                            console.warn('图片太大，无法保存到本地存储');
-                            alert('图片已更换，但无法永久保存（超出存储限制）');
-                        }
-                    });
-                } else {
-                    const reader = new FileReader();
-                    reader.onload = (event) => {
-                        photoWidgetPhotos.value[index].url = event.target.result;
-                        try {
-                            localStorage.setItem(`photoWidgetPhoto${index}`, event.target.result);
-                        } catch (e) {
-                            console.warn('图片太大，无法保存到本地存储');
-                            alert('图片已更换，但无法永久保存（超出存储限制）');
-                        }
-                    };
-                    reader.readAsDataURL(file);
-                }
+                // 更激进的压缩，使用更小的尺寸和更低的质量
+                compressImage(file, 400, 0.5).then(compressedDataUrl => {
+                    photoWidgetPhotos.value[index].url = compressedDataUrl;
+                    try {
+                        localStorage.setItem(`photoWidgetPhoto${index}`, compressedDataUrl);
+                    } catch (e) {
+                        console.warn('图片太大，无法保存到本地存储');
+                        alert('图片已更换，但无法永久保存（超出存储限制）');
+                    }
+                });
             }
         };
         input.click();
@@ -510,8 +496,19 @@ onMounted(() => {
         // 绑定触摸事件 - 只有滑动才能换页，点击不换页
         let hasMoved = false;
         
+        const isHabitInput = (element) => {
+            let el = element;
+            while (el) {
+                if (el.classList && el.classList.contains('habit-goal-input')) {
+                    return true;
+                }
+                el = el.parentElement;
+            }
+            return false;
+        };
+        
         homePagesElement.addEventListener('touchstart', (e) => {
-            if (e.target.classList.contains('habit-goal-input')) {
+            if (isHabitInput(e.target)) {
                 return;
             }
             console.log('触摸开始:', e.touches[0].clientX);
@@ -521,7 +518,7 @@ onMounted(() => {
         }, { passive: true });
         
         homePagesElement.addEventListener('touchmove', (e) => {
-            if (e.target.classList.contains('habit-goal-input')) {
+            if (isHabitInput(e.target)) {
                 return;
             }
             touchEndX = e.touches[0].clientX;
@@ -531,7 +528,7 @@ onMounted(() => {
         }, { passive: true });
         
         homePagesElement.addEventListener('touchend', (e) => {
-            if (e.target.classList.contains('habit-goal-input')) {
+            if (isHabitInput(e.target)) {
                 return;
             }
             console.log('触摸结束 - 开始:', touchStartX, '结束:', touchEndX, '是否移动:', hasMoved);
@@ -575,7 +572,7 @@ onMounted(() => {
         let mouseHasMoved = false;
         
         homePagesElement.addEventListener('mousedown', (e) => {
-            if (e.target.classList.contains('habit-goal-input')) {
+            if (isHabitInput(e.target)) {
                 return;
             }
             console.log('鼠标按下:', e.clientX);
@@ -588,7 +585,7 @@ onMounted(() => {
         
         homePagesElement.addEventListener('mousemove', (e) => {
             if (!isDragging) return;
-            if (e.target.classList.contains('habit-goal-input')) {
+            if (isHabitInput(e.target)) {
                 return;
             }
             mouseEndX = e.clientX;
@@ -598,7 +595,7 @@ onMounted(() => {
         });
         
         homePagesElement.addEventListener('mouseup', (e) => {
-            if (e.target.classList.contains('habit-goal-input')) {
+            if (isHabitInput(e.target)) {
                 return;
             }
             console.log('鼠标释放:', mouseStartX, mouseEndX, '是否移动:', mouseHasMoved);
@@ -645,7 +642,7 @@ onMounted(() => {
         });
         
         homePagesElement.addEventListener('mouseleave', (e) => {
-            if (e.target.classList.contains('habit-goal-input')) {
+            if (isHabitInput(e.target)) {
                 return;
             }
             if (isDragging) {
