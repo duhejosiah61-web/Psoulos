@@ -8,8 +8,44 @@ import { useMate } from './mate.js';
 import { useNotice } from './notice.js';
 import { useGames } from './games.js';
 
+// 自动缩放功能
+function setupAutoScaling() {
+    const appElement = document.getElementById('app');
+    if (!appElement) return;
+
+    function updateScale() {
+        const windowWidth = window.innerWidth;
+        const windowHeight = window.innerHeight;
+        const appWidth = 390;
+        const appHeight = 844;
+
+        // 计算缩放比例
+        const scaleX = windowWidth / appWidth;
+        const scaleY = windowHeight / appHeight;
+        const scale = Math.min(scaleX, scaleY, 1); // 最大缩放为1
+
+        // 应用缩放
+        appElement.style.transform = `scale(${scale})`;
+        appElement.style.width = `${appWidth}px`;
+        appElement.style.height = `${appHeight}px`;
+    }
+
+    // 初始化缩放
+    updateScale();
+
+    // 监听窗口大小变化
+    window.addEventListener('resize', updateScale);
+
+    return () => {
+        window.removeEventListener('resize', updateScale);
+    };
+}
+
 export function setupApp() {
     console.log('setup start'); 
+    
+    // 初始化自动缩放
+    setupAutoScaling();
     
     // IndexedDB 初始化
     let db = null;
@@ -123,6 +159,7 @@ export function setupApp() {
             'url(https://images.unsplash.com/photo-1557682250-33bd709cbe85?w=300)'
         ]);
         const randomHexCode = ref('0x00000000');
+        const isPlaying = ref(false);
         
         const generateRandomHex = () => {
             const hex = Math.floor(Math.random() * 0xFFFFFFFF).toString(16).toUpperCase().padStart(8, '0');
@@ -1283,6 +1320,17 @@ export function setupApp() {
             loadWorldbooks();
             loadPresets();
             applyTheme();
+            
+            // 直播间观众数字随机变化
+            setInterval(() => {
+                const viewerCountEl = document.getElementById('viewerCount');
+                if (viewerCountEl) {
+                    const currentCount = parseInt(viewerCountEl.textContent.replace(/,/g, ''));
+                    const change = Math.floor(Math.random() * 21) - 10; // -10 to +10
+                    const newCount = Math.max(100, currentCount + change);
+                    viewerCountEl.textContent = newCount.toLocaleString();
+                }
+            }, 3000);
         });
 
         // --- COMPUTED PROPERTIES ---
@@ -1583,6 +1631,21 @@ export function setupApp() {
                 'Theme': 'fas fa-palette', 'Workshop': 'fas fa-hammer', 'System': 'fas fa-book', 'Console': 'fas fa-terminal'
             };
             return icons[appName] || 'fas fa-question-circle';
+        };
+
+        // Music player controls
+        const togglePlayPause = () => {
+            isPlaying.value = !isPlaying.value;
+        };
+
+        const playPrevious = () => {
+            console.log('Previous song');
+            // Add previous song logic here
+        };
+
+        const playNext = () => {
+            console.log('Next song');
+            // Add next song logic here
         };
 
         // --- Console App Methods ---
@@ -6687,6 +6750,8 @@ export function setupApp() {
             // Core
             currentTime, currentDate, randomHexCode, openedApp, currentScreen, deviceBatteryText, deviceSignalText,
             isHomeScreenVisible,
+            // Music Player
+            isPlaying, togglePlayPause, playPrevious, playNext,
             // New Features (Chat Menu, Call, Virtual Camera, Panels)
             userIdentity, userRelation, userAvatar, uploadUserAvatar, resetUserAvatar, bubbleStyle, customBubbleCSS, setBubbleStyle, applyCustomCSS, saveAndCloseSettings, confirmChatMenu, showArchiveDialog, showArchivedChats, archiveName, archiveDescription, archivedChats, filteredArchivedChats, sortedArchivedChats, archiveCurrentChat, restoreArchivedChat, deleteArchivedChat, saveChatMenuSettings, loadChatMenuSettings, clearChatHistory, exportChatHistory, showCreateGroupDialog, newGroupName, newGroupMembers, createNewGroup, newGroupAvatar, selectedGroupMembers, groupAvatarInput, triggerGroupAvatarUpload, handleGroupAvatarUpload, toggleGroupMember, showAddMemberDialog, selectedAddMembers, getAvailableCharactersForAdd, toggleAddMember, addMembersToGroup, removeGroupMember, addMemberMode, customMemberAvatar, customMemberName, customMemberPersona, customMemberAvatarInput, triggerCustomMemberAvatarUpload, handleCustomMemberAvatarUpload, addCustomMember, showRenameGroupDialog, newGroupNameInput, tempGroupAvatar, renameGroupAvatarInput, triggerRenameGroupAvatarUpload, handleRenameGroupAvatarUpload, renameGroup, shakeCharacter, shakeGroupMember,
             callActive, callType, callTimer, callInput, callMessages, isCallAiTyping, isMuted, toggleMute, isSpeakerOn, toggleSpeaker, isCameraOn, toggleCamera, currentChatName, currentChatAvatar,
