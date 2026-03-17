@@ -53,197 +53,272 @@
 
         <!-- 主屏幕 -->
         <div v-if="isHomeScreenVisible" class="homescreen">
-            <!-- Hero 插图区域 -->
-            <div class="hero-section">
-                <svg class="decorative-blob blob-1" viewBox="0 0 100 100" fill="none">
-                    <path d="M20,50 Q50,10 80,50 Q50,90 20,50" stroke="#000000" stroke-width="1" fill="none" stroke-linecap="round"/>
-                </svg>
-                
-                <svg class="decorative-arrow arrow-1" viewBox="0 0 60 30" fill="none">
-                    <path d="M10,15 Q30,5 50,15 L45,10 M50,15 L45,20" stroke="#000000" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-                
-                <h1 class="hero-title">Companion</h1>
-                <p class="hero-subtitle">Your everyday AI friend</p>
-                
-                <svg class="hero-illustration" viewBox="0 0 300 200" fill="none">
-                    <circle cx="150" cy="100" r="60" stroke="#000000" stroke-width="1.5" fill="none"/>
-                    <circle cx="130" cy="90" r="6" fill="#000000"/>
-                    <circle cx="170" cy="90" r="6" fill="#000000"/>
-                    <path d="M130 120 Q150 140 170 120" stroke="#000000" stroke-width="1.5" fill="none" stroke-linecap="round"/>
-                </svg>
-                
-                <svg class="decorative-blob blob-2" viewBox="0 0 80 80" fill="none">
-                    <path d="M15,40 Q40,5 65,40 Q40,75 15,40" stroke="#000000" stroke-width="1" fill="none" stroke-linecap="round"/>
-                </svg>
-            </div>
-            
-            <!-- 应用卡片列表 -->
-            <div class="app-cards-grid">
-                <div class="app-card card-style-1" @click="openApp('chat')">
-                    <svg class="app-card-icon" viewBox="0 0 64 64" fill="none">
-                        <rect x="8" y="8" width="48" height="44" rx="6" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
-                        <path d="M20 24 H44" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
-                        <path d="M20 34 H38" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
-                        <path d="M48 48 L40 40" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
-                    </svg>
-                    <div class="app-card-content">
-                        <span class="app-card-metadata">Active now</span>
-                        <span class="app-card-title">Chat</span>
-                        <span class="app-card-description">私密聊天，端对端加密保护你的每一句对话</span>
-                    </div>
-                    <div class="app-card-action">→</div>
-                </div>
-                
-                <div class="app-card card-style-2" @click="openApp('feed')">
-                    <svg class="app-card-icon" viewBox="0 0 64 64" fill="none">
-                        <rect x="8" y="12" width="48" height="40" rx="4" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
-                        <line x1="16" y1="24" x2="48" y2="24" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
-                        <line x1="16" y1="34" x2="40" y2="34" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
-                        <circle cx="16" cy="8" r="4" fill="#000000"/>
-                        <circle cx="32" cy="8" r="4" fill="#000000"/>
-                        <circle cx="48" cy="8" r="4" fill="#000000"/>
-                    </svg>
-                    <div class="app-card-content">
-                        <span class="app-card-metadata">12 new</span>
-                        <span class="app-card-title">Feed</span>
-                        <span class="app-card-description">记录生活点滴，分享美好时刻给重要的人</span>
-                    </div>
-                    <div class="app-card-action">+</div>
-                </div>
-                
-                <div class="app-card card-style-3" @click="openApp('hub')">
-                    <svg class="app-card-icon" viewBox="0 0 64 64" fill="none">
-                        <circle cx="32" cy="32" r="8" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
-                        <line x1="32" y1="4" x2="32" y2="20" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
-                        <line x1="32" y1="44" x2="32" y2="60" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
-                        <line x1="4" y1="32" x2="20" y2="32" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
-                        <line x1="44" y1="32" x2="60" y2="32" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
-                        <circle cx="32" cy="4" r="3" fill="#000000"/>
-                        <circle cx="32" cy="60" r="3" fill="#000000"/>
-                        <circle cx="4" cy="32" r="3" fill="#000000"/>
-                        <circle cx="60" cy="32" r="3" fill="#000000"/>
-                    </svg>
-                    <div class="app-card-content">
-                        <span class="app-card-metadata">Trending</span>
-                        <span class="app-card-title">Hub</span>
-                        <span class="app-card-description">社交中心，连接你与全世界的精彩</span>
-                    </div>
-                    <div class="app-card-action">→</div>
-                </div>
-                
-                <div class="app-card card-style-4" @click="openApp('ember')">
-                    <svg class="app-card-icon" viewBox="0 0 64 64" fill="none">
-                        <path d="M32 8 C28 16 20 20 20 28 C20 36 28 40 32 48 C36 40 44 36 44 28 C44 20 36 16 32 8" stroke="#000000" stroke-width="1.5" fill="none" stroke-linecap="round"/>
-                        <circle cx="28" cy="28" r="3" fill="#000000"/>
-                        <circle cx="36" cy="28" r="3" fill="#000000"/>
-                    </svg>
-                    <div class="app-card-content">
-                        <span class="app-card-metadata">Private</span>
-                        <span class="app-card-title">Ember</span>
-                        <span class="app-card-description">私密社区，成人专属的精神角落</span>
-                    </div>
-                    <div class="app-card-action">+</div>
-                </div>
-                
-                <div class="app-card card-style-5" @click="openApp('mate')">
-                    <svg class="app-card-icon" viewBox="0 0 64 64" fill="none">
-                        <circle cx="32" cy="24" r="12" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
-                        <path d="M16 48 Q32 36 48 48" stroke="#000000" stroke-width="1.5" fill="none" stroke-linecap="round"/>
-                        <path d="M24 54 L24 48" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
-                        <path d="M40 54 L40 48" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
-                    </svg>
-                    <div class="app-card-content">
-                        <span class="app-card-metadata">Online</span>
-                        <span class="app-card-title">Mate</span>
-                        <span class="app-card-description">AI陪伴，随时随地温暖你的心灵</span>
-                    </div>
-                    <div class="app-card-action">→</div>
-                </div>
-                
-                <div class="app-card card-style-6" @click="openApp('nest')">
-                    <svg class="app-card-icon" viewBox="0 0 64 64" fill="none">
-                        <path d="M8 40 L32 16 L56 40 L56 52 L8 52 Z" stroke="#000000" stroke-width="1.5" fill="none" stroke-linecap="round"/>
-                        <rect x="24" y="36" width="16" height="16" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
-                        <circle cx="28" cy="28" r="2" fill="#000000"/>
-                        <circle cx="36" cy="28" r="2" fill="#000000"/>
-                    </svg>
-                    <div class="app-card-content">
-                        <span class="app-card-metadata">30 mins</span>
-                        <span class="app-card-title">Nest</span>
-                        <span class="app-card-description">情侣空间，珍藏你们的甜蜜回忆</span>
-                    </div>
-                    <div class="app-card-action">+</div>
-                </div>
-                
-                <div class="app-card card-style-7" @click="openApp('games')">
-                    <svg class="app-card-icon" viewBox="0 0 64 64" fill="none">
-                        <rect x="12" y="8" width="40" height="48" rx="8" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
-                        <circle cx="24" cy="28" r="6" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
-                        <rect x="36" y="22" width="12" height="4" rx="2" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
-                        <rect x="36" y="30" width="12" height="4" rx="2" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
-                        <circle cx="24" cy="44" r="3" fill="#000000"/>
-                        <circle cx="40" cy="44" r="3" fill="#000000"/>
-                    </svg>
-                    <div class="app-card-content">
-                        <span class="app-card-metadata">Update available</span>
-                        <span class="app-card-title">Games</span>
-                        <span class="app-card-description">游戏中心，轻松时刻的欢乐源泉</span>
-                    </div>
-                    <div class="app-card-action">→</div>
-                </div>
-                
-                <div class="app-card card-style-8" @click="openApp('peek')">
-                    <svg class="app-card-icon" viewBox="0 0 64 64" fill="none">
-                        <rect x="12" y="8" width="40" height="48" rx="4" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
-                        <circle cx="32" cy="28" r="10" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
-                        <circle cx="32" cy="28" r="4" fill="#000000"/>
-                        <rect x="20" y="44" width="24" height="4" rx="2" fill="#000000"/>
-                        <circle cx="16" cy="14" r="2" fill="#000000"/>
-                        <circle cx="32" cy="14" r="2" fill="#000000"/>
-                        <circle cx="48" cy="14" r="2" fill="#000000"/>
-                    </svg>
-                    <div class="app-card-content">
-                        <span class="app-card-metadata">Just now</span>
-                        <span class="app-card-title">Peek</span>
-                        <span class="app-card-description">他的手机，探索另一个世界的入口</span>
-                    </div>
-                    <div class="app-card-action">+</div>
-                </div>
-            </div>
-            
-            <!-- 音乐播放器 -->
-            <div class="music-widget">
-                <div class="player-header">
-                    <span class="player-label">Now Playing</span>
-                </div>
-                
-                <div class="now-playing-area">
-                    <div class="spectrum-bars">
-                        <div class="spectrum-bar"></div>
-                        <div class="spectrum-bar"></div>
-                        <div class="spectrum-bar"></div>
-                    </div>
-                    
-                    <div class="widget-info">
-                        <div class="widget-song">Nonsense</div>
-                        <div class="widget-artist">Sabrina Carpenter</div>
-                        
-                        <div class="widget-progress-container">
-                            <div class="widget-time">00:00</div>
-                            <div class="widget-progress">
-                                <div class="widget-progress-bar"></div>
+            <!-- 页面容器 -->
+            <div class="home-pages" ref="homePages" @touchstart="touchStart" @touchmove="touchMove" @touchend="touchEnd">
+                <!-- 第一页 -->
+                <div class="home-page" :class="{ 'active': currentPage === 0 }">
+                    <div class="app-grid">
+                        <!-- 第一行 -->
+                        <div class="grid-spacer"></div>
+                        <div class="app-widget widget-2x2" @click="openApp('smiley')">
+                            <div class="smiley-widget">
+                                <div class="widget-header">
+                                    <span class="widget-title">Mood</span>
+                                </div>
+                                <div class="smiley-content">
+                                    <i class="fa fa-smile-o" style="font-size: 48px;"></i>
+                                    <div style="margin-top: 12px; font-size: 14px; font-weight: 600;">Happy Day!</div>
+                                </div>
                             </div>
-                            <div class="widget-time">03:45</div>
                         </div>
+                        <div class="grid-spacer"></div>
+                        
+                        <!-- 第二行 -->
+                        <div class="grid-spacer"></div>
+                        <!-- 笑脸组件占据第二行的中间两列 -->
+                        <div class="grid-spacer"></div>
+                        
+                        <!-- 第三行 -->
+                        <div class="app-widget widget-2x2" @click="openApp('feed')">
+                            <div class="feed-widget">
+                                <div class="widget-header">
+                                    <span class="widget-title">Feed</span>
+                                </div>
+                                <div class="feed-content">
+                                    <div style="font-size: 14px; font-weight: 500; margin-bottom: 8px;">Latest Updates</div>
+                                    <div style="font-size: 12px; color: #666; line-height: 1.4;">• New post from Ember<br>• Message from Mate<br>• Hub activity</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="app-icon" @click="openApp('chat')">
+                            <div class="app-icon-wrapper">
+                                <svg class="app-icon-svg" viewBox="0 0 64 64" fill="none">
+                                    <rect x="8" y="8" width="48" height="44" rx="6" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
+                                    <path d="M20 24 H44" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
+                                    <path d="M20 34 H38" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
+                                    <path d="M48 48 L40 40" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
+                                </svg>
+                            </div>
+                            <div class="app-label">Chat</div>
+                        </div>
+                        <div class="app-icon" @click="openApp('hub')">
+                            <div class="app-icon-wrapper">
+                                <svg class="app-icon-svg" viewBox="0 0 64 64" fill="none">
+                                    <circle cx="32" cy="32" r="8" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
+                                    <line x1="32" y1="4" x2="32" y2="20" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
+                                    <line x1="32" y1="44" x2="32" y2="60" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
+                                    <line x1="4" y1="32" x2="20" y2="32" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
+                                    <line x1="44" y1="32" x2="60" y2="32" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
+                                    <circle cx="32" cy="4" r="3" fill="#000000"/>
+                                    <circle cx="32" cy="60" r="3" fill="#000000"/>
+                                    <circle cx="4" cy="32" r="3" fill="#000000"/>
+                                    <circle cx="60" cy="32" r="3" fill="#000000"/>
+                                </svg>
+                            </div>
+                            <div class="app-label">Hub</div>
+                        </div>
+                        
+                        <!-- 第四行 -->
+                        <!-- Feed组件占据第四行的左侧两列 -->
+                        <div class="app-icon" @click="openApp('games')">
+                            <div class="app-icon-wrapper">
+                                <svg class="app-icon-svg" viewBox="0 0 64 64" fill="none">
+                                    <rect x="12" y="8" width="40" height="48" rx="8" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
+                                    <circle cx="24" cy="28" r="6" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
+                                    <rect x="36" y="22" width="12" height="4" rx="2" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
+                                    <rect x="36" y="30" width="12" height="4" rx="2" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
+                                    <circle cx="24" cy="44" r="3" fill="#000000"/>
+                                    <circle cx="40" cy="44" r="3" fill="#000000"/>
+                                </svg>
+                            </div>
+                            <div class="app-label">Games</div>
+                        </div>
+                        <div class="app-icon" @click="openApp('ember')">
+                            <div class="app-icon-wrapper">
+                                <svg class="app-icon-svg" viewBox="0 0 64 64" fill="none">
+                                    <path d="M32 8 C28 16 20 20 20 28 C20 36 28 40 32 48 C36 40 44 36 44 28 C44 20 36 16 32 8" stroke="#000000" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+                                    <circle cx="28" cy="28" r="3" fill="#000000"/>
+                                    <circle cx="36" cy="28" r="3" fill="#000000"/>
+                                </svg>
+                            </div>
+                            <div class="app-label">Ember</div>
+                        </div>
+                        
+                        <!-- 第五行 -->
+                        <div class="app-icon" @click="openApp('mate')">
+                            <div class="app-icon-wrapper">
+                                <svg class="app-icon-svg" viewBox="0 0 64 64" fill="none">
+                                    <circle cx="32" cy="24" r="12" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
+                                    <path d="M16 48 Q32 36 48 48" stroke="#000000" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+                                    <path d="M24 54 L24 48" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
+                                    <path d="M40 54 L40 48" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
+                                </svg>
+                            </div>
+                            <div class="app-label">Mate</div>
+                        </div>
+                        <div class="app-icon" @click="openApp('peek')">
+                            <div class="app-icon-wrapper">
+                                <svg class="app-icon-svg" viewBox="0 0 64 64" fill="none">
+                                    <rect x="12" y="8" width="40" height="48" rx="4" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
+                                    <circle cx="32" cy="28" r="10" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
+                                    <circle cx="32" cy="28" r="4" fill="#000000"/>
+                                    <rect x="20" y="44" width="24" height="4" rx="2" fill="#000000"/>
+                                    <circle cx="16" cy="14" r="2" fill="#000000"/>
+                                    <circle cx="32" cy="14" r="2" fill="#000000"/>
+                                    <circle cx="48" cy="14" r="2" fill="#000000"/>
+                                </svg>
+                            </div>
+                            <div class="app-label">Peek</div>
+                        </div>
+                        <div class="app-widget widget-2x2" @click="openApp('music')">
+                            <div class="music-widget">
+                                <div class="player-header">
+                                    <span class="player-label">Now Playing</span>
+                                </div>
+                                <div class="now-playing-area">
+                                    <div class="spectrum-bars">
+                                        <div class="spectrum-bar"></div>
+                                        <div class="spectrum-bar"></div>
+                                        <div class="spectrum-bar"></div>
+                                    </div>
+                                    
+                                    <div class="widget-info">
+                                        <div class="widget-song">Nonsense</div>
+                                        <div class="widget-artist">Sabrina Carpenter</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 第六行 -->
+                        <div class="app-icon" @click="openApp('weather')">
+                            <div class="app-icon-wrapper">
+                                <i class="fa fa-cloud app-icon-font"></i>
+                            </div>
+                            <div class="app-label">Weather</div>
+                        </div>
+                        <div class="app-icon" @click="openApp('calculator')">
+                            <div class="app-icon-wrapper">
+                                <i class="fa fa-calculator app-icon-font"></i>
+                            </div>
+                            <div class="app-label">Calculator</div>
+                        </div>
+                        <!-- 音乐播放器组件占据第六行的右侧两列 -->
                     </div>
                 </div>
                 
-                <div class="widget-controls">
-                    <button class="widget-control-btn"><i class="fa fa-step-backward"></i></button>
-                    <button class="widget-control-btn play-pause"><i class="fa fa-pause"></i></button>
-                    <button class="widget-control-btn"><i class="fa fa-step-forward"></i></button>
+                <!-- 第二页 -->
+                <div class="home-page" :class="{ 'active': currentPage === 1 }">
+                    <div class="app-grid">
+                        <!-- 第一行 -->
+                        <div class="grid-spacer"></div>
+                        <div class="app-widget widget-2x2" @click="openApp('nest')">
+                            <div class="nest-widget">
+                                <div class="widget-header">
+                                    <span class="widget-title">Nest</span>
+                                </div>
+                                <div class="nest-content">
+                                    <i class="fa fa-home" style="font-size: 36px; margin-bottom: 8px;"></i>
+                                    <div style="font-size: 14px; font-weight: 500;">Home Status</div>
+                                    <div style="font-size: 12px; color: #666; margin-top: 4px;">• Temperature: 22°C<br>• Lights: On<br>• Security: Armed</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="grid-spacer"></div>
+                        
+                        <!-- 第二行 -->
+                        <div class="grid-spacer"></div>
+                        <!-- Nest组件占据第二行的中间两列 -->
+                        <div class="grid-spacer"></div>
+                        
+                        <!-- 第三行 -->
+                        <div class="app-widget widget-2x2" @click="openApp('weather')">
+                            <div class="weather-widget">
+                                <div class="widget-header">
+                                    <span class="widget-title">Weather</span>
+                                </div>
+                                <div class="weather-content">
+                                    <i class="fa fa-sun-o" style="font-size: 36px; margin-bottom: 8px;"></i>
+                                    <div style="font-size: 20px; font-weight: 600;">24°C</div>
+                                    <div style="font-size: 12px; color: #666;">Sunny</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="app-icon" @click="openApp('camera')">
+                            <div class="app-icon-wrapper">
+                                <i class="fa fa-camera app-icon-font"></i>
+                            </div>
+                            <div class="app-label">Camera</div>
+                        </div>
+                        <div class="app-icon" @click="openApp('gallery')">
+                            <div class="app-icon-wrapper">
+                                <i class="fa fa-picture-o app-icon-font"></i>
+                            </div>
+                            <div class="app-label">Gallery</div>
+                        </div>
+                        
+                        <!-- 第四行 -->
+                        <!-- Weather组件占据第四行的左侧两列 -->
+                        <div class="app-icon" @click="openApp('phone')">
+                            <div class="app-icon-wrapper">
+                                <i class="fa fa-phone app-icon-font"></i>
+                            </div>
+                            <div class="app-label">Phone</div>
+                        </div>
+                        <div class="app-icon" @click="openApp('contacts')">
+                            <div class="app-icon-wrapper">
+                                <i class="fa fa-address-book app-icon-font"></i>
+                            </div>
+                            <div class="app-label">Contacts</div>
+                        </div>
+                        
+                        <!-- 第五行 -->
+                        <div class="app-icon" @click="openApp('clock')">
+                            <div class="app-icon-wrapper">
+                                <i class="fa fa-clock-o app-icon-font"></i>
+                            </div>
+                            <div class="app-label">Clock</div>
+                        </div>
+                        <div class="app-icon" @click="openApp('settings')">
+                            <div class="app-icon-wrapper">
+                                <i class="fa fa-cog app-icon-font"></i>
+                            </div>
+                            <div class="app-label">Settings</div>
+                        </div>
+                        <div class="app-widget widget-2x2" @click="openApp('notes')">
+                            <div class="notes-widget">
+                                <div class="widget-header">
+                                    <span class="widget-title">Notes</span>
+                                </div>
+                                <div class="notes-content">
+                                    <div style="font-size: 14px; font-weight: 500; margin-bottom: 8px;">Recent Notes</div>
+                                    <div style="font-size: 12px; color: #666; line-height: 1.4;">• Shopping list<br>• Meeting at 2 PM<br>• Call John</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 第六行 -->
+                        <div class="app-icon" @click="openApp('maps')">
+                            <div class="app-icon-wrapper">
+                                <i class="fa fa-map-marker app-icon-font"></i>
+                            </div>
+                            <div class="app-label">Maps</div>
+                        </div>
+                        <div class="app-icon" @click="openApp('browser')">
+                            <div class="app-icon-wrapper">
+                                <i class="fa fa-globe app-icon-font"></i>
+                            </div>
+                            <div class="app-label">Browser</div>
+                        </div>
+                        <!-- 笔记组件占据第六行的右侧两列 -->
+                    </div>
                 </div>
+            </div>
+            
+            <!-- 页面指示器 -->
+            <div class="page-indicator">
+                <div class="indicator-dot" :class="{ 'active': currentPage === 0 }"></div>
+                <div class="indicator-dot" :class="{ 'active': currentPage === 1 }"></div>
             </div>
         </div>
         
@@ -251,19 +326,19 @@
         <div v-if="isHomeScreenVisible" class="dock">
             <div class="dock-icon" @click="openApp('workshop')">
                 <i class="fa fa-wrench"></i>
-                <span>WORKSHOP</span>
+                <span>Workshop</span>
             </div>
             <div class="dock-icon" @click="openApp('console')">
                 <i class="fa fa-terminal"></i>
-                <span>CONSOLE</span>
+                <span>Console</span>
             </div>
             <div class="dock-icon" @click="openApp('theme')">
                 <i class="fa fa-paint-brush"></i>
-                <span>THEME</span>
+                <span>Theme</span>
             </div>
-            <div class="dock-icon" @click="openApp('announcement')">
+            <div class="dock-icon" @click="openApp('notice')">
                 <i class="fa fa-bullhorn"></i>
-                <span>NOTICE</span>
+                <span>Notice</span>
             </div>
         </div>
 
