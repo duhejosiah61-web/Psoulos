@@ -109,85 +109,53 @@
         <!-- 主屏幕 -->
         <div v-if="isHomeScreenVisible" class="homescreen">
             <!-- 页面容器 -->
-            <div class="home-pages" ref="homePages" @touchstart="handleTouchStart" @touchmove="handleTouchMove" @touchend="handleTouchEnd">
+            <div class="home-pages" ref="homePages" style="cursor: grab;">
                 <!-- 第一页 -->
                 <div class="home-page" :class="{ 'active': currentPage === 0 }">
                     <div class="app-grid">
-                        <!-- 第一行 -->
-                        <div class="grid-spacer"></div>
-                        <div class="app-widget widget-2x2 companion-widget" @click="openApp('smiley')">
-                            <div class="companion-content">
-                                <div class="companion-title">Companion</div>
-                                <div class="companion-subtitle">Your everyday AI friend</div>
-                                <div class="companion-smiley">
-                                    <svg viewBox="0 0 100 100" class="smiley-svg">
-                                        <circle cx="50" cy="50" r="40" stroke="#000000" stroke-width="2" fill="none"/>
-                                        <circle cx="35" cy="40" r="3" fill="#000000"/>
-                                        <circle cx="65" cy="40" r="3" fill="#000000"/>
-                                        <path d="M30 65 Q50 80 70 65" stroke="#000000" stroke-width="2" fill="none"/>
-                                    </svg>
+                        <!-- 第一行 - 4x4照片小组件 -->
+                        <div class="app-widget widget-4x4 photo-widget" @click.stop>
+                            <div class="photo-widget-content">
+                                <!-- 顶部信息栏 -->
+                                <div class="photo-widget-header">
+                                    <div class="photo-widget-date">
+                                        <div class="photo-date-day">{{ photoWidgetDate.day }}</div>
+                                        <div class="photo-date-weekday">{{ photoWidgetDate.weekday }}</div>
+                                    </div>
+                                    <div class="photo-widget-text" @click="editPhotoWidgetText">
+                                        <div class="photo-text-line1">{{ photoWidgetText.line1 }}</div>
+                                        <div class="photo-text-line2">{{ photoWidgetText.line2 }}</div>
+                                    </div>
+                                </div>
+                                <!-- 照片网格 -->
+                                <div class="photo-widget-grid">
+                                    <div v-for="(photo, index) in photoWidgetPhotos" :key="index" 
+                                         class="photo-widget-item" 
+                                         @click="changePhotoWidgetImage(index)">
+                                        <img :src="photo.url" :alt="'Photo ' + (index + 1)" class="photo-widget-img">
+                                        <div class="photo-widget-overlay"></div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                        <div class="grid-spacer"></div>
                         
-                        <!-- 第二行 -->
-                        <div class="grid-spacer"></div>
-                        <!-- 笑脸组件占据第二行的中间两列 -->
-                        <div class="grid-spacer"></div>
+                        <!-- 第三行、第四行 - 贴纸小组件占据左侧两列 -->
+                        <div class="app-widget widget-2x2 sticker-widget" @click="changeStickerWidgetImage">
+                            <div class="sticker-widget-content">
+                                <img :src="stickerWidgetUrl" alt="Sticker" class="sticker-image">
+                            </div>
+                        </div>
                         
                         <!-- 第三行 -->
-                        <div class="app-widget widget-2x2 live-widget" @click="openApp('live')">
-                            <div class="live-stream-widget">
-                                <div class="live-screen">
-                                    <div class="live-message">
-                                        Hello everyone! Let's dancing tonight )))))
-                                        <span class="live-heart">❤</span>
-                                    </div>
-                                    <div class="live-send-button">Send</div>
-                                </div>
-                                <div class="live-progress-bar">
-                                    <div class="live-progress-fill"></div>
-                                </div>
-                                <div class="live-controls">
-                                    <div class="live-control-btn live-heart-btn">
-                                        <i class="fa fa-heart"></i>
-                                    </div>
-                                    <div class="live-control-btn live-prev-btn">
-                                        <i class="fa fa-step-backward"></i>
-                                    </div>
-                                    <div class="live-control-btn live-play-btn">
-                                        <i class="fa fa-play"></i>
-                                    </div>
-                                    <div class="live-control-btn live-next-btn">
-                                        <i class="fa fa-step-forward"></i>
-                                    </div>
-                                    <div class="live-control-btn live-repeat-btn">
-                                        <i class="fa fa-refresh"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
                         <div class="app-icon" @click="openApp('chat')">
                             <div class="app-icon-wrapper">
-                                <svg class="app-icon-svg" viewBox="0 0 64 64" fill="none">
-                                    <rect x="12" y="12" width="40" height="40" rx="8" stroke="#000000" stroke-width="2"/>
-                                    <circle cx="24" cy="28" r="3" fill="#000000"/>
-                                    <circle cx="32" cy="28" r="3" fill="#000000"/>
-                                    <circle cx="40" cy="28" r="3" fill="#000000"/>
-                                </svg>
+                                <i class="fa fa-comments app-icon-font"></i>
                             </div>
                             <div class="app-label">Chat</div>
                         </div>
                         <div class="app-icon" @click="openApp('hub')">
                             <div class="app-icon-wrapper">
-                                <svg class="app-icon-svg" viewBox="0 0 64 64" fill="none">
-                                    <circle cx="32" cy="32" r="10" stroke="#000000" stroke-width="2"/>
-                                    <circle cx="32" cy="16" r="4" fill="#000000"/>
-                                    <circle cx="32" cy="48" r="4" fill="#000000"/>
-                                    <circle cx="16" cy="32" r="4" fill="#000000"/>
-                                    <circle cx="48" cy="32" r="4" fill="#000000"/>
-                                </svg>
+                                <i class="fa fa-share-alt app-icon-font"></i>
                             </div>
                             <div class="app-label">Hub</div>
                         </div>
@@ -196,211 +164,167 @@
                         <!-- Feed组件占据第四行的左侧两列 -->
                         <div class="app-icon" @click="openApp('games')">
                             <div class="app-icon-wrapper">
-                                <svg class="app-icon-svg" viewBox="0 0 64 64" fill="none">
-                                    <rect x="12" y="12" width="40" height="40" rx="8" stroke="#000000" stroke-width="2"/>
-                                    <circle cx="26" cy="26" r="4" fill="#000000"/>
-                                    <circle cx="38" cy="26" r="4" fill="#000000"/>
-                                    <circle cx="26" cy="38" r="4" fill="#000000"/>
-                                    <circle cx="38" cy="38" r="4" fill="#000000"/>
-                                </svg>
+                                <i class="fa fa-gamepad app-icon-font"></i>
                             </div>
                             <div class="app-label">Games</div>
                         </div>
                         <div class="app-icon" @click="openApp('ember')">
                             <div class="app-icon-wrapper">
-                                <svg class="app-icon-svg" viewBox="0 0 64 64" fill="none">
-                                    <path d="M32 14 L32 50" stroke="#000000" stroke-width="2" stroke-linecap="round"/>
-                                    <circle cx="32" cy="20" r="6" stroke="#000000" stroke-width="2"/>
-                                    <circle cx="32" cy="44" r="6" stroke="#000000" stroke-width="2"/>
-                                </svg>
+                                <i class="fa fa-fire app-icon-font"></i>
                             </div>
                             <div class="app-label">Ember</div>
                         </div>
-                        
-                        <!-- 第五行 -->
-                        <div class="app-icon" @click="openApp('mate')">
-                            <div class="app-icon-wrapper">
-                                <svg class="app-icon-svg" viewBox="0 0 64 64" fill="none">
-                                    <circle cx="32" cy="28" r="12" stroke="#000000" stroke-width="2"/>
-                                    <path d="M20 44 Q32 36 44 44" stroke="#000000" stroke-width="2" fill="none"/>
-                                </svg>
-                            </div>
-                            <div class="app-label">Mate</div>
-                        </div>
-                        <div class="app-icon" @click="openApp('peek')">
-                            <div class="app-icon-wrapper">
-                                <svg class="app-icon-svg" viewBox="0 0 64 64" fill="none">
-                                    <rect x="12" y="12" width="40" height="40" rx="8" stroke="#000000" stroke-width="2"/>
-                                    <circle cx="32" cy="32" r="10" stroke="#000000" stroke-width="2"/>
-                                    <circle cx="32" cy="32" r="4" fill="#000000"/>
-                                </svg>
-                            </div>
-                            <div class="app-label">Peek</div>
-                        </div>
-                        <div class="app-widget widget-2x2 recorder-widget" @click="openApp('music')">
-                            <div class="recorder-stream-widget">
-                                <div class="recorder-screen">
-                                    <div class="recorder-cover"></div>
-                                    <div class="recorder-song-info">
-                                        <div class="song-title">Nonsense</div>
-                                        <div class="song-artist">Sabrina Carpenter</div>
-                                    </div>
-                                </div>
-                                <div class="recorder-progress-bar">
-                                    <div class="recorder-progress-fill"></div>
-                                </div>
-                                <div class="recorder-controls">
-                                    <div class="recorder-control-btn recorder-heart-btn">
-                                        <i class="fa fa-heart"></i>
-                                    </div>
-                                    <div class="recorder-control-btn recorder-prev-btn" @click="playPrevious">
-                                        <i class="fa fa-step-backward"></i>
-                                    </div>
-                                    <div class="recorder-control-btn recorder-play-btn" @click="togglePlayPause">
-                                        <i v-if="!isPlaying" class="fa fa-play"></i>
-                                        <i v-else class="fa fa-pause"></i>
-                                    </div>
-                                    <div class="recorder-control-btn recorder-next-btn" @click="playNext">
-                                        <i class="fa fa-step-forward"></i>
-                                    </div>
-                                    <div class="recorder-control-btn recorder-repeat-btn">
-                                        <i class="fa fa-refresh"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- 第六行 -->
-                        <div class="app-icon" @click="openApp('feed')">
-                            <div class="app-icon-wrapper">
-                                <svg class="app-icon-svg" viewBox="0 0 64 64" fill="none">
-                                    <rect x="12" y="12" width="40" height="40" rx="8" stroke="#000000" stroke-width="2"/>
-                                    <circle cx="20" cy="24" r="3" fill="#000000"/>
-                                    <line x1="28" y1="24" x2="44" y2="24" stroke="#000000" stroke-width="2"/>
-                                    <circle cx="20" cy="36" r="3" fill="#000000"/>
-                                    <line x1="28" y1="36" x2="40" y2="36" stroke="#000000" stroke-width="2"/>
-                                </svg>
-                            </div>
-                            <div class="app-label">Feed</div>
-                        </div>
-                        <div class="app-icon" @click="openApp('nest')">
-                            <div class="app-icon-wrapper">
-                                <svg class="app-icon-svg" viewBox="0 0 64 64" fill="none">
-                                    <rect x="12" y="12" width="40" height="40" rx="8" stroke="#000000" stroke-width="2"/>
-                                    <path d="M20 32 L32 22 L44 32 L44 44 L20 44 Z" stroke="#000000" stroke-width="2" fill="none"/>
-                                    <rect x="28" y="36" width="8" height="8" fill="#000000"/>
-                                </svg>
-                            </div>
-                            <div class="app-label">Nest</div>
-                        </div>
-                        <!-- 音乐播放器组件占据第六行的右侧两列 -->
                     </div>
                 </div>
                 
                 <!-- 第二页 -->
                 <div class="home-page" :class="{ 'active': currentPage === 1 }">
                     <div class="app-grid">
-                        <!-- 第一行 -->
-                        <div class="grid-spacer"></div>
-                        <div class="app-widget widget-2x2" @click="openApp('nest')">
-                            <div class="nest-widget">
-                                <div class="widget-header">
-                                    <span class="widget-title">Nest</span>
+                        <!-- 第一行 - 音乐播放器组件占据整行 -->
+                        <div class="app-widget widget-4x2 music-widget" @click="openApp('music')">
+                            <div class="spotify-widget">
+                                <!-- 顶部LED点阵显示 -->
+                                <div class="led-display">
+                                    <span class="led-text">MUSIC</span>
+                                    <span class="led-icon">▶</span>
+                                    <span class="led-text">RAP-2004</span>
                                 </div>
-                                <div class="nest-content">
-                                    <i class="fa fa-home" style="font-size: 36px; margin-bottom: 8px;"></i>
-                                    <div style="font-size: 14px; font-weight: 500;">Home Status</div>
-                                    <div style="font-size: 12px; color: #666; margin-top: 4px;">• Temperature: 22°C<br>• Lights: On<br>• Security: Armed</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="grid-spacer"></div>
-                        
-                        <!-- 第二行 -->
-                        <div class="grid-spacer"></div>
-                        <!-- Nest组件占据第二行的中间两列 -->
-                        <div class="grid-spacer"></div>
-                        
-                        <!-- 第三行 -->
-                        <div class="app-widget widget-2x2" @click="openApp('weather')">
-                            <div class="weather-widget">
-                                <div class="widget-header">
-                                    <span class="widget-title">Weather</span>
-                                </div>
-                                <div class="weather-content">
-                                    <i class="fa fa-sun-o" style="font-size: 36px; margin-bottom: 8px;"></i>
-                                    <div style="font-size: 20px; font-weight: 600;">24°C</div>
-                                    <div style="font-size: 12px; color: #666;">Sunny</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="app-icon" @click="openApp('camera')">
-                            <div class="app-icon-wrapper">
-                                <i class="fa fa-camera app-icon-font"></i>
-                            </div>
-                            <div class="app-label">Camera</div>
-                        </div>
-                        <div class="app-icon" @click="openApp('gallery')">
-                            <div class="app-icon-wrapper">
-                                <i class="fa fa-picture-o app-icon-font"></i>
-                            </div>
-                            <div class="app-label">Gallery</div>
-                        </div>
-                        
-                        <!-- 第四行 -->
-                        <!-- Weather组件占据第四行的左侧两列 -->
-                        <div class="app-icon" @click="openApp('phone')">
-                            <div class="app-icon-wrapper">
-                                <i class="fa fa-phone app-icon-font"></i>
-                            </div>
-                            <div class="app-label">Phone</div>
-                        </div>
-                        <div class="app-icon" @click="openApp('contacts')">
-                            <div class="app-icon-wrapper">
-                                <i class="fa fa-address-book app-icon-font"></i>
-                            </div>
-                            <div class="app-label">Contacts</div>
-                        </div>
-                        
-                        <!-- 第五行 -->
-                        <div class="app-icon" @click="openApp('clock')">
-                            <div class="app-icon-wrapper">
-                                <i class="fa fa-clock-o app-icon-font"></i>
-                            </div>
-                            <div class="app-label">Clock</div>
-                        </div>
-                        <div class="app-icon" @click="openApp('settings')">
-                            <div class="app-icon-wrapper">
-                                <i class="fa fa-cog app-icon-font"></i>
-                            </div>
-                            <div class="app-label">Settings</div>
-                        </div>
-                        <div class="app-widget widget-2x2" @click="openApp('notes')">
-                            <div class="notes-widget">
-                                <div class="widget-header">
-                                    <span class="widget-title">Notes</span>
-                                </div>
-                                <div class="notes-content">
-                                    <div style="font-size: 14px; font-weight: 500; margin-bottom: 8px;">Recent Notes</div>
-                                    <div style="font-size: 12px; color: #666; line-height: 1.4;">• Shopping list<br>• Meeting at 2 PM<br>• Call John</div>
+                                <!-- 主要内容区域 -->
+                                <div class="music-content">
+                                    <!-- 左侧黑胶唱片 -->
+                                    <div class="vinyl-record">
+                                        <div class="vinyl-disc">
+                                            <div class="vinyl-center"></div>
+                                            <div class="vinyl-reflections">
+                                                <div class="vinyl-reflection r1"></div>
+                                                <div class="vinyl-reflection r2"></div>
+                                                <div class="vinyl-reflection r3"></div>
+                                                <div class="vinyl-reflection r4"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- 右侧信息区域 -->
+                                    <div class="music-info-panel">
+                                        <div class="music-info-header">
+                                            <div class="album-cover">
+                                                <img src="https://placehold.co/100x100/333/fff?text=Album" alt="Album Cover">
+                                            </div>
+                                            <div class="track-info">
+                                                <div class="track-title">Purple Hearts</div>
+                                                <div class="track-artist">Kendrick Lamar, Summer Walk...</div>
+                                            </div>
+                                        </div>
+                                        <div class="progress-section">
+                                            <div class="progress-bar-container">
+                                                <div class="progress-bar">
+                                                    <div class="progress-fill" style="width: 70%;"></div>
+                                                </div>
+                                            </div>
+                                            <div class="time-section">
+                                                <span class="current-time">04:38</span>
+                                                <span class="total-time">05:29</span>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                         
-                        <!-- 第六行 -->
-                        <div class="app-icon" @click="openApp('maps')">
-                            <div class="app-icon-wrapper">
-                                <i class="fa fa-map-marker app-icon-font"></i>
+                        <!-- 习惯追踪小组件 -->
+                        <div class="app-widget widget-2x2 habit-widget">
+                            <div class="habit-widget-content">
+                                <div class="habit-header">
+                                    <span class="habit-title">{{ habitMonth }}</span>
+                                    <span class="habit-percent">{{ habitPercent }}%</span>
+                                </div>
+                                <div class="habit-dots">
+                                    <div v-for="(row, rowIndex) in habitDots" :key="rowIndex" class="dot-row">
+                                        <div 
+                                            v-for="(dot, colIndex) in row" 
+                                            :key="colIndex"
+                                            class="dot"
+                                            :class="getDotClass(dot)"
+                                            @click="toggleHabitDot(rowIndex, colIndex)"
+                                        ></div>
+                                    </div>
+                                </div>
+                                <div class="habit-footer">
+                                    <input 
+                                        type="text" 
+                                        class="habit-goal-input"
+                                        v-model="habitGoal"
+                                        placeholder="设置目标..."
+                                        @blur="saveHabitGoal"
+                                        @click.stop
+                                        @mousedown.stop
+                                        @touchstart.stop
+                                    >
+                                </div>
                             </div>
-                            <div class="app-label">Maps</div>
                         </div>
-                        <div class="app-icon" @click="openApp('browser')">
+                        
+                        <!-- 第二行 - Mate、Peek、Feed、Nest -->
+                        <div class="app-icon" @click="openApp('mate')">
                             <div class="app-icon-wrapper">
-                                <i class="fa fa-globe app-icon-font"></i>
+                                <i class="fa fa-user app-icon-font"></i>
                             </div>
-                            <div class="app-label">Browser</div>
+                            <div class="app-label">Mate</div>
                         </div>
-                        <!-- 笔记组件占据第六行的右侧两列 -->
+                        <div class="app-icon" @click="openApp('peek')">
+                            <div class="app-icon-wrapper">
+                                <i class="fa fa-eye app-icon-font"></i>
+                            </div>
+                            <div class="app-label">Peek</div>
+                        </div>
+                        <div class="app-icon" @click="openApp('feed')">
+                            <div class="app-icon-wrapper">
+                                <i class="fa fa-list app-icon-font"></i>
+                            </div>
+                            <div class="app-label">Feed</div>
+                        </div>
+                        <div class="app-icon" @click="openApp('nest')">
+                            <div class="app-icon-wrapper">
+                                <i class="fa fa-home app-icon-font"></i>
+                            </div>
+                            <div class="app-label">Nest</div>
+                        </div>
+                        
+                        <!-- 角色信息小组件 -->
+                        <div class="app-widget widget-4x2 character-widget">
+                            <div class="character-left">
+                                <img :src="selectedCharacter.avatarUrl || 'https://placehold.co/150x150/333/fff?text=Character'" alt="Character" class="character-img">
+                            </div>
+                            <div class="character-right">
+                                <div class="char-name" @click="showCharacterSelector = true">{{ selectedCharacter.nickname || selectedCharacter.name || '未命名角色' }}</div>
+                                
+                                <div class="char-row-1">
+                                    <div class="char-card">
+                                        <i class="fa fa-heart"></i>
+                                        <span>{{ formatBindTime(selectedCharacter.bindTime) }}</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="char-progress">
+                                    <div class="prog-top">
+                                        <i class="fa fa-heart"></i>
+                                        <span>{{ selectedCharacter.affection || 0 }}%</span>
+                                    </div>
+                                    <div class="prog-text">{{ getLastChatMessage(selectedCharacter) }}</div>
+                                    <div class="prog-bar">
+                                        <div class="prog-fill" :style="{ width: (selectedCharacter.affection || 0) + '%' }"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="char-decor">
+                                <i class="fa fa-star s1"></i>
+                                <i class="fa fa-star s2"></i>
+                                <i class="fa fa-star s3"></i>
+                                <div class="heart-decor">
+                                    <i class="fa fa-heart"></i>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -3951,6 +3875,78 @@
                 </div>
             </div>
         </div>
+
+        <!-- 照片小组件文字编辑对话框 -->
+        <div v-if="showPhotoWidgetEditDialog" class="photo-widget-edit-dialog" @click.self="closePhotoWidgetEditDialog">
+            <div class="photo-widget-edit-content">
+                <div class="photo-widget-edit-header">
+                    <h3>编辑文字</h3>
+                    <button class="photo-widget-edit-close" @click="closePhotoWidgetEditDialog">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="photo-widget-edit-body">
+                    <div class="photo-widget-edit-field">
+                        <label>第一行</label>
+                        <input 
+                            type="text" 
+                            v-model="photoWidgetEditText1" 
+                            placeholder="请输入第一行文字"
+                            maxlength="20"
+                        >
+                    </div>
+                    <div class="photo-widget-edit-field">
+                        <label>第二行</label>
+                        <input 
+                            type="text" 
+                            v-model="photoWidgetEditText2" 
+                            placeholder="请输入第二行文字"
+                            maxlength="20"
+                        >
+                    </div>
+                </div>
+                <div class="photo-widget-edit-footer">
+                    <button class="photo-widget-edit-btn photo-widget-edit-cancel" @click="closePhotoWidgetEditDialog">取消</button>
+                    <button class="photo-widget-edit-btn photo-widget-edit-save" @click="savePhotoWidgetText">保存</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 角色选择器对话框 -->
+        <div v-if="showCharacterSelector" class="photo-widget-edit-dialog" @click.self="showCharacterSelector = false">
+            <div class="photo-widget-edit-content">
+                <div class="photo-widget-edit-header">
+                    <h3>选择角色</h3>
+                    <button class="photo-widget-edit-close" @click="showCharacterSelector = false">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="photo-widget-edit-body">
+                    <div v-if="characters.length === 0" style="text-align: center; color: #666; padding: 40px;">
+                        暂无角色，请先去工作室创建
+                    </div>
+                    <div v-else style="display: flex; flex-direction: column; gap: 12px; max-height: 400px; overflow-y: auto;">
+                        <div 
+                            v-for="char in characters" 
+                            :key="char.id" 
+                            @click="selectCharacter(char)"
+                            style="display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px; cursor: pointer; transition: background 0.2s;"
+                            :style="{ background: selectedCharacter.id === char.id ? '#F0F0F0' : 'transparent' }"
+                            @mouseover="e => e.currentTarget.style.background = selectedCharacter.id === char.id ? '#F0F0F0' : '#F8F8F8'"
+                            @mouseout="e => e.currentTarget.style.background = selectedCharacter.id === char.id ? '#F0F0F0' : 'transparent'"
+                        >
+                            <img :src="char.avatarUrl || 'https://placehold.co/60x60?text=No+Avatar'" style="width: 50px; height: 50px; border-radius: 10px; object-fit: cover;">
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; color: #000;">{{ char.nickname || char.name || '未命名角色' }}</div>
+                                <div style="font-size: 12px; color: #888;">好感度: {{ char.affection || 0 }}%</div>
+                            </div>
+                            <i v-if="selectedCharacter.id === char.id" class="fas fa-check" style="color: #000; font-size: 18px;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script type="module" src="main.js"></script>
 </body>

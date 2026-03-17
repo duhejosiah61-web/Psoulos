@@ -17,11 +17,233 @@ export function setupApp() {
     const enableLockScreen = ref(localStorage.getItem('enableLockScreen') !== 'false');
     const isLockScreenVisible = ref(enableLockScreen.value);
     
-    // 主屏幕状态
-    const isHomeScreenVisible = computed(() => !isLockScreenVisible.value && !openedApp.value);
-    
-    // 主页面切换
+    // 页面切换
     const currentPage = ref(0);
+    const homePages = ref(null);
+    let touchStartX = 0;
+    let touchEndX = 0;
+    let mouseStartX = 0;
+    let mouseEndX = 0;
+    let isDragging = false;
+    
+    // 照片小组件
+    const photoWidgetDate = ref({
+        day: '',
+        weekday: ''
+    });
+    const photoWidgetText = ref({
+        line1: localStorage.getItem('photoWidgetText1') || '小则乖宝，想你啦^o^',
+        line2: localStorage.getItem('photoWidgetText2') || '他好酷，好可爱，我好喜欢^ω^'
+    });
+    const photoWidgetPhotos = ref([
+        { url: localStorage.getItem('photoWidgetPhoto0') || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=300&fit=crop' },
+        { url: localStorage.getItem('photoWidgetPhoto1') || 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&h=300&fit=crop' },
+        { url: localStorage.getItem('photoWidgetPhoto2') || 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=200&h=300&fit=crop' },
+        { url: localStorage.getItem('photoWidgetPhoto3') || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=300&fit=crop' }
+    ]);
+    
+    // 贴纸小组件
+    const stickerWidgetUrl = ref(localStorage.getItem('stickerWidgetUrl') || 'https://img.heliar.top/file/1773774569024_retouch_2026031803084004.png');
+    
+    // 更换贴纸小组件图片
+    const changeStickerWidgetImage = () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    stickerWidgetUrl.value = event.target.result;
+                    try {
+                        localStorage.setItem('stickerWidgetUrl', event.target.result);
+                    } catch (e) {
+                        console.warn('图片太大，无法保存到本地存储');
+                        alert('贴纸已更换，但无法永久保存（超出存储限制）');
+                    }
+                };
+                reader.readAsDataURL(file);
+            }
+        };
+        input.click();
+    };
+    
+    // 习惯追踪小组件
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const habitMonth = ref(monthNames[new Date().getMonth()]);
+    
+    const initHabitDots = () => {
+        const saved = localStorage.getItem('habitDots');
+        if (saved) {
+            try {
+                return JSON.parse(saved);
+            } catch (e) {
+                console.error('Failed to load habit dots', e);
+            }
+        }
+        const dots = [];
+        for (let i = 0; i < 7; i++) {
+            const row = [];
+            for (let j = 0; j < 5; j++) {
+                row.push(null);
+            }
+            dots.push(row);
+        }
+        return dots;
+    };
+    
+    const habitDots = ref(initHabitDots());
+    
+    const habitGoal = ref(localStorage.getItem('habitGoal') || '');
+    
+    const habitPercent = computed(() => {
+        let total = 0;
+        let completed = 0;
+        habitDots.value.forEach(row => {
+            row.forEach(dot => {
+                if (dot !== null) {
+                    total++;
+                    if (dot === 'blue' || dot === 'green') {
+                        completed++;
+                    }
+                }
+            });
+        });
+        if (total === 0) return 0;
+        return Math.round((completed / total) * 100);
+    });
+    
+    const getDotClass = (dot) => {
+        if (dot === 'red') return 'red';
+        if (dot === 'blue') return 'blue';
+        if (dot === 'green') return 'green';
+        return '';
+    };
+    
+    const toggleHabitDot = (row, col) => {
+        const current = habitDots.value[row][col];
+        if (current === null) {
+            habitDots.value[row][col] = 'red';
+        } else if (current === 'red') {
+            habitDots.value[row][col] = 'blue';
+        } else if (current === 'blue') {
+            habitDots.value[row][col] = 'green';
+        } else {
+            habitDots.value[row][col] = null;
+        }
+        localStorage.setItem('habitDots', JSON.stringify(habitDots.value));
+    };
+    
+    const saveHabitGoal = () => {
+        localStorage.setItem('habitGoal', habitGoal.value);
+    };
+    
+    // 照片小组件文字编辑对话框
+    const showPhotoWidgetEditDialog = ref(false);
+    const photoWidgetEditText1 = ref('');
+    const photoWidgetEditText2 = ref('');
+    
+    // 更新照片小组件日期
+    const updatePhotoWidgetDate = () => {
+        const now = new Date();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+        const weekday = weekdays[now.getDay()];
+        
+        photoWidgetDate.value = {
+            day: `${month}/${day}`,
+            weekday: weekday
+        };
+    };
+    
+    // 更换照片小组件图片
+    const changePhotoWidgetImage = (index) => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                // 检查文件大小，如果超过1MB则压缩
+                if (file.size > 1024 * 1024) {
+                    compressImage(file, 800, 0.7).then(compressedDataUrl => {
+                        photoWidgetPhotos.value[index].url = compressedDataUrl;
+                        try {
+                            localStorage.setItem(`photoWidgetPhoto${index}`, compressedDataUrl);
+                        } catch (e) {
+                            console.warn('图片太大，无法保存到本地存储');
+                            alert('图片已更换，但无法永久保存（超出存储限制）');
+                        }
+                    });
+                } else {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        photoWidgetPhotos.value[index].url = event.target.result;
+                        try {
+                            localStorage.setItem(`photoWidgetPhoto${index}`, event.target.result);
+                        } catch (e) {
+                            console.warn('图片太大，无法保存到本地存储');
+                            alert('图片已更换，但无法永久保存（超出存储限制）');
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                }
+            }
+        };
+        input.click();
+    };
+    
+    // 压缩图片
+    const compressImage = (file, maxWidth, quality) => {
+        return new Promise((resolve) => {
+            const img = new Image();
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            img.onload = () => {
+                let width = img.width;
+                let height = img.height;
+                
+                if (width > maxWidth) {
+                    height = (height * maxWidth) / width;
+                    width = maxWidth;
+                }
+                
+                canvas.width = width;
+                canvas.height = height;
+                ctx.drawImage(img, 0, 0, width, height);
+                
+                resolve(canvas.toDataURL('image/jpeg', quality));
+            };
+            
+            img.src = URL.createObjectURL(file);
+        });
+    };
+    
+    // 编辑照片小组件文字 - 打开对话框
+    const editPhotoWidgetText = () => {
+        photoWidgetEditText1.value = photoWidgetText.value.line1;
+        photoWidgetEditText2.value = photoWidgetText.value.line2;
+        showPhotoWidgetEditDialog.value = true;
+    };
+    
+    // 关闭照片小组件文字编辑对话框
+    const closePhotoWidgetEditDialog = () => {
+        showPhotoWidgetEditDialog.value = false;
+        photoWidgetEditText1.value = '';
+        photoWidgetEditText2.value = '';
+    };
+    
+    // 保存照片小组件文字
+    const savePhotoWidgetText = () => {
+        photoWidgetText.value.line1 = photoWidgetEditText1.value;
+        photoWidgetText.value.line2 = photoWidgetEditText2.value;
+        localStorage.setItem('photoWidgetText1', photoWidgetEditText1.value);
+        localStorage.setItem('photoWidgetText2', photoWidgetEditText2.value);
+        showPhotoWidgetEditDialog.value = false;
+    };
     
     // 切换锁屏开关
     const toggleLockScreen = () => {
@@ -273,28 +495,232 @@ const addFontByUrl = () => {
     console.log('通过URL添加字体:', newFont.displayName);
 };
 
-// 初始化字体
-const initFonts = () => {
-    console.log('初始化字体...');
-    // 加载默认字体
-    const savedFont = localStorage.getItem('lockFont');
-    let defaultFont;
+// 组件挂载后初始化
+onMounted(() => {
+    console.log('组件挂载完成');
+    console.log('homePages引用:', homePages.value);
     
-    if (savedFont) {
-        defaultFont = fonts.value.find(font => font.fontFamily === savedFont);
+    // 获取home-pages元素
+    const homePagesElement = document.querySelector('.home-pages');
+    console.log('获取到的homePages元素:', homePagesElement);
+    
+    if (homePagesElement) {
+        console.log('成功获取homePages元素');
+        
+        // 绑定触摸事件 - 只有滑动才能换页，点击不换页
+        let hasMoved = false;
+        
+        homePagesElement.addEventListener('touchstart', (e) => {
+            if (e.target.classList.contains('habit-goal-input')) {
+                return;
+            }
+            console.log('触摸开始:', e.touches[0].clientX);
+            touchStartX = e.touches[0].clientX;
+            touchEndX = touchStartX;
+            hasMoved = false;
+        }, { passive: true });
+        
+        homePagesElement.addEventListener('touchmove', (e) => {
+            if (e.target.classList.contains('habit-goal-input')) {
+                return;
+            }
+            touchEndX = e.touches[0].clientX;
+            if (Math.abs(touchEndX - touchStartX) > 5) {
+                hasMoved = true;
+            }
+        }, { passive: true });
+        
+        homePagesElement.addEventListener('touchend', (e) => {
+            if (e.target.classList.contains('habit-goal-input')) {
+                return;
+            }
+            console.log('触摸结束 - 开始:', touchStartX, '结束:', touchEndX, '是否移动:', hasMoved);
+            
+            if (!hasMoved) {
+                console.log('只是点击，不切换页面');
+                touchStartX = 0;
+                touchEndX = 0;
+                hasMoved = false;
+                return;
+            }
+            
+            const diff = touchStartX - touchEndX;
+            const threshold = 30;
+            
+            console.log('滑动距离:', diff, '阈值:', threshold);
+            
+            if (Math.abs(diff) > threshold) {
+                if (diff > 0) {
+                    console.log('向左滑动，切换到下一页');
+                    if (currentPage.value < 1) {
+                        currentPage.value++;
+                        updateHomePagePosition();
+                    }
+                } else {
+                    console.log('向右滑动，切换到上一页');
+                    if (currentPage.value > 0) {
+                        currentPage.value--;
+                        updateHomePagePosition();
+                    }
+                }
+            } else {
+                console.log('滑动距离不够，不切换页面');
+            }
+            
+            touchStartX = 0;
+            touchEndX = 0;
+            hasMoved = false;
+        });
+        
+        let mouseHasMoved = false;
+        
+        homePagesElement.addEventListener('mousedown', (e) => {
+            if (e.target.classList.contains('habit-goal-input')) {
+                return;
+            }
+            console.log('鼠标按下:', e.clientX);
+            mouseStartX = e.clientX;
+            mouseEndX = mouseStartX;
+            isDragging = true;
+            mouseHasMoved = false;
+            e.target.style.cursor = 'grabbing';
+        });
+        
+        homePagesElement.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            if (e.target.classList.contains('habit-goal-input')) {
+                return;
+            }
+            mouseEndX = e.clientX;
+            if (Math.abs(mouseEndX - mouseStartX) > 5) {
+                mouseHasMoved = true;
+            }
+        });
+        
+        homePagesElement.addEventListener('mouseup', (e) => {
+            if (e.target.classList.contains('habit-goal-input')) {
+                return;
+            }
+            console.log('鼠标释放:', mouseStartX, mouseEndX, '是否移动:', mouseHasMoved);
+            if (!isDragging) return;
+            
+            if (!mouseHasMoved) {
+                console.log('只是点击，不切换页面');
+                mouseStartX = 0;
+                mouseEndX = 0;
+                isDragging = false;
+                mouseHasMoved = false;
+                e.target.style.cursor = 'grab';
+                return;
+            }
+            
+            const diff = mouseStartX - mouseEndX;
+            const threshold = 30;
+            
+            console.log('鼠标拖动距离:', diff, '阈值:', threshold);
+            
+            if (Math.abs(diff) > threshold) {
+                if (diff > 0) {
+                    console.log('向左拖动，切换到下一页');
+                    if (currentPage.value < 1) {
+                        currentPage.value++;
+                        updateHomePagePosition();
+                    }
+                } else {
+                    console.log('向右拖动，切换到上一页');
+                    if (currentPage.value > 0) {
+                        currentPage.value--;
+                        updateHomePagePosition();
+                    }
+                }
+            } else {
+                console.log('拖动距离不够，不切换页面');
+            }
+            
+            mouseStartX = 0;
+            mouseEndX = 0;
+            isDragging = false;
+            mouseHasMoved = false;
+            e.target.style.cursor = 'grab';
+        });
+        
+        homePagesElement.addEventListener('mouseleave', (e) => {
+            if (e.target.classList.contains('habit-goal-input')) {
+                return;
+            }
+            if (isDragging) {
+                console.log('鼠标离开:', mouseStartX, mouseEndX, '是否移动:', mouseHasMoved);
+                
+                // 如果没有移动（只是点击），不切换页面
+                if (!mouseHasMoved) {
+                    mouseStartX = 0;
+                    mouseEndX = 0;
+                    isDragging = false;
+                    mouseHasMoved = false;
+                    e.target.style.cursor = 'grab';
+                    return;
+                }
+                
+                const diff = mouseStartX - mouseEndX;
+                const threshold = 30; // 滑动阈值
+                
+                console.log('鼠标拖动距离:', diff, '阈值:', threshold);
+                
+                if (Math.abs(diff) > threshold) {
+                    if (diff > 0) {
+                        console.log('向左拖动，切换到下一页');
+                        if (currentPage.value < 1) {
+                            currentPage.value++;
+                            updateHomePagePosition();
+                        }
+                    } else {
+                        console.log('向右拖动，切换到上一页');
+                        if (currentPage.value > 0) {
+                            currentPage.value--;
+                            updateHomePagePosition();
+                        }
+                    }
+                }
+                
+                mouseStartX = 0;
+                mouseEndX = 0;
+                isDragging = false;
+                mouseHasMoved = false;
+                e.target.style.cursor = 'grab';
+            }
+        });
+    } else {
+        console.log('无法获取homePages元素');
     }
     
-    if (!defaultFont) {
-        defaultFont = fonts.value[0];
-        selectedFont.value = defaultFont.fontFamily;
-    }
+    // 更新页面位置的函数
+    const updateHomePagePosition = () => {
+        console.log('更新页面位置:', currentPage.value);
+        // 直接获取DOM元素
+        const homePagesElement = document.querySelector('.home-pages');
+        if (homePagesElement) {
+            console.log('获取到homePages元素');
+            homePagesElement.style.transform = `translateX(-${currentPage.value * 100}%)`;
+            console.log('设置transform:', `translateX(-${currentPage.value * 100}%)`);
+        } else {
+            console.log('无法获取homePages元素');
+        }
+    };
     
-    if (defaultFont) {
-        loadFontCSS(defaultFont);
-        console.log('默认字体:', defaultFont.fontFamily);
-    }
-    console.log('初始化完成');
-};
+    // 初始化照片小组件日期
+    updatePhotoWidgetDate();
+    // 每分钟更新一次日期
+    setInterval(updatePhotoWidgetDate, 60000);
+    
+    // 初始化页面位置
+    updateHomePagePosition();
+    
+    // 监听currentPage变化
+    watch(currentPage, (newValue) => {
+        console.log('currentPage变化:', newValue);
+        updateHomePagePosition();
+    });
+});
 
 // 保存字体设置
 const saveFont = () => {
@@ -574,6 +1000,10 @@ const saveFont = () => {
         const deviceNetworkType = ref('');
         const deviceNetworkOnline = ref(true);
         const openedApp = ref(null);
+        
+        // 主屏幕状态 - 必须在openedApp定义之后
+        const isHomeScreenVisible = computed(() => !isLockScreenVisible.value && !openedApp.value);
+        
         const isAiTyping = ref(false);
         const themeMode = ref(localStorage.getItem('themeMode') || 'light');
         const themeWallpaper = ref(localStorage.getItem('themeWallpaper') || 'var(--bg-primary)');
@@ -1762,8 +2192,6 @@ const saveFont = () => {
         });
 
         // --- COMPUTED PROPERTIES ---
-        const isHomeScreenVisible = computed(() => !openedApp.value);
-        
         const activeProfile = computed(() => {
             if (!activeProfileId.value) return null;
             return profiles.value.find(p => p.id === activeProfileId.value);
@@ -2300,6 +2728,82 @@ const saveFont = () => {
         const soulLinkInput = ref('');
         const soulLinkReplyTarget = ref(null);
         const soulLinkMessages = ref({});
+        
+        // 角色信息小组件
+        const showCharacterSelector = ref(false);
+        const selectedCharacterId = ref(localStorage.getItem('selectedCharacterId') || null);
+        const selectedCharacter = computed(() => {
+            if (characters.value.length === 0) {
+                return { nickname: '未命名角色', name: '未命名角色', avatarUrl: '', bindTime: null, affection: 0 };
+            }
+            const char = characters.value.find(c => c.id === selectedCharacterId.value);
+            const targetChar = char || characters.value[0];
+            return {
+                ...targetChar,
+                nickname: targetChar.nickname || targetChar.name || '未命名角色',
+                name: targetChar.name || targetChar.nickname || '未命名角色',
+                bindTime: targetChar.bindTime || null,
+                affection: typeof targetChar.affection === 'number' ? targetChar.affection : 0
+            };
+        });
+        
+        // 选择角色
+        const selectCharacter = (char) => {
+            selectedCharacterId.value = char.id;
+            localStorage.setItem('selectedCharacterId', char.id);
+            
+            const charIndex = characters.value.findIndex(c => c.id === char.id);
+            if (charIndex !== -1) {
+                if (!characters.value[charIndex].bindTime) {
+                    characters.value[charIndex].bindTime = new Date().toISOString();
+                }
+                if (typeof characters.value[charIndex].affection !== 'number') {
+                    characters.value[charIndex].affection = 0;
+                }
+                saveCharacters();
+            }
+            
+            showCharacterSelector.value = false;
+        };
+        
+        // 格式化绑定时间
+        const formatBindTime = (bindTime) => {
+            if (!bindTime) {
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                const hour = String(now.getHours()).padStart(2, '0');
+                const minute = String(now.getMinutes()).padStart(2, '0');
+                return `${year}/${month}/${day} ${hour}:${minute}`;
+            }
+            const date = new Date(bindTime);
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hour = String(date.getHours()).padStart(2, '0');
+            const minute = String(date.getMinutes()).padStart(2, '0');
+            return `${year}/${month}/${day} ${hour}:${minute}`;
+        };
+        
+        // 获取最后一条聊天消息
+        const getLastChatMessage = (char) => {
+            if (!char || !char.id) return '暂无聊天记录';
+            try {
+                const messages = soulLinkMessages.value[char.id];
+                if (messages && Array.isArray(messages) && messages.length > 0) {
+                    const lastMsg = messages[messages.length - 1];
+                    if (lastMsg && lastMsg.text) {
+                        const content = lastMsg.text.substring(0, 7);
+                        return content.length < lastMsg.text.length ? content + '...' : content;
+                    }
+                }
+            } catch (e) {
+                console.error('获取聊天记录失败', e);
+            }
+            return '暂无聊天记录';
+        };
+        
         const novelMode = ref(localStorage.getItem('soulos_novel_mode') === 'true');
         const chatOfflineModes = ref({});
         
@@ -2403,12 +2907,10 @@ const saveFont = () => {
         const customMemberName = ref('');
         const customMemberPersona = ref('');
         const customMemberAvatarInput = ref(null);
-        const showRenameGroupDialog = ref(false);
         const newGroupNameInput = ref('');
         const tempGroupAvatar = ref('');
         const renameGroupAvatarInput = ref(null);
-        
-
+        const showRenameGroupDialog = ref(false);
         
         // 聊天背景设置
         const chatBackgroundStyle = ref('default');
@@ -4727,16 +5229,10 @@ const saveFont = () => {
         // --- Advanced Interactions ---
         const onMessageContextMenu = (event, msg) => {
             event.preventDefault();
-            
             let x = event.clientX;
             let y = event.clientY;
-            
-            const menuWidth = 160;
-            const menuHeight = 240;
-            
-            if (msg.sender === 'user') {
-                x = x - menuWidth;
-            }
+            const menuWidth = 180;
+            const menuHeight = 200;
             
             if (x + menuWidth > window.innerWidth) {
                 x = window.innerWidth - menuWidth - 10;
@@ -4751,7 +5247,7 @@ const saveFont = () => {
                 y: Math.max(10, y),
                 msg: msg
             };
-        };
+        }
 
         const closeContextMenu = () => {
             contextMenu.value.visible = false;
@@ -5048,18 +5544,7 @@ const saveFont = () => {
             }
         };
         
-        // --- Chat Archive Logic ---        
-        // showArchiveDialog 已在作用域外声明，这里仅作初始化，避免重复声明
-        if (typeof showArchiveDialog === 'undefined') {
-            const showArchiveDialog = ref(false);
-        } else {
-            showArchiveDialog.value = false;
-        }
-        showArchivedChats.value = false;
-        // 已在外部声明，无需重复声明
-        // const archiveName = ref('');
-        archiveDescription.value = '';
-        // archivedChats 已在上方声明，此处无需重复声明
+       
 
         const setBubbleStyle = (style) => {
             bubbleStyle.value = style;
@@ -7143,10 +7628,38 @@ const saveFont = () => {
                 feed.loadPosts();
             }
         });
-         console.log('setup end');
-         
+        console.log('setup end');
         
-        // 构造返回对象
+        // 初始化字体函数（在returnObject之前定义）
+        const initFonts = () => {
+            console.log('初始化字体...');
+            // 加载默认字体
+            const savedFont = localStorage.getItem('lockFont');
+            let defaultFont;
+            
+            if (savedFont) {
+                defaultFont = fonts.value.find(font => font.fontFamily === savedFont);
+            }
+            
+            if (!defaultFont) {
+                defaultFont = fonts.value[0];
+                selectedFont.value = defaultFont.fontFamily;
+            }
+            
+            if (defaultFont) {
+                loadFontCSS(defaultFont);
+                console.log('默认字体:', defaultFont.fontFamily);
+            }
+            console.log('初始化完成');
+        };
+        
+        const updateHomePagePosition = () => {
+            const homePagesElement = document.querySelector('.home-pages');
+            if (homePagesElement) {
+                homePagesElement.style.transform = `translateX(-${currentPage.value * 100}%)`;
+            }
+        };
+        
         const returnObject = {
             // SoulLink / Chat
             soulLinkTab, soulLinkActiveChat, soulLinkActiveChatType, soulLinkInput, soulLinkReplyTarget,
@@ -7200,10 +7713,10 @@ const saveFont = () => {
             // Profile & Navigation
             profileChar, viewCharacterProfile, goBackInSoulLink, showProfile, showChatMenu,
             // New Input Logic
-            moodValue, bedTiming, showLocationPanel, showTransferPanel, showChatSettings,
+            moodValue, bedTiming, showLocationPanel, showTransferPanel,
             showAttachmentPanel, showImageSubmenu, toggleEmojiPanel, toggleAttachmentPanel, toggleOfflineMode, selectGreeting, addDefaultGreeting, addCustomGreeting,
             startVoiceInput, onSendOrCall, selectFromAlbum, sendTextImage,
-            handleRetry, handleTakeaway, handleVote, handleShare, handleTarot, handlePet, handleOrder, startVoiceInput,
+            handleRetry, handleTakeaway, handleVote, handleShare, handleTarot, handlePet, handleOrder,
             showVotePanel, voteQuestion, voteOptions, addVoteOption, removeVoteOption, createVote, castVoteInChat,
             showTaobaoPanel, taobaoSearchTerm, taobaoProducts, taobaoLoading, openTaobaoPanel, searchTaobaoProducts, buyTaobaoProduct, helpBuyTaobaoProduct, confirmHelpBuy,
             showSharePanel, shareSource, shareContent, shareSources, sendShareCard,
@@ -7300,10 +7813,25 @@ const saveFont = () => {
             rollDice,
             toggleAutoPlay,
             sendMessage,
+            showRenameGroupDialog,
+            renameGroup,
+            contextMenu,
+            onMessageContextMenu,
+            closeContextMenu,
             // touch events
-            startY, handleTouchStart, handleTouchMove, handleTouchEnd,
+            pullDistance, handleTouchStart, handleTouchMove, handleTouchEnd,
             // home page
-            currentPage,
+            currentPage, homePages, updateHomePagePosition,
+            // photo widget
+            photoWidgetDate, photoWidgetText, photoWidgetPhotos, changePhotoWidgetImage, editPhotoWidgetText,
+            // sticker widget
+            stickerWidgetUrl, changeStickerWidgetImage,
+            // habit widget
+            habitMonth, habitDots, habitGoal, habitPercent, getDotClass, toggleHabitDot, saveHabitGoal,
+            // character widget
+            showCharacterSelector, selectedCharacter, selectCharacter, formatBindTime, getLastChatMessage,
+            // photo widget edit dialog
+            showPhotoWidgetEditDialog, photoWidgetEditText1, photoWidgetEditText2, closePhotoWidgetEditDialog, savePhotoWidgetText,
             // lock screen touch events
             lockTouchStart, lockTouchMove, lockTouchEnd,
             // lock screen mouse events
@@ -7322,13 +7850,21 @@ const saveFont = () => {
 
         console.log('final return object:', returnObject);
         
-        // 初始化字体
         initFonts();
         
         return returnObject;
 
     } catch (error) {
         console.error('setup 同步错误:', error);
-        return {};
+        return {
+            isLockScreenVisible: ref(true),
+            currentTime: ref(''),
+            currentDate: ref(''),
+            isHomeScreenVisible: ref(false),
+            openedApp: ref(null),
+            showGreetingSelect: ref(false),
+            showTransferPanel: ref(false),
+            showChatSettings: ref(false),
+        };
     }
 }
