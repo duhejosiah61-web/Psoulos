@@ -8,44 +8,134 @@ import { useMate } from './mate.js';
 import { useNotice } from './notice.js';
 import { useGames } from './games.js';
 
-// 自动缩放功能
-function setupAutoScaling() {
-    const appElement = document.getElementById('app');
-    if (!appElement) return;
 
-    function updateScale() {
-        const windowWidth = window.innerWidth;
-        const windowHeight = window.innerHeight;
-        const appWidth = 390;
-        const appHeight = 844;
-
-        // 计算缩放比例
-        const scaleX = windowWidth / appWidth;
-        const scaleY = windowHeight / appHeight;
-        const scale = Math.min(scaleX, scaleY, 1); // 最大缩放为1
-
-        // 应用缩放
-        appElement.style.transform = `scale(${scale})`;
-        appElement.style.width = `${appWidth}px`;
-        appElement.style.height = `${appHeight}px`;
-    }
-
-    // 初始化缩放
-    updateScale();
-
-    // 监听窗口大小变化
-    window.addEventListener('resize', updateScale);
-
-    return () => {
-        window.removeEventListener('resize', updateScale);
-    };
-}
 
 export function setupApp() {
     console.log('setup start'); 
     
-    // 初始化自动缩放
-    setupAutoScaling();
+    // 锁屏状态
+    const isLockScreenVisible = ref(true);
+    
+    // 主屏幕状态
+    const isHomeScreenVisible = computed(() => !isLockScreenVisible.value && !openedApp.value);
+    
+    // 锁定屏幕
+    const lockScreen = () => {
+        isLockScreenVisible.value = true;
+        // 重置锁屏样式
+        setTimeout(() => {
+            const lockScreen = document.querySelector('.lockscreen');
+            const blurBg = document.querySelector('.lock-screen-background-blur');
+            if (lockScreen) {
+                lockScreen.style.transform = 'translateY(0)';
+            }
+            if (blurBg) {
+                blurBg.style.opacity = '1';
+            }
+        }, 100);
+    };
+    
+    // 解锁屏幕
+    const unlockScreen = () => {
+        // 获取锁屏和毛玻璃背景元素
+        const lockScreen = document.querySelector('.lockscreen');
+        const blurBg = document.querySelector('.lock-screen-background-blur');
+        
+        // 让锁屏界面向下滑动
+        if (lockScreen) {
+            lockScreen.style.transform = 'translateY(100%)';
+        }
+        
+        // 让毛玻璃背景淡出
+        if (blurBg) {
+            blurBg.style.opacity = '0';
+        }
+        
+        // 动画结束后，设置isLockScreenVisible为false
+        setTimeout(() => {
+            isLockScreenVisible.value = false;
+        }, 300);
+    };
+    
+    // 触摸事件相关
+    const touchStartY = ref(0);
+    const touchEndY = ref(0);
+    
+    // 触摸开始
+    const lockTouchStart = (e) => {
+        touchStartY.value = e.touches[0].clientY;
+    };
+    
+    // 触摸移动
+    const lockTouchMove = (e) => {
+        touchEndY.value = e.touches[0].clientY;
+    };
+    
+    // 触摸结束
+    const lockTouchEnd = () => {
+        // 计算滑动距离
+        const distance = touchStartY.value - touchEndY.value;
+        // 向上滑动超过50px解锁
+        if (distance > 50) {
+            unlockScreen();
+        }
+    };
+    
+    // 鼠标事件相关
+    const lockMouseDown = (e) => {
+        touchStartY.value = e.clientY;
+    };
+    
+    const lockMouseMove = (e) => {
+        touchEndY.value = e.clientY;
+    };
+    
+    const lockMouseUp = () => {
+        // 计算滑动距离
+        const distance = touchStartY.value - touchEndY.value;
+        // 向上滑动超过50px解锁
+        if (distance > 50) {
+            unlockScreen();
+        }
+    };
+    
+    // 日期时间相关
+    const currentTime = ref('');
+    const currentDate = ref('');
+    const currentDay = ref('');
+    const currentMonth = ref('');
+    const currentDayOfMonth = ref('');
+    
+    // 更新时间
+    const updateTime = () => {
+        const now = new Date();
+        
+        // 时间
+        const hours = now.getHours().toString().padStart(2, '0');
+        const minutes = now.getMinutes().toString().padStart(2, '0');
+        currentTime.value = `${hours}:${minutes}`;
+        
+        // 日期
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        currentDate.value = now.toLocaleDateString('zh-CN', options);
+        
+        // 星期
+        const days = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+        currentDay.value = days[now.getDay()];
+        
+        // 月份
+        const months = ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'];
+        currentMonth.value = months[now.getMonth()];
+        
+        // 日期
+        currentDayOfMonth.value = now.getDate().toString();
+    };
+    
+    // 初始化时间
+    updateTime();
+    
+    // 每秒更新时间
+    setInterval(updateTime, 1000);
     
     // IndexedDB 初始化
     let db = null;
@@ -139,8 +229,6 @@ export function setupApp() {
     
     try {
         // --- DATA (State) ---
-        const currentTime = ref('');
-        const currentDate = ref('');
         const deviceBatteryLevel = ref(null);
         const deviceBatteryCharging = ref(false);
         const deviceNetworkType = ref('');
@@ -6870,6 +6958,12 @@ export function setupApp() {
             sendMessage,
             // touch events
             startY, handleTouchMove, handleTouchEnd,
+            // lock screen touch events
+            lockTouchStart, lockTouchMove, lockTouchEnd,
+            // lock screen mouse events
+            lockMouseDown, lockMouseMove, lockMouseUp,
+            // lock screen functions
+            lockScreen,
         };
 
         console.log('final return object:', returnObject);

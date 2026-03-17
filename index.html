@@ -27,6 +27,99 @@
 </head>
 <body>
     <div id="app" v-cloak>
+        <!-- 锁屏毛玻璃背景 -->
+        <div v-if="isLockScreenVisible" class="lock-screen-background-blur"></div>
+        <!-- 锁屏界面 -->
+        <div v-if="isLockScreenVisible" class="lockscreen" @touchstart="lockTouchStart" @touchmove="lockTouchMove" @touchend="lockTouchEnd" @mousedown="lockMouseDown" @mousemove="lockMouseMove" @mouseup="lockMouseUp">
+            <!-- 顶部状态栏 -->
+            <div class="lock-status-bar">
+                <div class="lock-status-left">
+                    <span>{{ currentDate }}</span>
+                </div>
+                <div class="lock-status-right">
+                    <i class="fa fa-signal"></i>
+                    <i class="fa fa-wifi"></i>
+                    <i class="fa fa-battery-full"></i>
+                    <span>56%</span>
+                </div>
+            </div>
+            
+            <!-- 主时间显示 -->
+            <div class="lock-time">
+                <div class="lock-date">{{ currentDay }}, {{ currentMonth }} {{ currentDayOfMonth }}</div>
+                <div class="lock-clock">{{ currentTime }}</div>
+            </div>
+            
+            <!-- 音乐播放器 -->
+            <div class="lock-music-player">
+                <div class="lock-music-info">
+                    <i class="fa fa-music"></i>
+                    <span>QQMUSIC</span>
+                    <i class="fa fa-chevron-right"></i>
+                </div>
+                <div class="lock-music-status">
+                    <span>正在充电 55%</span>
+                    <div class="lock-music-progress">
+                        <div class="lock-music-progress-bar"></div>
+                    </div>
+                </div>
+                <div class="lock-music-controls">
+                    <i class="fa fa-clock"></i>
+                    <span>Today</span>
+                    <i class="fa fa-calendar"></i>
+                    <span>8h</span>
+                </div>
+            </div>
+            
+            <!-- 消息区域 -->
+            <div class="lock-message">
+                <h3>Message:</h3>
+                <div class="lock-message-content">
+                    <p>有时候我觉得，</p>
+                    <p>流泪是一种自我排毒的手段。</p>
+                </div>
+                <div class="lock-message-meta">
+                    <span class="lock-message-emoji">笑</span>
+                    <span class="lock-message-tag">/DAILY/</span>
+                </div>
+                <div class="lock-message-controls">
+                    <i class="fa fa-heart"></i>
+                    <i class="fa fa-step-backward"></i>
+                    <i class="fa fa-play"></i>
+                    <i class="fa fa-step-forward"></i>
+                </div>
+                <div class="lock-countdown">
+                    <span>Today countdown</span>
+                    <div class="lock-countdown-time">8h 15m 9s</div>
+                </div>
+            </div>
+            
+            <!-- 便签 -->
+            <div class="lock-note">
+                <div class="lock-note-content">
+                    <p>"你与我相遇，化作我们是奇迹</p>
+                    <p>若是那春风拂过，</p>
+                    <p>我们会再次相遇。"</p>
+                    <p>—— 《spring breeze》</p>
+                    <p>wanna one</p>
+                    <p class="lock-note-signature">Love,Tear,Ocean, it's us.</p>
+                </div>
+            </div>
+            
+            <!-- 底部操作按钮 -->
+            <div class="lock-bottom-controls">
+                <div class="lock-bottom-btn">
+                    <i class="fa fa-phone"></i>
+                </div>
+                <div class="lock-unlock-btn">
+                    <div class="lock-unlock-circle" @click="unlockScreen"></div>
+                </div>
+                <div class="lock-bottom-btn">
+                    <i class="fa fa-camera"></i>
+                </div>
+            </div>
+        </div>
+        
         <!-- 浮动装饰图标 -->
         <svg class="sparkle-icon sparkle-1" viewBox="0 0 24 24" fill="none">
             <path d="M12 2 L14 10 L22 12 L14 14 L12 22 L10 14 L2 12 L10 10 Z" fill="currentColor"/>
