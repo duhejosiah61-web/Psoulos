@@ -14,7 +14,6 @@
     
     <link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@400;500;600&family=Caveat:wght@400;500;600&display=swap">
-    
     <link rel="stylesheet" href="style.css">
     
     <script type="importmap">
@@ -30,79 +29,42 @@
         <!-- 锁屏毛玻璃背景 -->
         <div v-if="isLockScreenVisible" class="lock-screen-background-blur"></div>
         <!-- 锁屏界面 -->
-        <div v-if="isLockScreenVisible" class="lockscreen" @touchstart="lockTouchStart" @touchmove="lockTouchMove" @touchend="lockTouchEnd" @mousedown="lockMouseDown" @mousemove="lockMouseMove" @mouseup="lockMouseUp">
-            <!-- 顶部状态栏 -->
-            <div class="lock-status-bar">
-                <div class="lock-status-left">
-                    <span>{{ currentDate }}</span>
-                </div>
-                <div class="lock-status-right">
-                    <i class="fa fa-signal"></i>
-                    <i class="fa fa-wifi"></i>
-                    <i class="fa fa-battery-full"></i>
-                    <span>56%</span>
-                </div>
-            </div>
+        <div v-if="isLockScreenVisible" class="lockscreen" :style="{ backgroundImage: `url(${lockWallpaper})` }" @touchstart="lockTouchStart" @touchmove="lockTouchMove" @touchend="lockTouchEnd" @mousedown="lockMouseDown" @mousemove="lockMouseMove" @mouseup="lockMouseUp">
+
             
             <!-- 主时间显示 -->
-            <div class="lock-time">
-                <div class="lock-date">{{ currentDay }}, {{ currentMonth }} {{ currentDayOfMonth }}</div>
-                <div class="lock-clock">{{ currentTime }}</div>
-            </div>
-            
-            <!-- 音乐播放器 -->
-            <div class="lock-music-player">
-                <div class="lock-music-info">
-                    <i class="fa fa-music"></i>
-                    <span>QQMUSIC</span>
-                    <i class="fa fa-chevron-right"></i>
+                <div class="lock-time" :style="{ color: lockDateTimeColor }">
+                    <div class="lock-clock">{{ currentTime }}</div>
+                    <div class="lock-date">{{ fullDate }}</div>
+                    <div class="lock-signature">{{ lockSignature }}</div>
                 </div>
-                <div class="lock-music-status">
-                    <span>正在充电 55%</span>
-                    <div class="lock-music-progress">
-                        <div class="lock-music-progress-bar"></div>
+            
+            <!-- 密码输入区域 -->
+            <div class="lock-password">
+                <div class="lock-password-input">
+                    <div v-for="(dot, index) in 4" :key="index" class="lock-password-dot" :class="{ active: password.length > index }"></div>
+                </div>
+                <div class="lock-password-keyboard">
+                    <div class="lock-password-row">
+                        <div class="lock-password-key" @click="addPassword('1')">1</div>
+                        <div class="lock-password-key" @click="addPassword('2')">2</div>
+                        <div class="lock-password-key" @click="addPassword('3')">3</div>
                     </div>
-                </div>
-                <div class="lock-music-controls">
-                    <i class="fa fa-clock"></i>
-                    <span>Today</span>
-                    <i class="fa fa-calendar"></i>
-                    <span>8h</span>
-                </div>
-            </div>
-            
-            <!-- 消息区域 -->
-            <div class="lock-message">
-                <h3>Message:</h3>
-                <div class="lock-message-content">
-                    <p>有时候我觉得，</p>
-                    <p>流泪是一种自我排毒的手段。</p>
-                </div>
-                <div class="lock-message-meta">
-                    <span class="lock-message-emoji">笑</span>
-                    <span class="lock-message-tag">/DAILY/</span>
-                </div>
-                <div class="lock-message-controls">
-                    <i class="fa fa-heart"></i>
-                    <i class="fa fa-step-backward"></i>
-                    <i class="fa fa-play"></i>
-                    <i class="fa fa-step-forward"></i>
-                </div>
-                <div class="lock-countdown">
-                    <span>Today countdown</span>
-                    <div class="lock-countdown-time">8h 15m 9s</div>
-                </div>
-            </div>
-            
-            <!-- 便签 -->
-            <div class="lock-note">
-                <div class="lock-note-content">
-                    <p>"你与我相遇，化作我们是奇迹</p>
-                    <p>若是那春风拂过，</p>
-                    <p>我们会再次相遇。"</p>
-                    <p>—— 《spring breeze》</p>
-                    <p>wanna one</p>
-                    <p class="lock-note-signature">Love,Tear,Ocean, it's us.</p>
+                    <div class="lock-password-row">
+                        <div class="lock-password-key" @click="addPassword('4')">4</div>
+                        <div class="lock-password-key" @click="addPassword('5')">5</div>
+                        <div class="lock-password-key" @click="addPassword('6')">6</div>
+                    </div>
+                    <div class="lock-password-row">
+                        <div class="lock-password-key" @click="addPassword('7')">7</div>
+                        <div class="lock-password-key" @click="addPassword('8')">8</div>
+                        <div class="lock-password-key" @click="addPassword('9')">9</div>
+                    </div>
+                    <div class="lock-password-row">
+                        <div class="lock-password-key"></div>
+                        <div class="lock-password-key" @click="addPassword('0')">0</div>
+                        <div class="lock-password-key" @click="removePassword"><i class="fa fa-backspace"></i></div>
+                    </div>
                 </div>
             </div>
             
@@ -112,7 +74,7 @@
                     <i class="fa fa-phone"></i>
                 </div>
                 <div class="lock-unlock-btn">
-                    <div class="lock-unlock-circle" @click="unlockScreen"></div>
+                    <div class="lock-unlock-circle"></div>
                 </div>
                 <div class="lock-bottom-btn">
                     <i class="fa fa-camera"></i>
@@ -147,7 +109,7 @@
         <!-- 主屏幕 -->
         <div v-if="isHomeScreenVisible" class="homescreen">
             <!-- 页面容器 -->
-            <div class="home-pages" ref="homePages" @touchstart="touchStart" @touchmove="touchMove" @touchend="touchEnd">
+            <div class="home-pages" ref="homePages" @touchstart="handleTouchStart" @touchmove="handleTouchMove" @touchend="handleTouchEnd">
                 <!-- 第一页 -->
                 <div class="home-page" :class="{ 'active': currentPage === 0 }">
                     <div class="app-grid">
@@ -3672,7 +3634,7 @@
                                     <i class="fas fa-thermometer-half"></i> 温度 (Temperature)
                                     <span class="temperature-value">{{ activeProfile.temperature !== undefined ? activeProfile.temperature : 0.7 }}</span>
                                 </label>
-                                <input type="range" class="console-slider" min="0" max="2" step="0.1" v-model.number="activeProfile.temperature" :value="activeProfile.temperature !== undefined ? activeProfile.temperature : 0.7">
+                                <input type="range" class="console-slider" min="0" max="2" step="0.1" v-model.number="activeProfile.temperature">
                                 <div class="temperature-hint">
                                     <span class="hint-label">保守</span>
                                     <span class="hint-desc">控制AI回复的随机性。较低值使回复更确定、一致；较高值使回复更有创意、多样。</span>
@@ -3790,6 +3752,153 @@
                         <div class="theme-hint">
                             <i class="fas fa-info-circle"></i>
                             <span>支持图片URL、CSS颜色值、渐变（如 linear-gradient(...)）</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 锁屏设置卡片 -->
+                <div class="card theme-card">
+                    <div class="theme-card-header">
+                        <i class="fas fa-lock"></i>
+                        <span>锁屏设置</span>
+                    </div>
+                    <div class="lock-screen-setting">
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <div class="setting-label">启用锁屏</div>
+                                <div class="setting-desc">打开应用时显示锁屏界面</div>
+                            </div>
+                            <div class="setting-toggle" @click="toggleLockScreen">
+                                <div class="toggle-slider" :class="{ active: enableLockScreen }">
+                                    <div class="toggle-thumb"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="setting-item" v-if="enableLockScreen">
+                            <div class="setting-info">
+                                <div class="setting-label">设置密码</div>
+                                <div class="setting-desc">请设置四位数字密码</div>
+                            </div>
+                            <div class="password-setting">
+                                <input type="password" class="password-input" v-model="passwordSetting" placeholder="输入4位数字" maxlength="4" @input="validatePassword">
+                                <button class="password-save-btn" @click="savePassword" :disabled="!isPasswordValid">保存</button>
+                            </div>
+                        </div>
+                        <div class="setting-item setting-item-full" v-if="enableLockScreen">
+                            <div class="setting-info">
+                                <div class="setting-label">字体</div>
+                                <div class="setting-desc">设置锁屏界面的字体</div>
+                            </div>
+                            <div class="font-setting">
+                                <div class="font-cards-container">
+                                    <div 
+                                        v-for="font in fonts" 
+                                        :key="font.fontId" 
+                                        class="font-card"
+                                        :class="{ active: selectedFont === font.fontFamily }"
+                                        @click="selectFont(font); console.log('点击字体卡片:', font.fontFamily)"
+                                        :style="{ fontFamily: font.fontFamily }"
+                                    >
+                                        <div class="font-card-row font-card-name">{{ font.displayName }}</div>
+                                        <div class="font-card-row font-card-english">ABCabc</div>
+                                        <div class="font-card-row font-card-number">123</div>
+                                    </div>
+                                </div>
+                                <div class="font-actions">
+                                    <div class="font-import">
+                                        <input type="file" accept=".ttf" @change="importCustomFont" ref="fontFileInput" style="display: none;">
+                                        <button class="font-import-btn" @click="showFontImportDialog = true">导入字体</button>
+                                    </div>
+                                    <button class="font-save-btn" @click="saveFont">保存</button>
+                                </div>
+                                
+                                <!-- 字体导入对话框 -->
+                                <div v-if="showFontImportDialog" class="font-import-dialog">
+                                    <div class="font-import-dialog-content">
+                                        <h3>导入字体</h3>
+                                        <div class="font-import-form">
+                                            <div class="form-group">
+                                                <label>字体名称</label>
+                                                <input type="text" v-model="newFontName" placeholder="输入字体名称">
+                                            </div>
+                                            <div class="form-group">
+                                                <label>字体链接 (TTF格式)</label>
+                                                <input type="text" v-model="newFontUrl" placeholder="输入TTF字体链接">
+                                            </div>
+                                            <div class="form-actions">
+                                                <button class="cancel-btn" @click="showFontImportDialog = false">取消</button>
+                                                <button class="confirm-btn" @click="addFontByUrl">确定</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="setting-item" v-if="enableLockScreen">
+                            <div class="setting-info">
+                                <div class="setting-label">个性签名</div>
+                                <div class="setting-desc">设置锁屏界面的个性签名</div>
+                            </div>
+                            <div class="signature-setting">
+                                <input type="text" class="signature-input" v-model="signatureSetting" placeholder="输入个性签名">
+                                <button class="signature-save-btn" @click="saveSignature">保存</button>
+                            </div>
+                        </div>
+                        <div class="setting-item" v-if="enableLockScreen">
+                            <div class="setting-info">
+                                <div class="setting-label">锁屏壁纸</div>
+                                <div class="setting-desc">设置锁屏界面的背景图片</div>
+                            </div>
+                            <div class="lock-wallpaper-setting">
+                                <input type="text" class="lock-wallpaper-input" v-model="lockWallpaperInput" placeholder="输入图片URL">
+                                <button class="lock-wallpaper-save-btn" @click="saveLockWallpaper">保存</button>
+                            </div>
+                        </div>
+                        <div class="setting-item" v-if="enableLockScreen">
+                            <div class="setting-info">
+                                <div class="setting-label">日期时间颜色</div>
+                                <div class="setting-desc">设置锁屏界面的日期时间颜色</div>
+                            </div>
+                            <div class="lock-color-setting">
+                                <input type="color" class="lock-color-input" v-model="lockDateTimeColor">
+                                <button class="lock-color-save-btn" @click="saveLockDateTimeColor">保存</button>
+                            </div>
+                        </div>
+                        <!-- 锁屏预览 -->
+                        <div class="lock-screen-preview" v-if="enableLockScreen">
+                            <div class="lock-preview-header">预览</div>
+                            <div class="lock-preview-container" :style="{ backgroundImage: `url(${lockWallpaper})` }">
+                                <div class="lock-preview-time" :style="{ color: lockDateTimeColor }">
+                                <div class="lock-preview-clock">12:00</div>
+                                <div class="lock-preview-date">2026年3月17日</div>
+                                <div class="lock-preview-signature">{{ lockSignature }}</div>
+                            </div>
+                                <div class="lock-preview-password">
+                                    <div class="lock-preview-dots">
+                                        <div class="lock-preview-dot"></div>
+                                        <div class="lock-preview-dot"></div>
+                                        <div class="lock-preview-dot"></div>
+                                        <div class="lock-preview-dot"></div>
+                                    </div>
+                                    <div class="lock-preview-keyboard">
+                                        <div class="lock-preview-row">
+                                            <div class="lock-preview-key"></div>
+                                            <div class="lock-preview-key"></div>
+                                            <div class="lock-preview-key"></div>
+                                        </div>
+                                        <div class="lock-preview-row">
+                                            <div class="lock-preview-key"></div>
+                                            <div class="lock-preview-key"></div>
+                                            <div class="lock-preview-key"></div>
+                                        </div>
+                                        <div class="lock-preview-row">
+                                            <div class="lock-preview-key"></div>
+                                            <div class="lock-preview-key"></div>
+                                            <div class="lock-preview-key"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

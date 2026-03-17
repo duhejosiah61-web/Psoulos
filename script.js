@@ -14,13 +14,29 @@ export function setupApp() {
     console.log('setup start'); 
     
     // 锁屏状态
-    const isLockScreenVisible = ref(true);
+    const enableLockScreen = ref(localStorage.getItem('enableLockScreen') !== 'false');
+    const isLockScreenVisible = ref(enableLockScreen.value);
     
     // 主屏幕状态
     const isHomeScreenVisible = computed(() => !isLockScreenVisible.value && !openedApp.value);
     
+    // 主页面切换
+    const currentPage = ref(0);
+    
+    // 切换锁屏开关
+    const toggleLockScreen = () => {
+        enableLockScreen.value = !enableLockScreen.value;
+        localStorage.setItem('enableLockScreen', enableLockScreen.value);
+        
+        // 如果关闭锁屏，确保锁屏界面隐藏
+        if (!enableLockScreen.value && isLockScreenVisible.value) {
+            isLockScreenVisible.value = false;
+        }
+    };
+    
     // 锁定屏幕
     const lockScreen = () => {
+        if (!enableLockScreen.value) return;
         isLockScreenVisible.value = true;
         // 重置锁屏样式
         setTimeout(() => {
@@ -33,6 +49,318 @@ export function setupApp() {
                 blurBg.style.opacity = '1';
             }
         }, 100);
+    };
+    
+    // 密码相关
+    const password = ref('');
+    const correctPassword = ref(localStorage.getItem('lockScreenPassword') || '1234'); // 从localStorage读取密码，默认1234
+    const passwordSetting = ref('');
+    const isPasswordValid = ref(false);
+    
+    // 日期相关
+const chineseDate = ref('');
+const fullDate = ref('');
+const lockSignature = ref(localStorage.getItem('lockSignature') || '每一天都是新的开始');
+const signatureSetting = ref(lockSignature.value);
+
+// 字体相关
+const fonts = ref([
+    {
+        name: '默认字体1',
+        displayName: '默认字体1',
+        fontFamily: 'CustomFont1',
+        url: 'https://files.catbox.moe/5r7lc4.ttf',
+        fontId: 'font1'
+    },
+    {
+        name: '默认字体2',
+        displayName: '默认字体2',
+        fontFamily: 'CustomFont2',
+        url: 'https://files.catbox.moe/tqrgcm.ttf',
+        fontId: 'font2'
+    },
+    {
+        name: '默认字体3',
+        displayName: '默认字体3',
+        fontFamily: 'CustomFont3',
+        url: 'https://files.catbox.moe/rmahta.ttf',
+        fontId: 'font3'
+    },
+    {
+        name: '默认字体4',
+        displayName: '默认字体4',
+        fontFamily: 'CustomFont4',
+        url: 'https://files.catbox.moe/x9ifle.ttf',
+        fontId: 'font4'
+    },
+    {
+        name: '默认字体5',
+        displayName: '默认字体5',
+        fontFamily: 'CustomFont5',
+        url: 'https://files.catbox.moe/t94xpc.ttf',
+        fontId: 'font5'
+    },
+    {
+        name: '默认字体6',
+        displayName: '默认字体6',
+        fontFamily: 'CustomFont6',
+        url: 'https://files.catbox.moe/m8ydxq.ttf',
+        fontId: 'font6'
+    },
+    {
+        name: '默认字体7',
+        displayName: '默认字体7',
+        fontFamily: 'CustomFont7',
+        url: 'https://files.catbox.moe/a31kd3.ttf',
+        fontId: 'font7'
+    },
+    {
+        name: '默认字体8',
+        displayName: '默认字体8',
+        fontFamily: 'CustomFont8',
+        url: 'https://files.catbox.moe/5r7lc4.ttf',
+        fontId: 'font8'
+    }
+]);
+const selectedFont = ref(localStorage.getItem('lockFont') || 'CustomFont1');
+const loadedFonts = ref(new Set());
+const customFontCount = ref(8);
+const showFontImportDialog = ref(false);
+const newFontName = ref('');
+const newFontUrl = ref('');
+
+// 动态加载TTF字体
+const loadFontCSS = (font) => {
+    console.log('加载字体:', font.fontFamily, 'URL:', font.url);
+    
+    // 移除之前的字体样式
+    const oldStyle = document.getElementById('font-style');
+    if (oldStyle) {
+        oldStyle.remove();
+    }
+    
+    const style = document.createElement('style');
+    style.id = 'font-style';
+    style.textContent = `
+        @font-face {
+            font-family: 'CustomFont';
+            src: url('${font.url}') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+        
+        /* 确保字体在锁屏界面生效 */
+        .lock-time, .lock-preview-time {
+            font-family: 'CustomFont', sans-serif !important;
+        }
+        
+        /* 确保字体在预览界面生效 */
+        .lock-preview-clock, .lock-preview-date, .lock-preview-signature {
+            font-family: 'CustomFont', sans-serif !important;
+        }
+        
+        /* 确保字体在主界面生效 */
+        .lock-clock, .lock-date, .lock-signature {
+            font-family: 'CustomFont', sans-serif !important;
+        }
+    `;
+    document.head.appendChild(style);
+    console.log('字体加载完成:', font.fontFamily);
+    
+    // 测试字体是否加载成功
+    setTimeout(() => {
+        const testDiv = document.createElement('div');
+        testDiv.style.fontFamily = 'CustomFont, sans-serif';
+        testDiv.style.position = 'absolute';
+        testDiv.style.left = '-9999px';
+        testDiv.textContent = '测试字体';
+        document.body.appendChild(testDiv);
+        
+        const computedStyle = window.getComputedStyle(testDiv);
+        console.log('字体应用测试:', font.fontFamily, 'computed font-family:', computedStyle.fontFamily);
+        
+        document.body.removeChild(testDiv);
+    }, 1000);
+};
+
+// 锁屏样式相关
+const lockWallpaper = ref(localStorage.getItem('lockWallpaper') || 'https://img.heliar.top/file/1773753630799_1773753603638.png');
+const lockWallpaperInput = ref(lockWallpaper.value);
+const lockDateTimeColor = ref(localStorage.getItem('lockDateTimeColor') || '#000000');
+const lockFont = ref(localStorage.getItem('lockFont') || 'CustomFont1');
+
+// 导入自定义字体
+const importCustomFont = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const fontData = e.target.result;
+        const fontId = `custom_${customFontCount.value}`;
+        const fontFamily = `CustomFont${customFontCount.value}`;
+        
+        const newFont = {
+            name: `自定义字体${customFontCount.value - 7}`,
+            displayName: `自定义字体${customFontCount.value - 7}`,
+            fontFamily: fontFamily,
+            url: fontData,
+            fontId: fontId,
+            isCustom: true
+        };
+        
+        fonts.value.push(newFont);
+        customFontCount.value++;
+        
+        const style = document.createElement('style');
+        style.textContent = `
+            @font-face {
+                font-family: '${fontFamily}';
+                src: url('${fontData}') format('truetype');
+                font-weight: normal;
+                font-style: normal;
+            }
+        `;
+        document.head.appendChild(style);
+        loadedFonts.value.add(fontId);
+    };
+    reader.readAsDataURL(file);
+};
+
+// 选择字体时加载对应的CSS
+const selectFont = (font) => {
+    console.log('选择字体:', font.fontFamily);
+    selectedFont.value = font.fontFamily;
+    loadFontCSS(font);
+    console.log('selectedFont:', selectedFont.value);
+    console.log('字体URL:', font.url);
+};
+
+// 通过URL添加字体
+const addFontByUrl = () => {
+    if (!newFontName.value || !newFontUrl.value) {
+        alert('请输入字体名称和链接');
+        return;
+    }
+    
+    if (!newFontUrl.value.endsWith('.ttf')) {
+        alert('请输入TTF格式的字体链接');
+        return;
+    }
+    
+    const fontId = `custom_${customFontCount.value}`;
+    const fontFamily = `CustomFont${customFontCount.value}`;
+    
+    const newFont = {
+        name: newFontName.value,
+        displayName: newFontName.value,
+        fontFamily: fontFamily,
+        url: newFontUrl.value,
+        fontId: fontId,
+        isCustom: true
+    };
+    
+    fonts.value.push(newFont);
+    customFontCount.value++;
+    
+    // 关闭对话框
+    showFontImportDialog.value = false;
+    
+    // 重置输入
+    newFontName.value = '';
+    newFontUrl.value = '';
+    
+    console.log('通过URL添加字体:', newFont.displayName);
+};
+
+// 初始化字体
+const initFonts = () => {
+    console.log('初始化字体...');
+    // 加载默认字体
+    const savedFont = localStorage.getItem('lockFont');
+    let defaultFont;
+    
+    if (savedFont) {
+        defaultFont = fonts.value.find(font => font.fontFamily === savedFont);
+    }
+    
+    if (!defaultFont) {
+        defaultFont = fonts.value[0];
+        selectedFont.value = defaultFont.fontFamily;
+    }
+    
+    if (defaultFont) {
+        loadFontCSS(defaultFont);
+        console.log('默认字体:', defaultFont.fontFamily);
+    }
+    console.log('初始化完成');
+};
+
+// 保存字体设置
+const saveFont = () => {
+    localStorage.setItem('lockFont', selectedFont.value);
+    console.log('字体保存成功:', selectedFont.value);
+};
+    
+    // 添加密码
+    const addPassword = (digit) => {
+        if (password.value.length < 4) {
+            password.value += digit;
+            // 当输入4位密码时，验证密码
+            if (password.value.length === 4) {
+                setTimeout(() => {
+                    if (password.value === correctPassword.value) {
+                        unlockScreen();
+                    } else {
+                        // 密码错误，清空密码
+                        password.value = '';
+                        // 可以添加错误提示动画
+                    }
+                }, 500);
+            }
+        }
+    };
+    
+    // 验证密码
+    const validatePassword = () => {
+        // 验证是否为4位数字
+        isPasswordValid.value = /^\d{4}$/.test(passwordSetting.value);
+    };
+    
+    // 保存密码
+    const savePassword = () => {
+        if (isPasswordValid.value) {
+            correctPassword.value = passwordSetting.value;
+            localStorage.setItem('lockScreenPassword', passwordSetting.value);
+            // 可以添加保存成功提示
+            passwordSetting.value = '';
+        }
+    };
+    
+    // 保存个性签名
+    const saveSignature = () => {
+        lockSignature.value = signatureSetting.value;
+        localStorage.setItem('lockSignature', signatureSetting.value);
+    };
+    
+    // 保存锁屏壁纸
+    const saveLockWallpaper = () => {
+        lockWallpaper.value = lockWallpaperInput.value;
+        localStorage.setItem('lockWallpaper', lockWallpaperInput.value);
+    };
+    
+    // 保存日期时间颜色
+    const saveLockDateTimeColor = () => {
+        localStorage.setItem('lockDateTimeColor', lockDateTimeColor.value);
+    };
+    
+
+    
+    // 删除密码
+    const removePassword = () => {
+        if (password.value.length > 0) {
+            password.value = password.value.slice(0, -1);
+        }
     };
     
     // 解锁屏幕
@@ -54,6 +382,7 @@ export function setupApp() {
         // 动画结束后，设置isLockScreenVisible为false
         setTimeout(() => {
             isLockScreenVisible.value = false;
+            password.value = ''; // 清空密码
         }, 300);
     };
     
@@ -75,8 +404,8 @@ export function setupApp() {
     const lockTouchEnd = () => {
         // 计算滑动距离
         const distance = touchStartY.value - touchEndY.value;
-        // 向上滑动超过50px解锁
-        if (distance > 50) {
+        // 向上滑动超过50px且密码正确时解锁
+        if (distance > 50 && password.value === correctPassword.value) {
             unlockScreen();
         }
     };
@@ -93,8 +422,8 @@ export function setupApp() {
     const lockMouseUp = () => {
         // 计算滑动距离
         const distance = touchStartY.value - touchEndY.value;
-        // 向上滑动超过50px解锁
-        if (distance > 50) {
+        // 向上滑动超过50px且密码正确时解锁
+        if (distance > 50 && password.value === correctPassword.value) {
             unlockScreen();
         }
     };
@@ -129,6 +458,17 @@ export function setupApp() {
         
         // 日期
         currentDayOfMonth.value = now.getDate().toString();
+        
+        // 公历日期（2026年3月17日格式）
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1;
+        const day = now.getDate();
+        fullDate.value = `${year}年${month}月${day}日`;
+        
+        // 汉字日期
+        const chineseMonths = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '十一', '十二'];
+        const chineseDays = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九', '二十', '二十一', '二十二', '二十三', '二十四', '二十五', '二十六', '二十七', '二十八', '二十九', '三十'];
+        chineseDate.value = `${chineseMonths[now.getMonth()]}月${chineseDays[now.getDate()]}`;
     };
     
     // 初始化时间
@@ -1505,6 +1845,10 @@ export function setupApp() {
         // Touch event variables for pull-to-refresh
         let startY = 0;
         const pullDistance = ref(0);
+        
+        const handleTouchStart = (e) => {
+            startY = e.touches[0].clientY;
+        };
         
         const handleTouchMove = (e) => {
             if (openedApp.value !== 'hub') return;
@@ -6836,7 +7180,7 @@ export function setupApp() {
             goBackInChat: exitSoulLinkChat,
 
             // Core
-            currentTime, currentDate, randomHexCode, openedApp, currentScreen, deviceBatteryText, deviceSignalText,
+            currentTime, currentDate, currentDay, currentMonth, currentDayOfMonth, randomHexCode, openedApp, currentScreen, deviceBatteryText, deviceSignalText,
             isHomeScreenVisible,
             // Music Player
             isPlaying, togglePlayPause, playPrevious, playNext,
@@ -6957,16 +7301,30 @@ export function setupApp() {
             toggleAutoPlay,
             sendMessage,
             // touch events
-            startY, handleTouchMove, handleTouchEnd,
+            startY, handleTouchStart, handleTouchMove, handleTouchEnd,
+            // home page
+            currentPage,
             // lock screen touch events
             lockTouchStart, lockTouchMove, lockTouchEnd,
             // lock screen mouse events
             lockMouseDown, lockMouseMove, lockMouseUp,
             // lock screen functions
-            lockScreen,
+            isLockScreenVisible, enableLockScreen, toggleLockScreen, lockScreen, unlockScreen,
+            // password functions
+            password, addPassword, removePassword, correctPassword, passwordSetting, isPasswordValid, validatePassword, savePassword,
+            // signature functions
+            chineseDate, fullDate, lockSignature, signatureSetting, saveSignature,
+            // lock screen style functions
+            lockWallpaper, lockWallpaperInput, saveLockWallpaper, lockDateTimeColor, saveLockDateTimeColor,
+            // font functions
+            fonts, selectedFont, saveFont, lockFont, selectFont, loadFontCSS, importCustomFont, customFontCount, initFonts, showFontImportDialog, newFontName, newFontUrl, addFontByUrl,
         };
 
         console.log('final return object:', returnObject);
+        
+        // 初始化字体
+        initFonts();
+        
         return returnObject;
 
     } catch (error) {
