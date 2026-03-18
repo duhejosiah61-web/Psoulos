@@ -486,6 +486,20 @@ onMounted(() => {
     console.log('组件挂载完成');
     console.log('homePages引用:', homePages.value);
     
+    // 更新页面位置的函数
+    const updateHomePagePosition = () => {
+        console.log('更新页面位置:', currentPage.value);
+        // 直接获取DOM元素
+        const homePagesElement = document.querySelector('.home-pages');
+        if (homePagesElement) {
+            console.log('获取到homePages元素');
+            homePagesElement.style.transform = `translateX(-${currentPage.value * 100}%)`;
+            console.log('设置transform:', `translateX(-${currentPage.value * 100}%)`);
+        } else {
+            console.log('无法获取homePages元素');
+        }
+    };
+    
     // 获取home-pages元素
     const homePagesElement = document.querySelector('.home-pages');
     console.log('获取到的homePages元素:', homePagesElement);
@@ -689,20 +703,6 @@ onMounted(() => {
     } else {
         console.log('无法获取homePages元素');
     }
-    
-    // 更新页面位置的函数
-    const updateHomePagePosition = () => {
-        console.log('更新页面位置:', currentPage.value);
-        // 直接获取DOM元素
-        const homePagesElement = document.querySelector('.home-pages');
-        if (homePagesElement) {
-            console.log('获取到homePages元素');
-            homePagesElement.style.transform = `translateX(-${currentPage.value * 100}%)`;
-            console.log('设置transform:', `translateX(-${currentPage.value * 100}%)`);
-        } else {
-            console.log('无法获取homePages元素');
-        }
-    };
     
     // 初始化照片小组件日期
     updatePhotoWidgetDate();
