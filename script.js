@@ -724,6 +724,22 @@ onMounted(() => {
     });
 });
 
+// 上一页
+const prevPage = () => {
+    console.log('点击上一页按钮');
+    if (currentPage.value > 0) {
+        currentPage.value--;
+    }
+};
+
+// 下一页
+const nextPage = () => {
+    console.log('点击下一页按钮');
+    if (currentPage.value < 1) {
+        currentPage.value++;
+    }
+};
+
 // 保存字体设置
 const saveFont = () => {
     localStorage.setItem('lockFont', selectedFont.value);
@@ -7823,7 +7839,7 @@ const saveFont = () => {
             // touch events
             pullDistance, handleTouchStart, handleTouchMove, handleTouchEnd,
             // home page
-            currentPage, homePages, updateHomePagePosition,
+            currentPage, homePages, updateHomePagePosition, prevPage, nextPage,
             // photo widget
             photoWidgetDate, photoWidgetText, photoWidgetPhotos, changePhotoWidgetImage, editPhotoWidgetText,
             // sticker widget

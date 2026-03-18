@@ -326,10 +326,30 @@
                 </div>
             </div>
             
-            <!-- 页面指示器 -->
-            <div class="page-indicator">
-                <div class="indicator-dot" :class="{ 'active': currentPage === 0 }"></div>
-                <div class="indicator-dot" :class="{ 'active': currentPage === 1 }"></div>
+            <!-- 页面指示器和翻页箭头 -->
+            <div class="page-indicator-container">
+                <button 
+                    class="page-nav-arrow left" 
+                    @click="prevPage"
+                    :disabled="currentPage === 0"
+                    v-show="currentPage > 0"
+                >
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                
+                <div class="page-indicator">
+                    <div class="indicator-dot" :class="{ 'active': currentPage === 0 }"></div>
+                    <div class="indicator-dot" :class="{ 'active': currentPage === 1 }"></div>
+                </div>
+                
+                <button 
+                    class="page-nav-arrow right" 
+                    @click="nextPage"
+                    :disabled="currentPage === 1"
+                    v-show="currentPage < 1"
+                >
+                    <i class="fas fa-chevron-right"></i>
+                </button>
             </div>
         </div>
         
