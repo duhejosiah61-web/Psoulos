@@ -1094,6 +1094,43 @@ body {
     box-sizing: border-box;
 }
 
+/* 第二页 - 6行×4格网格布局 */
+.grid-6x4 {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(6, 1fr);
+    gap: 1%;
+    padding: 1% 0;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+/* 第1行 - 通话小组件 (1行×4格) */
+.grid-row-1 {
+    grid-column: 1 / 5;
+    grid-row: 1 / 2;
+}
+
+/* 第2行 - 4个app */
+.app-icon.grid-row-2:nth-child(2) { grid-column: 1 / 2; grid-row: 2 / 3; }
+.app-icon.grid-row-2:nth-child(3) { grid-column: 2 / 3; grid-row: 2 / 3; }
+.app-icon.grid-row-2:nth-child(4) { grid-column: 3 / 4; grid-row: 2 / 3; }
+.app-icon.grid-row-2:nth-child(5) { grid-column: 4 / 5; grid-row: 2 / 3; }
+
+/* 第3-4行 - 天气时间小组件 (2行×4格) */
+.grid-row-3-4 {
+    grid-column: 1 / 5;
+    grid-row: 3 / 5;
+}
+
+/* 第5-6行 - 音乐播放器组件 (2行×4格) */
+.grid-row-5-6 {
+    grid-column: 1 / 5;
+    grid-row: 5 / 7;
+}
+
 /* 应用图标 */
 .app-icon {
     display: flex;
@@ -1772,118 +1809,7 @@ body {
     content: none !important;
 }
 
-/* 习惯追踪小组件 */
-.habit-widget {
-    background: #FFFFFF !important;
-    border-radius: 24px !important;
-    padding: 16px !important;
-    border: none !important;
-    box-shadow: none !important;
-}
 
-.habit-widget::before,
-.habit-widget::after {
-    display: none !important;
-}
-
-.habit-widget-content {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-}
-
-.habit-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 12px;
-}
-
-.habit-title {
-    font-size: 2rem;
-    font-weight: 700;
-    color: #000000;
-    font-family: 'Georgia', 'Times New Roman', serif;
-    font-style: italic;
-}
-
-.habit-percent {
-    font-size: 1.8rem;
-    font-weight: 600;
-    color: #888888;
-}
-
-.habit-dots {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    margin-bottom: 12px;
-}
-
-.dot-row {
-    display: flex;
-    justify-content: space-between;
-    gap: 6px;
-}
-
-.dot {
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    background: #D0D0D0;
-    flex-shrink: 0;
-    cursor: pointer;
-    transition: transform 0.1s;
-}
-
-.dot:hover {
-    transform: scale(1.1);
-}
-
-.dot.red {
-    background: #FF4D4F;
-}
-
-.dot.blue {
-    background: #1890FF;
-}
-
-.dot.green {
-    background: #52C41A;
-}
-
-.habit-footer {
-    margin-top: auto;
-}
-
-.habit-goal-input {
-    width: 100%;
-    padding: 10px 16px;
-    border: 2px solid #E8E8E8;
-    background: #FFFFFF;
-    border-radius: 12px;
-    font-size: 1rem;
-    color: #000000;
-    outline: none;
-    text-align: center;
-    cursor: text;
-    transition: border-color 0.2s;
-    position: relative;
-    z-index: 100;
-    pointer-events: auto;
-    -webkit-user-select: text;
-    user-select: text;
-}
-
-.habit-goal-input:focus {
-    border-color: #000000;
-}
-
-.habit-goal-input::placeholder {
-    color: #AAAAAA;
-}
 
 .sticker-widget-content {
     width: 100%;
@@ -1904,173 +1830,433 @@ body {
     outline: none !important;
 }
 
-/* 角色信息小组件 */
-.character-widget {
-    background: #FFFFFF !important;
-    border-radius: 24px !important;
-    padding: 16px !important;
+
+
+/* 通话小组件 */
+.call-widget {
+    background: #000000 !important;
+    border-radius: 50px !important;
+    padding: 4px 20px !important;
     border: none !important;
-    box-shadow: none !important;
-    position: relative !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+    color: #FFFFFF !important;
+    transition: transform 0.2s ease !important;
+    max-width: 85% !important;
+    margin: 0 auto !important;
+    height: 48px !important;
     display: flex !important;
-    gap: 16px !important;
+    align-items: center !important;
+    box-sizing: border-box !important;
 }
 
-.character-widget::before,
-.character-widget::after {
+.call-widget:hover {
+    transform: translateY(-2px) !important;
+}
+
+.call-widget::before,
+.call-widget::after {
     display: none !important;
 }
 
-.character-left {
-    flex-shrink: 0;
+.call-widget-content {
+    width: 100% !important;
+    height: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 16px !important;
+    justify-content: space-between !important;
 }
 
-.character-img {
-    width: 130px;
-    height: 130px;
-    object-fit: cover;
-    border-radius: 20px;
+.call-avatar {
+    width: 36px !important;
+    height: 36px !important;
+    border-radius: 50% !important;
+    overflow: hidden !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    flex-shrink: 0 !important;
 }
 
-.character-right {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+.call-avatar img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    filter: grayscale(100%) !important;
+    transition: transform 0.3s ease !important;
 }
 
-.char-name {
-    font-size: 1.6rem;
-    font-weight: 700;
-    color: #000000;
+.call-avatar:hover img {
+    transform: scale(1.05) !important;
 }
 
-.char-row-1 {
-    display: flex;
-    gap: 12px;
+.sticker-widget img {
+    filter: grayscale(100%) !important;
 }
 
-.char-row-2 {
-    display: flex;
+.call-info {
+    flex: 1 !important;
+    min-width: 0 !important;
 }
 
-.char-card {
-    background: #F5F5F5;
-    border-radius: 18px;
-    padding: 10px 14px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
+.call-title {
+    font-size: 1rem !important;
+    font-weight: 600 !important;
+    color: #FFFFFF !important;
+    margin-bottom: 4px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    cursor: pointer !important;
+    font-family: 'Helvetica Neue', Arial, sans-serif !important;
+    transition: color 0.2s ease !important;
 }
 
-.char-card.paw {
-    flex-direction: column;
-    justify-content: center;
-    padding: 10px 18px;
+.call-title:hover {
+    color: #E0E0E0 !important;
 }
 
-.char-card.paw i {
-    font-size: 1.6rem;
+.call-subtitle {
+    font-size: 0.8rem !important;
+    color: #CCCCCC !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    cursor: pointer !important;
+    font-family: 'Helvetica Neue', Arial, sans-serif !important;
+    transition: color 0.2s ease !important;
 }
 
-.char-card i {
-    font-size: 1rem;
-    color: #000000;
+.call-subtitle:hover {
+    color: #FFFFFF !important;
 }
 
-.char-card span {
-    font-size: 1rem;
-    font-weight: 600;
-    color: #000000;
+.call-buttons {
+    display: flex !important;
+    gap: 12px !important;
+    flex-shrink: 0 !important;
 }
 
-.char-progress {
-    background: #F5F5F5;
-    border-radius: 16px;
-    padding: 10px 14px;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+.call-btn {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 50% !important;
+    border: none !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
 }
 
-.prog-top {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+.call-btn:hover {
+    transform: scale(1.1) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
 }
 
-.prog-top i {
-    font-size: 1.2rem;
-    color: #000000;
+.call-btn.decline {
+    background: #666666 !important;
+    color: #FFFFFF !important;
 }
 
-.prog-top span {
-    font-size: 1.2rem;
-    font-weight: 600;
-    color: #000000;
+.call-btn.decline:hover {
+    background: #777777 !important;
 }
 
-.prog-text {
-    font-size: 0.8rem;
-    color: #666666;
+.call-btn.accept {
+    background: #333333 !important;
+    color: #FFFFFF !important;
 }
 
-.prog-bar {
-    width: 100%;
-    height: 8px;
-    background: #E0E0E0;
-    border-radius: 4px;
-    overflow: hidden;
+.call-btn.accept:hover {
+    background: #444444 !important;
 }
 
-.prog-fill {
-    height: 100%;
-    background: #000000;
-    border-radius: 4px;
+.call-btn i {
+    font-size: 14px !important;
 }
 
-.char-decor {
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    pointer-events: none;
+/* 角色选择器 */
+.character-selector {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: rgba(0, 0, 0, 0.5) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 9999 !important;
 }
 
-.char-decor .fa-star {
-    position: absolute;
-    color: #000000;
-    font-size: 0.9rem;
+.character-selector-content {
+    background: #FFFFFF !important;
+    border-radius: 24px !important;
+    padding: 24px !important;
+    width: 90% !important;
+    max-width: 400px !important;
+    max-height: 80% !important;
+    overflow-y: auto !important;
 }
 
-.char-decor .s1 {
-    top: 18%;
-    right: 14%;
+.character-selector h3 {
+    margin-top: 0 !important;
+    margin-bottom: 20px !important;
+    font-size: 1.2rem !important;
+    color: #333333 !important;
 }
 
-.char-decor .s2 {
-    top: 22%;
-    right: 9%;
+.character-selector-list {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
 }
 
-.char-decor .s3 {
-    bottom: 14%;
-    right: 7%;
+.character-selector-item {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    padding: 12px !important;
+    border-radius: 12px !important;
+    cursor: pointer !important;
+    transition: background-color 0.2s ease !important;
 }
 
-.heart-decor {
-    position: absolute;
-    bottom: 10%;
-    right: 18%;
-    font-size: 2.2rem;
-    color: #B0B0B0;
-    transform: rotate(-10deg);
+.character-selector-item:hover {
+    background: #F5F5F5 !important;
 }
 
-.heart-decor i {
-    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+.character-selector-item img {
+    width: 60px !important;
+    height: 60px !important;
+    border-radius: 12px !important;
+    object-fit: cover !important;
+}
+
+.character-selector-item-info {
+    flex: 1 !important;
+}
+
+.character-selector-item-name {
+    font-weight: 600 !important;
+    color: #333333 !important;
+    margin-bottom: 4px !important;
+}
+
+.character-selector-item-desc {
+    font-size: 0.9rem !important;
+    color: #666666 !important;
+}
+
+.character-selector-buttons {
+    margin-top: 24px !important;
+}
+
+.character-selector-buttons button {
+    width: 100% !important;
+    padding: 12px !important;
+    border: none !important;
+    border-radius: 12px !important;
+    font-size: 1rem !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    transition: background-color 0.2s ease !important;
+    background: #F5F5F5 !important;
+    color: #333333 !important;
+}
+
+.character-selector-buttons button:hover {
+    background: #E5E5E5 !important;
+}
+
+/* 天气时间小组件 */
+.weather-time-widget {
+    background: #000000 !important;
+    border-radius: 24px !important;
+    padding: 24px !important;
+    border: none !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+    color: #FFFFFF !important;
+    transition: transform 0.2s ease !important;
+}
+
+.weather-time-widget:hover {
+    transform: translateY(-2px) !important;
+}
+
+.weather-time-content {
+    width: 100% !important;
+    height: 100% !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    gap: 32px !important;
+}
+
+.weather-info {
+    flex: 1 !important;
+    position: relative !important;
+    padding-left: 24px !important;
+}
+
+.weather-info::before {
+    content: "" !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    height: 80% !important;
+    width: 1px !important;
+    background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.3), transparent) !important;
+}
+
+.location {
+    font-size: 1.3rem !important;
+    font-weight: 600 !important;
+    color: #FFFFFF !important;
+    margin-bottom: 6px !important;
+    font-family: 'Helvetica Neue', Arial, sans-serif !important;
+}
+
+.weather-source {
+    font-size: 0.85rem !important;
+    color: #999999 !important;
+    margin-bottom: 16px !important;
+    font-family: 'Helvetica Neue', Arial, sans-serif !important;
+}
+
+.temperature {
+    font-size: 1.1rem !important;
+    color: #FFFFFF !important;
+    font-family: 'Helvetica Neue', Arial, sans-serif !important;
+    font-weight: 500 !important;
+}
+
+.time-info {
+    flex: 2 !important;
+    text-align: right !important;
+}
+
+.date {
+    font-size: 0.95rem !important;
+    color: #999999 !important;
+    margin-bottom: 12px !important;
+    font-family: 'Helvetica Neue', Arial, sans-serif !important;
+    letter-spacing: 0.5px !important;
+}
+
+.time {
+    font-size: 2.8rem !important;
+    font-weight: 300 !important;
+    color: #FFFFFF !important;
+    margin-bottom: 16px !important;
+    font-family: 'Helvetica Neue', Arial, sans-serif !important;
+    letter-spacing: 1px !important;
+}
+
+.weekday {
+    display: flex !important;
+    justify-content: flex-end !important;
+    gap: 12px !important;
+}
+
+.weekday-item {
+    font-size: 0.9rem !important;
+    color: #999999 !important;
+    padding: 6px 12px !important;
+    border-radius: 16px !important;
+    font-family: 'Helvetica Neue', Arial, sans-serif !important;
+    transition: all 0.2s ease !important;
+}
+
+.weekday-item:hover {
+    color: #FFFFFF !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+}
+
+.weekday-item.active {
+    color: #FFFFFF !important;
+    background: rgba(255, 255, 255, 0.15) !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+    font-weight: 500 !important;
+}
+
+/* 通话小组件编辑对话框 */
+.call-widget-editor {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: rgba(0, 0, 0, 0.5) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 9999 !important;
+}
+
+.call-widget-editor-content {
+    background: #FFFFFF !important;
+    border-radius: 24px !important;
+    padding: 24px !important;
+    width: 90% !important;
+    max-width: 400px !important;
+}
+
+.call-widget-editor h3 {
+    margin-top: 0 !important;
+    margin-bottom: 20px !important;
+    font-size: 1.2rem !important;
+    color: #333333 !important;
+}
+
+.call-widget-edit-input {
+    width: 100% !important;
+    padding: 12px !important;
+    border: 1px solid #E0E0E0 !important;
+    border-radius: 12px !important;
+    font-size: 1rem !important;
+    margin-bottom: 20px !important;
+    outline: none !important;
+    box-sizing: border-box !important;
+}
+
+.call-widget-edit-input:focus {
+    border-color: #333333 !important;
+}
+
+.call-widget-editor-buttons {
+    display: flex !important;
+    gap: 12px !important;
+}
+
+.call-widget-editor-buttons button {
+    flex: 1 !important;
+    padding: 12px !important;
+    border: none !important;
+    border-radius: 12px !important;
+    font-size: 1rem !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    transition: background-color 0.2s ease !important;
+}
+
+.call-widget-editor-buttons button:first-child {
+    background: #F5F5F5 !important;
+    color: #333333 !important;
+}
+
+.call-widget-editor-buttons button:first-child:hover {
+    background: #E5E5E5 !important;
+}
+
+.call-widget-editor-buttons button:last-child {
+    background: #333333 !important;
+    color: #FFFFFF !important;
+}
+
+.call-widget-editor-buttons button:last-child:hover {
+    background: #222222 !important;
 }
 
 .spotify-widget {

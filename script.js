@@ -69,80 +69,14 @@ export function setupApp() {
         input.click();
     };
     
-    // 习惯追踪小组件
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const habitMonth = ref(monthNames[new Date().getMonth()]);
-    
-    const initHabitDots = () => {
-        const saved = localStorage.getItem('habitDots');
-        if (saved) {
-            try {
-                return JSON.parse(saved);
-            } catch (e) {
-                console.error('Failed to load habit dots', e);
-            }
-        }
-        const dots = [];
-        for (let i = 0; i < 7; i++) {
-            const row = [];
-            for (let j = 0; j < 5; j++) {
-                row.push(null);
-            }
-            dots.push(row);
-        }
-        return dots;
-    };
-    
-    const habitDots = ref(initHabitDots());
-    
-    const habitGoal = ref(localStorage.getItem('habitGoal') || '');
-    
-    const habitPercent = computed(() => {
-        let total = 0;
-        let completed = 0;
-        habitDots.value.forEach(row => {
-            row.forEach(dot => {
-                if (dot !== null) {
-                    total++;
-                    if (dot === 'blue' || dot === 'green') {
-                        completed++;
-                    }
-                }
-            });
-        });
-        if (total === 0) return 0;
-        return Math.round((completed / total) * 100);
-    });
-    
-    const getDotClass = (dot) => {
-        if (dot === 'red') return 'red';
-        if (dot === 'blue') return 'blue';
-        if (dot === 'green') return 'green';
-        return '';
-    };
-    
-    const toggleHabitDot = (row, col) => {
-        const current = habitDots.value[row][col];
-        if (current === null) {
-            habitDots.value[row][col] = 'red';
-        } else if (current === 'red') {
-            habitDots.value[row][col] = 'blue';
-        } else if (current === 'blue') {
-            habitDots.value[row][col] = 'green';
-        } else {
-            habitDots.value[row][col] = null;
-        }
-        localStorage.setItem('habitDots', JSON.stringify(habitDots.value));
-    };
-    
-    const saveHabitGoal = () => {
-        localStorage.setItem('habitGoal', habitGoal.value);
-    };
+
     
     // 照片小组件文字编辑对话框
     const showPhotoWidgetEditDialog = ref(false);
     const photoWidgetEditText1 = ref('');
     const photoWidgetEditText2 = ref('');
+    
+
     
     // 更新照片小组件日期
     const updatePhotoWidgetDate = () => {
@@ -510,19 +444,10 @@ onMounted(() => {
         // 绑定触摸事件 - 只有滑动才能换页，点击不换页
         let hasMoved = false;
         
-        const isHabitInput = (element) => {
-            let el = element;
-            while (el) {
-                if (el.classList && el.classList.contains('habit-goal-input')) {
-                    return true;
-                }
-                el = el.parentElement;
-            }
-            return false;
-        };
-        
         homePagesElement.addEventListener('touchstart', (e) => {
-            if (isHabitInput(e.target)) {
+            // 检查是否点击了对话输入框或聊天气泡
+            const target = e.touches[0].target;
+            if (target.classList && (target.classList.contains('chat-message-input') || target.classList.contains('chat-bubble') || target.classList.contains('chat-message'))) {
                 return;
             }
             console.log('触摸开始:', e.touches[0].clientX);
@@ -532,7 +457,9 @@ onMounted(() => {
         }, { passive: true });
         
         homePagesElement.addEventListener('touchmove', (e) => {
-            if (isHabitInput(e.target)) {
+            // 检查是否在对话输入框或聊天气泡上移动
+            const target = e.touches[0].target;
+            if (target.classList && (target.classList.contains('chat-message-input') || target.classList.contains('chat-bubble') || target.classList.contains('chat-message'))) {
                 return;
             }
             touchEndX = e.touches[0].clientX;
@@ -547,7 +474,9 @@ onMounted(() => {
         }, { passive: false });
         
         homePagesElement.addEventListener('touchend', (e) => {
-            if (isHabitInput(e.target)) {
+            // 检查是否在对话输入框或聊天气泡上释放
+            const target = e.changedTouches[0].target;
+            if (target.classList && (target.classList.contains('chat-message-input') || target.classList.contains('chat-bubble') || target.classList.contains('chat-message'))) {
                 return;
             }
             console.log('触摸结束 - 开始:', touchStartX, '结束:', touchEndX, '是否移动:', hasMoved);
@@ -591,7 +520,8 @@ onMounted(() => {
         let mouseHasMoved = false;
         
         homePagesElement.addEventListener('mousedown', (e) => {
-            if (isHabitInput(e.target)) {
+            // 检查是否点击了对话输入框或聊天气泡
+            if (e.target.classList && (e.target.classList.contains('chat-message-input') || e.target.classList.contains('chat-bubble') || e.target.classList.contains('chat-message'))) {
                 return;
             }
             console.log('鼠标按下:', e.clientX);
@@ -604,7 +534,8 @@ onMounted(() => {
         
         homePagesElement.addEventListener('mousemove', (e) => {
             if (!isDragging) return;
-            if (isHabitInput(e.target)) {
+            // 检查是否在对话输入框或聊天气泡上移动
+            if (e.target.classList && (e.target.classList.contains('chat-message-input') || e.target.classList.contains('chat-bubble') || e.target.classList.contains('chat-message'))) {
                 return;
             }
             mouseEndX = e.clientX;
@@ -614,7 +545,8 @@ onMounted(() => {
         });
         
         homePagesElement.addEventListener('mouseup', (e) => {
-            if (isHabitInput(e.target)) {
+            // 检查是否在对话输入框或聊天气泡上释放
+            if (e.target.classList && (e.target.classList.contains('chat-message-input') || e.target.classList.contains('chat-bubble') || e.target.classList.contains('chat-message'))) {
                 return;
             }
             console.log('鼠标释放:', mouseStartX, mouseEndX, '是否移动:', mouseHasMoved);
@@ -2747,7 +2679,7 @@ const saveFont = () => {
         const soulLinkReplyTarget = ref(null);
         const soulLinkMessages = ref({});
         
-        // 角色信息小组件
+        // 角色信息相关
         const showCharacterSelector = ref(false);
         const selectedCharacterId = ref(localStorage.getItem('selectedCharacterId') || null);
         const selectedCharacter = computed(() => {
@@ -2764,6 +2696,53 @@ const saveFont = () => {
                 affection: typeof targetChar.affection === 'number' ? targetChar.affection : 0
             };
         });
+        
+        // 通话小组件自定义文字
+        const callWidgetSubtitle = ref(localStorage.getItem('callWidgetSubtitle') || '点击更换角色');
+        const showCallWidgetEdit = ref(false);
+        const callWidgetEditInput = ref('');
+        
+        // 天气时间小组件
+        const currentDate = ref('');
+        const currentTime = ref('');
+        const weekdays = ref(['日', '一', '二', '三', '四', '五', '六']);
+        const currentWeekday = ref(0);
+        
+        // 更新时间和日期
+        const updateDateTime = () => {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            
+            currentDate.value = `${year}.${month}.${day}`;
+            currentTime.value = `${hours}:${minutes}`;
+            currentWeekday.value = now.getDay();
+        };
+        
+        // 初始化并每分钟更新一次
+        updateDateTime();
+        setInterval(updateDateTime, 60000);
+        
+        // 打开通话小组件编辑
+        const editCallWidgetSubtitle = () => {
+            callWidgetEditInput.value = callWidgetSubtitle.value;
+            showCallWidgetEdit.value = true;
+        };
+        
+        // 保存通话小组件自定义文字
+        const saveCallWidgetSubtitle = () => {
+            callWidgetSubtitle.value = callWidgetEditInput.value;
+            localStorage.setItem('callWidgetSubtitle', callWidgetEditInput.value);
+            showCallWidgetEdit.value = false;
+        };
+        
+        // 关闭通话小组件编辑
+        const closeCallWidgetEdit = () => {
+            showCallWidgetEdit.value = false;
+        };
         
         // 选择角色
         const selectCharacter = (char) => {
@@ -2783,45 +2762,7 @@ const saveFont = () => {
             
             showCharacterSelector.value = false;
         };
-        
-        // 格式化绑定时间
-        const formatBindTime = (bindTime) => {
-            if (!bindTime) {
-                const now = new Date();
-                const year = now.getFullYear();
-                const month = String(now.getMonth() + 1).padStart(2, '0');
-                const day = String(now.getDate()).padStart(2, '0');
-                const hour = String(now.getHours()).padStart(2, '0');
-                const minute = String(now.getMinutes()).padStart(2, '0');
-                return `${year}/${month}/${day} ${hour}:${minute}`;
-            }
-            const date = new Date(bindTime);
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            const hour = String(date.getHours()).padStart(2, '0');
-            const minute = String(date.getMinutes()).padStart(2, '0');
-            return `${year}/${month}/${day} ${hour}:${minute}`;
-        };
-        
-        // 获取最后一条聊天消息
-        const getLastChatMessage = (char) => {
-            if (!char || !char.id) return '暂无聊天记录';
-            try {
-                const messages = soulLinkMessages.value[char.id];
-                if (messages && Array.isArray(messages) && messages.length > 0) {
-                    const lastMsg = messages[messages.length - 1];
-                    if (lastMsg && lastMsg.text) {
-                        const content = lastMsg.text.substring(0, 7);
-                        return content.length < lastMsg.text.length ? content + '...' : content;
-                    }
-                }
-            } catch (e) {
-                console.error('获取聊天记录失败', e);
-            }
-            return '暂无聊天记录';
-        };
-        
+
         const novelMode = ref(localStorage.getItem('soulos_novel_mode') === 'true');
         const chatOfflineModes = ref({});
         
@@ -7844,10 +7785,12 @@ const saveFont = () => {
             photoWidgetDate, photoWidgetText, photoWidgetPhotos, changePhotoWidgetImage, editPhotoWidgetText,
             // sticker widget
             stickerWidgetUrl, changeStickerWidgetImage,
-            // habit widget
-            habitMonth, habitDots, habitGoal, habitPercent, getDotClass, toggleHabitDot, saveHabitGoal,
-            // character widget
-            showCharacterSelector, selectedCharacter, selectCharacter, formatBindTime, getLastChatMessage,
+            // character related
+            showCharacterSelector, selectedCharacter, selectCharacter,
+            // call widget
+            callWidgetSubtitle, showCallWidgetEdit, callWidgetEditInput, editCallWidgetSubtitle, saveCallWidgetSubtitle, closeCallWidgetEdit,
+            currentDate, currentTime, weekdays, currentWeekday,
+
             // photo widget edit dialog
             showPhotoWidgetEditDialog, photoWidgetEditText1, photoWidgetEditText2, closePhotoWidgetEditDialog, savePhotoWidgetText,
             // lock screen touch events
@@ -7878,6 +7821,8 @@ const saveFont = () => {
             isLockScreenVisible: ref(true),
             currentTime: ref(''),
             currentDate: ref(''),
+            weekdays: ref(['日', '一', '二', '三', '四', '五', '六']),
+            currentWeekday: ref(0),
             isHomeScreenVisible: ref(false),
             openedApp: ref(null),
             showGreetingSelect: ref(false),

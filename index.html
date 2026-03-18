@@ -177,148 +177,126 @@
                     </div>
                 </div>
                 
-                <!-- 第二页 -->
-                <div class="home-page" :class="{ 'active': currentPage === 1 }">
-                    <div class="app-grid">
-                        <!-- 第一行 - 音乐播放器组件占据整行 -->
-                        <div class="app-widget widget-4x2 music-widget" @click="openApp('music')">
-                            <div class="spotify-widget">
-                                <!-- 顶部LED点阵显示 -->
-                                <div class="led-display">
-                                    <span class="led-text">MUSIC</span>
-                                    <span class="led-icon">▶</span>
-                                    <span class="led-text">RAP-2004</span>
+                <!-- 第二页 - 6行×4格网格布局 -->
+                <div class="home-page page-2-grid" :class="{ 'active': currentPage === 1 }">
+                    <div class="app-grid grid-6x4">
+                        <!-- 第1行 - 通话小组件 (1行×4格) -->
+                        <div class="app-widget grid-row-1 call-widget">
+                            <div class="call-widget-content">
+                                <div class="call-avatar">
+                                    <img :src="selectedCharacter.avatarUrl || 'https://img.heliar.top/file/1773774569024_retouch_2026031803084004.png'" alt="Character Avatar">
                                 </div>
-                                <!-- 主要内容区域 -->
-                                <div class="music-content">
-                                    <!-- 左侧黑胶唱片 -->
-                                    <div class="vinyl-record">
-                                        <div class="vinyl-disc">
-                                            <div class="vinyl-center"></div>
-                                            <div class="vinyl-reflections">
-                                                <div class="vinyl-reflection r1"></div>
-                                                <div class="vinyl-reflection r2"></div>
-                                                <div class="vinyl-reflection r3"></div>
-                                                <div class="vinyl-reflection r4"></div>
-                                            </div>
-                                        </div>
+                                <div class="call-info">
+                                    <div class="call-title" @click="showCharacterSelector = true">{{ selectedCharacter.nickname || selectedCharacter.name || '未命名角色' }}</div>
+                                    <div class="call-subtitle" @click="editCallWidgetSubtitle">
+                                        <span v-if="!showCallWidgetEdit">{{ callWidgetSubtitle }}</span>
                                     </div>
-                                    <!-- 右侧信息区域 -->
-                                    <div class="music-info-panel">
-                                        <div class="music-info-header">
-                                            <div class="album-cover">
-                                                <img src="https://placehold.co/100x100/333/fff?text=Album" alt="Album Cover">
-                                            </div>
-                                            <div class="track-info">
-                                                <div class="track-title">Purple Hearts</div>
-                                                <div class="track-artist">Kendrick Lamar, Summer Walk...</div>
-                                            </div>
-                                        </div>
-                                        <div class="progress-section">
-                                            <div class="progress-bar-container">
-                                                <div class="progress-bar">
-                                                    <div class="progress-fill" style="width: 70%;"></div>
-                                                </div>
-                                            </div>
-                                            <div class="time-section">
-                                                <span class="current-time">04:38</span>
-                                                <span class="total-time">05:29</span>
-                                            </div>
-                                        </div>
-                                    </div>
+                                </div>
+                                <div class="call-buttons">
+                                    <button class="call-btn decline">
+                                        <i class="fa fa-phone-slash"></i>
+                                    </button>
+                                    <button class="call-btn accept">
+                                        <i class="fa fa-phone"></i>
+                                    </button>
                                 </div>
                             </div>
                         </div>
-                        
-                        <!-- 习惯追踪小组件 -->
-                        <div class="app-widget widget-2x2 habit-widget">
-                            <div class="habit-widget-content">
-                                <div class="habit-header">
-                                    <span class="habit-title">{{ habitMonth }}</span>
-                                    <span class="habit-percent">{{ habitPercent }}%</span>
-                                </div>
-                                <div class="habit-dots">
-                                    <div v-for="(row, rowIndex) in habitDots" :key="rowIndex" class="dot-row">
-                                        <div 
-                                            v-for="(dot, colIndex) in row" 
-                                            :key="colIndex"
-                                            class="dot"
-                                            :class="getDotClass(dot)"
-                                            @click="toggleHabitDot(rowIndex, colIndex)"
-                                        ></div>
-                                    </div>
-                                </div>
-                                <div class="habit-footer">
-                                    <input 
-                                        type="text" 
-                                        class="habit-goal-input"
-                                        v-model="habitGoal"
-                                        placeholder="设置目标..."
-                                        @blur="saveHabitGoal"
-                                    >
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- 第二行 - Mate、Peek、Feed、Nest -->
-                        <div class="app-icon" @click="openApp('mate')">
+
+                        <!-- 第2行 - 4个app (每行4格，每个app占1格) -->
+                        <div class="app-icon grid-row-2" @click="openApp('mate')">
                             <div class="app-icon-wrapper">
                                 <i class="fa fa-user app-icon-font"></i>
                             </div>
                             <div class="app-label">Mate</div>
                         </div>
-                        <div class="app-icon" @click="openApp('peek')">
+                        <div class="app-icon grid-row-2" @click="openApp('peek')">
                             <div class="app-icon-wrapper">
                                 <i class="fa fa-eye app-icon-font"></i>
                             </div>
                             <div class="app-label">Peek</div>
                         </div>
-                        <div class="app-icon" @click="openApp('feed')">
+                        <div class="app-icon grid-row-2" @click="openApp('feed')">
                             <div class="app-icon-wrapper">
                                 <i class="fa fa-list app-icon-font"></i>
                             </div>
                             <div class="app-label">Feed</div>
                         </div>
-                        <div class="app-icon" @click="openApp('nest')">
+                        <div class="app-icon grid-row-2" @click="openApp('nest')">
                             <div class="app-icon-wrapper">
                                 <i class="fa fa-home app-icon-font"></i>
                             </div>
                             <div class="app-label">Nest</div>
                         </div>
-                        
-                        <!-- 角色信息小组件 -->
-                        <div class="app-widget widget-4x2 character-widget">
-                            <div class="character-left">
-                                <img :src="selectedCharacter.avatarUrl || 'https://placehold.co/150x150/333/fff?text=Character'" alt="Character" class="character-img">
-                            </div>
-                            <div class="character-right">
-                                <div class="char-name" @click="showCharacterSelector = true">{{ selectedCharacter.nickname || selectedCharacter.name || '未命名角色' }}</div>
-                                
-                                <div class="char-row-1">
-                                    <div class="char-card">
-                                        <i class="fa fa-heart"></i>
-                                        <span>{{ formatBindTime(selectedCharacter.bindTime) }}</span>
-                                    </div>
+
+                        <!-- 第3-4行 - 天气时间小组件 (2行×4格) -->
+                        <div class="app-widget grid-row-3-4 weather-time-widget">
+                            <div class="weather-time-content">
+                                <div class="weather-info">
+                                    <div class="location">金海市</div>
+                                    <div class="weather-source">气象局</div>
+                                    <div class="temperature">24°C 多云</div>
                                 </div>
-                                
-                                <div class="char-progress">
-                                    <div class="prog-top">
-                                        <i class="fa fa-heart"></i>
-                                        <span>{{ selectedCharacter.affection || 0 }}%</span>
-                                    </div>
-                                    <div class="prog-text">{{ getLastChatMessage(selectedCharacter) }}</div>
-                                    <div class="prog-bar">
-                                        <div class="prog-fill" :style="{ width: (selectedCharacter.affection || 0) + '%' }"></div>
+                                <div class="time-info">
+                                    <div class="date">{{ currentDate }}</div>
+                                    <div class="time">{{ currentTime }}</div>
+                                    <div class="weekday">
+                                        <span 
+                                            v-for="(day, index) in weekdays" 
+                                            :key="index"
+                                            class="weekday-item"
+                                            :class="{ active: index === currentWeekday }"
+                                        >{{ day }}</span>
                                     </div>
                                 </div>
                             </div>
-                            
-                            <div class="char-decor">
-                                <i class="fa fa-star s1"></i>
-                                <i class="fa fa-star s2"></i>
-                                <i class="fa fa-star s3"></i>
-                                <div class="heart-decor">
-                                    <i class="fa fa-heart"></i>
+                        </div>
+
+                        <!-- 第5-6行 - 音乐播放器组件 (2行×4格) -->
+                        <div class="app-widget grid-row-5-6 music-widget" @click="openApp('music')">
+                            <div class="spotify-widget">
+                            <!-- 顶部LED点阵显示 -->
+                            <div class="led-display">
+                                <span class="led-text">MUSIC</span>
+                                <span class="led-icon">▶</span>
+                                <span class="led-text">RAP-2004</span>
+                            </div>
+                            <!-- 主要内容区域 -->
+                            <div class="music-content">
+                                <!-- 左侧黑胶唱片 -->
+                                <div class="vinyl-record">
+                                    <div class="vinyl-disc">
+                                        <div class="vinyl-center"></div>
+                                        <div class="vinyl-reflections">
+                                            <div class="vinyl-reflection r1"></div>
+                                            <div class="vinyl-reflection r2"></div>
+                                            <div class="vinyl-reflection r3"></div>
+                                            <div class="vinyl-reflection r4"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- 右侧信息区域 -->
+                                <div class="music-info-panel">
+                                    <div class="music-info-header">
+                                        <div class="album-cover">
+                                            <img src="https://placehold.co/100x100/333/fff?text=Album" alt="Album Cover">
+                                        </div>
+                                        <div class="track-info">
+                                            <div class="track-title">Purple Hearts</div>
+                                            <div class="track-artist">Kendrick Lamar, Summer Walk...</div>
+                                        </div>
+                                    </div>
+                                    <div class="progress-section">
+                                        <div class="progress-bar-container">
+                                            <div class="progress-bar">
+                                                <div class="progress-fill" style="width: 70%;"></div>
+                                            </div>
+                                        </div>
+                                        <div class="time-section">
+                                            <span class="current-time">04:38</span>
+                                            <span class="total-time">05:29</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -3960,6 +3938,47 @@
                             <i v-if="selectedCharacter.id === char.id" class="fas fa-check" style="color: #000; font-size: 18px;"></i>
                         </div>
                     </div>
+                </div>
+            </div>
+        
+        <!-- 角色选择器 -->
+        <div class="character-selector" v-if="showCharacterSelector">
+            <div class="character-selector-content">
+                <h3>选择角色</h3>
+                <div class="character-selector-list">
+                    <div 
+                        v-for="char in characters" 
+                        :key="char.id"
+                        class="character-selector-item"
+                        @click="selectCharacter(char)"
+                    >
+                        <img :src="char.avatarUrl || 'https://placehold.co/150x150/333/fff?text=Character'" alt="Character">
+                        <div class="character-selector-item-info">
+                            <div class="character-selector-item-name">{{ char.nickname || char.name || '未命名角色' }}</div>
+                            <div class="character-selector-item-desc">{{ char.description || '无描述' }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="character-selector-buttons">
+                    <button @click="showCharacterSelector = false">取消</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 通话小组件编辑对话框 -->
+        <div class="call-widget-editor" v-if="showCallWidgetEdit">
+            <div class="call-widget-editor-content">
+                <h3>编辑通话小组件文字</h3>
+                <input 
+                    type="text" 
+                    v-model="callWidgetEditInput" 
+                    class="call-widget-edit-input"
+                    placeholder="请输入自定义文字"
+                    autofocus
+                >
+                <div class="call-widget-editor-buttons">
+                    <button @click="closeCallWidgetEdit">取消</button>
+                    <button @click="saveCallWidgetSubtitle">保存</button>
                 </div>
             </div>
         </div>
