@@ -536,10 +536,15 @@ onMounted(() => {
                 return;
             }
             touchEndX = e.touches[0].clientX;
-            if (Math.abs(touchEndX - touchStartX) > 5) {
+            const diffX = touchEndX - touchStartX;
+            if (Math.abs(diffX) > 5) {
                 hasMoved = true;
+                // 水平滑动时阻止默认行为，防止页面滚动
+                if (e.cancelable) {
+                    e.preventDefault();
+                }
             }
-        }, { passive: true });
+        }, { passive: false });
         
         homePagesElement.addEventListener('touchend', (e) => {
             if (isHabitInput(e.target)) {

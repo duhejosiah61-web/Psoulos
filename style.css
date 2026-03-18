@@ -1059,7 +1059,7 @@ body {
     overflow: visible;
     transition: transform 0.3s ease;
     box-sizing: border-box;
-    touch-action: pan-y;
+    touch-action: none;
     -webkit-overflow-scrolling: touch;
     -ms-overflow-style: none;
     scrollbar-width: none;
