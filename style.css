@@ -1114,7 +1114,7 @@ body {
     gap: 1%;
     padding: 5%;
     width: 100%;
-    height: 100%;
+    height: calc(100% - var(--home-bottom-gap));
     min-width: 0;
     box-sizing: border-box;
 }
@@ -1444,6 +1444,20 @@ body {
     box-shadow: 0 12px 35px rgba(0,0,0,0.3);
 }
 
+/* 视觉遮罩：把“上半圆”用与背景同色的正方形遮住 */
+.record-disk::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 50%;
+    /* 与主屏白底接近：让遮罩看起来像“背景盖住” */
+    background: #fdfdfb;
+    z-index: 5;
+    pointer-events: none;
+}
+
 /* 模拟黑胶纹理与光泽 */
 .vinyl-texture {
     position: absolute;
@@ -1529,6 +1543,89 @@ body {
     font-size: 17px;
     margin: 4px 0 0;
     color: var(--sub-color);
+}
+
+/* ==========================================================
+   第二页（grid-row-3-4）音乐播放器：自适应网格单元大小
+   解决：在极端比例/缩放下固定 px 尺寸导致播放器“过大溢出”
+   ========================================================== */
+.grid-row-3-4 .player-container {
+    height: 100%;
+    justify-content: flex-start;
+    gap: 0;
+    padding: 0;
+}
+
+.grid-row-3-4 .record-slot {
+    /* 让唱片区域跟随单元高度，而不是固定 155px */
+    height: 58%;
+}
+
+.grid-row-3-4 .record-disk {
+    /* 半个唱片：让唱片直径等于槽高度，然后上移半径被裁剪 */
+    width: 100%;
+    height: 100%;
+    top: -50%;
+    box-shadow: 0 10px 24px rgba(0,0,0,0.18);
+    background: rgba(10, 10, 10, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+}
+
+.grid-row-3-4 .record-cover {
+    width: 54%;
+    height: 54%;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.grid-row-3-4 .record-disk::after {
+    /* 移除之前用同色遮罩盖掉上半部分的方案 */
+    display: none;
+}
+
+.grid-row-3-4 .vinyl-texture {
+    opacity: 0.35;
+}
+
+.grid-row-3-4 .record-cover img {
+    opacity: 0.55;
+    filter: saturate(0.7) contrast(1.05);
+}
+
+.grid-row-3-4 .player-footer {
+    margin-top: 10px;
+    padding: 0 6px;
+}
+
+.grid-row-3-4 .controls {
+    gap: 16px;
+}
+
+.grid-row-3-4 .icon-btn {
+    width: 18px;
+    height: 18px;
+}
+
+.grid-row-3-4 .play-pause {
+    width: 20px;
+    height: 20px;
+}
+
+.grid-row-3-4 .heart {
+    width: 16px;
+    height: 16px;
+    margin-left: 4px;
+}
+
+.grid-row-3-4 .song-name {
+    font-size: 20px;
+    letter-spacing: -0.3px;
+}
+
+.grid-row-3-4 .artist {
+    font-size: 11px;
+    margin-top: 3px;
 }
 
 /* 旋转动画 */
@@ -20091,7 +20188,8 @@ label {
     left: 50%;
     top: auto;
     bottom: 0;
-    /* 底部 UI 由 flex 流占位，不再需要减高度预留 */
+    /* 预留底部 UI（翻页器 + Dock）高度，避免遮住第5-6行 */
+    --home-bottom-gap: clamp(120px, 18vh, 190px);
     --phone-scale: min(calc(100vw / 430px), calc(100vh / 930px));
     transform: translateX(-50%) scale(var(--phone-scale));
     transform-origin: center bottom;
@@ -20130,10 +20228,10 @@ label {
 
 /* 页面指示器：固定在舞台内靠近底部，但不压到第5-6行 */
 .page-indicator-container {
-    position: relative !important;
-    left: auto !important;
-    bottom: auto !important;
-    transform: none !important;
+    position: absolute !important;
+    left: 50% !important;
+    bottom: 110px !important;
+    transform: translateX(-50%) !important;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -20146,10 +20244,10 @@ label {
 
 /* Dock：贴住舞台最底部中间 */
 .dock {
-    position: relative !important;
-    left: auto !important;
-    bottom: auto !important;
-    transform: none !important;
+    position: absolute !important;
+    left: 50% !important;
+    bottom: 20px !important;
+    transform: translateX(-50%) !important;
     width: auto;
     min-width: 320px;
     max-width: calc(100% - 32px);
@@ -20165,7 +20263,7 @@ label {
 
 /* Hover 时不要再套用旧版 fixed 布局的 translateX(-50%) */
 .dock:hover {
-    transform: translateY(-4px) !important;
+    transform: translateX(-50%) translateY(-4px) !important;
 }
 
 /* 第一页底部：左侧贴纸 右侧应用（严格 50/50） */
