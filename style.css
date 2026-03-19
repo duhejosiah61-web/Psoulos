@@ -1141,13 +1141,51 @@ body {
 .grid-row-5-6 {
     grid-column: 1 / 5;
     grid-row: 5 / 7;
+    /* 给底部贴纸+app 留出“呼吸感”，避免贴得太紧 */
+    --home-bottom-breath: clamp(10px, 1.6vh, 18px);
+    padding-top: var(--home-bottom-breath);
+    box-sizing: border-box;
+}
+
+/* 保证底部内容不被 padding 顶挤出格子：高度随内边距同步缩小 */
+.grid-row-5-6 .first-page-bottom-content {
+    height: calc(100% - var(--home-bottom-breath));
+    box-sizing: border-box;
+}
+
+/* 第二页第5-6行：避免 absolute 破坏网格高度自适应 */
+.page-2-grid .grid-row-5-6 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: stretch;
+    justify-items: stretch;
+}
+
+.page-2-grid .app-grid-bottom-left {
+    position: static !important; /* 不再脱离文档流，随单元高度铺满 */
+    top: auto !important;
+    bottom: auto !important;
+    left: auto !important;
+    width: 100%;
+    height: 100%;
+}
+
+.page-2-grid .glass-capsules {
+    position: static !important; /* 不再脱离文档流，随单元高度铺满 */
+    top: auto !important;
+    bottom: auto !important;
+    right: auto !important;
+    width: 100%;
+    height: 100%;
+    justify-content: flex-end;
+    align-items: flex-end;
 }
 
 /* 第一页 - 第1-4行：照片小组件 */
 .grid-row-1-4 {
     grid-column: 1 / 5;
-    /* 期望：照片小组件占两行 */
-    grid-row: 1 / 3;
+    /* 第一页：照片小组件占 4 行，减少底部空白 */
+    grid-row: 1 / 5;
 }
 
 /* 第一页底部内容 */
@@ -1157,22 +1195,24 @@ body {
     align-items: center;
     height: 100%;
     padding: 0 10px;
+    /* 防止容器因内容高度不足出现大片留白 */
+    min-height: 0;
 }
 
 /* 第一页贴纸小组件 */
 .first-page-bottom-content .sticker-widget {
-    flex: 0 0 30%;
-    height: 80%;
+    flex: none;
+    height: 100%;
 }
 
 /* 第一页app图标 */
 .first-page-apps {
-    flex: 0 0 65%;
+    flex: none;
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     grid-template-rows: repeat(2, 1fr);
     gap: 16px;
-    height: 80%;
+    height: 100%;
 }
 
 /* 引入字体 */
@@ -20291,6 +20331,33 @@ label {
     grid-template-columns: repeat(2, 1fr);
     grid-template-rows: repeat(2, 1fr);
     gap: 16px;
+}
+
+/* 主页底部：让 app 图标随网格单元“高度”自适应（避免只按宽度出高） */
+.first-page-apps .app-icon {
+    height: 100%;
+    justify-content: flex-start; /* 不拉伸到非等比尺寸 */
+}
+
+.first-page-apps .app-icon-wrapper {
+    flex: none;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1 / 1; /* 强制正方形 */
+    margin-bottom: 0;
+}
+
+.page-2-grid .app-grid-bottom-left .app-icon {
+    height: 100%;
+    justify-content: flex-start;
+}
+
+.page-2-grid .app-grid-bottom-left .app-icon-wrapper {
+    flex: none;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1 / 1;
+    margin-bottom: 0;
 }
 
 /* 第二页底部：左侧应用 右侧胶囊（严格 50/50，高度铺满） */
