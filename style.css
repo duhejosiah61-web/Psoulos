@@ -1060,7 +1060,7 @@ body {
 /* 页面容器 */
 .home-pages {
     width: 100%;
-    flex: 6 0 0; /* 8行结构中的上6行 */
+    flex: 1 1 auto; /* 由容器剩余高度决定，底部 UI 不再重叠遮挡 */
     display: flex;
     overflow: visible;
     transition: transform 0.3s ease;
@@ -1114,8 +1114,7 @@ body {
     gap: 1%;
     padding: 5%;
     width: 100%;
-    /* 给第二页内容留足高度，避免被裁空 */
-    height: calc(100% - var(--home-bottom-gap));
+    height: 100%;
     min-width: 0;
     box-sizing: border-box;
 }
@@ -20092,8 +20091,7 @@ label {
     left: 50%;
     top: auto;
     bottom: 0;
-    /* 预留底部 UI（翻页器 + Dock）高度，避免遮住第5-6行 */
-    --home-bottom-gap: clamp(120px, 18vh, 190px);
+    /* 底部 UI 由 flex 流占位，不再需要减高度预留 */
     --phone-scale: min(calc(100vw / 430px), calc(100vh / 930px));
     transform: translateX(-50%) scale(var(--phone-scale));
     transform-origin: center bottom;
@@ -20132,10 +20130,10 @@ label {
 
 /* 页面指示器：固定在舞台内靠近底部，但不压到第5-6行 */
 .page-indicator-container {
-    position: absolute;
-    left: 50%;
-    bottom: 110px;
-    transform: translateX(-50%);
+    position: relative !important;
+    left: auto !important;
+    bottom: auto !important;
+    transform: none !important;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -20143,14 +20141,15 @@ label {
     z-index: 99;
     width: 100%;
     padding: 0;
+    flex: 0 0 auto;
 }
 
 /* Dock：贴住舞台最底部中间 */
 .dock {
-    position: absolute;
-    left: 50%;
-    bottom: 20px;
-    transform: translateX(-50%);
+    position: relative !important;
+    left: auto !important;
+    bottom: auto !important;
+    transform: none !important;
     width: auto;
     min-width: 320px;
     max-width: calc(100% - 32px);
@@ -20161,11 +20160,12 @@ label {
     align-items: center;
     gap: 24px;
     margin: 0;
+    flex: 0 0 auto;
 }
 
 /* Hover 时不要再套用旧版 fixed 布局的 translateX(-50%) */
 .dock:hover {
-    transform: translateX(-50%) translateY(-4px) !important;
+    transform: translateY(-4px) !important;
 }
 
 /* 第一页底部：左侧贴纸 右侧应用（严格 50/50） */
