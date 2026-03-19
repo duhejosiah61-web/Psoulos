@@ -1,14 +1,6 @@
 /* Reset & Base - 高端杂志风格 */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-body {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
-    background: #f0f0f0;
-}
-
 /* ==========================================================
    WIDGET CONTAINER - 集中布局管理系统
    ========================================================== */
@@ -33,10 +25,10 @@ body {
     --font-xxl: 24px;
 }
 
-/* 手机容器 */
+/* 手机容器（整屏沉浸：交给 body + homescreen 控制，这里不再额外限制） */
 #app {
-    width: 100vw;
-    min-height: 100vh;
+    width: 100%;
+    height: 100%;
     position: relative;
     margin: 0;
     padding: 0;
@@ -1032,6 +1024,20 @@ body {
     padding-bottom: env(safe-area-inset-bottom, 0);
 }
 
+/* 主屏幕内部“隐形手机宽度”，锁住图标和小组件的布局宽度 */
+.homescreen-inner {
+    width: 100%;
+    max-width: 430px; /* 模拟常见手机宽度 */
+    margin: 0 auto;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    position: relative; /* 让内部绝对定位元素以它为参照 */
+    /* 为上方6行网格预留出底部一行 Dock 的空间，让 6×4 区域不会被遮挡 */
+    padding-bottom: 160px;
+    box-sizing: border-box;
+}
+
 .homescreen .status-bar {
     flex-shrink: 0;
 }
@@ -1054,7 +1060,7 @@ body {
 /* 页面容器 */
 .home-pages {
     width: 100%;
-    flex: 1;
+    flex: 6 0 0; /* 8行结构中的上6行 */
     display: flex;
     overflow: visible;
     transition: transform 0.3s ease;
@@ -1094,18 +1100,445 @@ body {
     box-sizing: border-box;
 }
 
-/* 第二页 - 6行×4格网格布局 */
+/* 第二页容器 */
+.page-2-grid {
+    position: relative;
+    height: 100%;
+}
+
+/* 6行×4格网格布局 */
 .grid-6x4 {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     grid-template-rows: repeat(6, 1fr);
     gap: 1%;
-    padding: 1% 0;
+    padding: 5%;
     width: 100%;
-    height: 100%;
+    /* 底部保留给 翻页器 + Dock，避免覆盖导致乱飞/遮挡 */
+    height: calc(100% - 140px);
     min-width: 0;
     box-sizing: border-box;
 }
+
+/* 网格单元格 */
+.grid-cell {
+    border-radius: 8px;
+    position: relative;
+}
+
+/* 第1-2行：音乐组件 */
+.grid-row-1-2 {
+    grid-column: 1 / 5;
+    grid-row: 1 / 3;
+}
+
+/* 第3-4行：app和胶囊框 */
+.grid-row-3-4 {
+    grid-column: 1 / 5;
+    grid-row: 3 / 5;
+}
+
+/* 第5-6行：预留空间 */
+.grid-row-5-6 {
+    grid-column: 1 / 5;
+    grid-row: 5 / 7;
+}
+
+/* 第一页 - 第1-4行：照片小组件 */
+.grid-row-1-4 {
+    grid-column: 1 / 5;
+    grid-row: 1 / 5;
+}
+
+/* 第一页底部内容 */
+.first-page-bottom-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 100%;
+    padding: 0 10px;
+}
+
+/* 第一页贴纸小组件 */
+.first-page-bottom-content .sticker-widget {
+    flex: 0 0 30%;
+    height: 80%;
+}
+
+/* 第一页app图标 */
+.first-page-apps {
+    flex: 0 0 65%;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 16px;
+    height: 80%;
+}
+
+/* 引入字体 */
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,600&family=Inter:wght@400;600&display=swap');
+
+:root {
+  --panel-bg: #000000;
+  --text-white: #ffffff;
+  --text-dim: rgba(255, 255, 255, 0.7);
+}
+
+/* 灵动岛小组件 */
+.dashboard-container {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  align-items: center;
+  padding: 20px;
+  width: 100%;
+  height: 100%;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+/* 顶部行布局 */
+.top-row {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
+/* 小胶囊 */
+.pill-sm {
+  background: var(--panel-bg);
+  color: var(--text-white);
+  padding: 8px 20px;
+  border-radius: 50px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: "Microsoft YaHei", sans-serif;
+  font-size: 14px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.icon-week { 
+  width: 24px; 
+  height: 24px; 
+}
+
+/* 圆环进度条 */
+.progress-circle {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  /* 模拟图中约 75% 的进度 */
+  background: conic-gradient(white 0deg 270deg, #333 270deg 360deg);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.inner-dark {
+  width: 34px;
+  height: 34px;
+  background: var(--panel-bg);
+  border-radius: 50%;
+}
+
+/* 大胶囊 */
+.pill-lg {
+  background: var(--panel-bg);
+  color: var(--text-white);
+  width: 100%;
+  max-width: 400px;
+  padding: 12px 20px;
+  border-radius: 100px;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-sizing: border-box;
+}
+
+/* 左侧圆形图片 */
+.avatar-section {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  overflow: hidden;
+  margin-right: 15px;
+  border: 1px solid #333;
+  flex-shrink: 0;
+}
+
+.avatar-section img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 中间时间天气 */
+.time-weather {
+  flex-grow: 1;
+  min-width: 0;
+}
+
+.time-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.meridiem {
+  font-weight: bold;
+  font-size: 14px;
+  font-family: 'Inter', sans-serif;
+}
+
+.clock {
+  font-size: 18px;
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.weather-row {
+  font-size: 12px;
+  color: var(--text-white);
+  margin-top: 4px;
+  font-family: "Microsoft YaHei", sans-serif;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 右侧日期与口号 */
+.date-section {
+  text-align: right;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.slogan {
+  font-family: 'Playfair Display', serif;
+  font-size: 16px;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.date-str {
+  font-size: 12px;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 第二页 - 左下角2x2网格 */
+.app-grid-bottom-left {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 16px;
+    width: 50%;
+}
+
+/* 右侧胶囊框容器 */
+.glass-capsules {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-end;
+}
+
+/* 毛玻璃胶囊框 */
+.glass-capsule {
+    padding: 14px 28px;
+    border-radius: 50px;
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    max-width: 160px;
+}
+
+.glass-capsule:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+/* 黑色胶囊 */
+.glass-black {
+    background: rgba(0, 0, 0, 0.95);
+    margin-right: 40px;
+}
+
+/* 灰色胶囊 */
+.glass-gray {
+    background: rgba(68, 68, 68, 0.7);
+}
+
+/* 胶囊文字 */
+.capsule-text {
+    color: white;
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-align: center;
+}
+
+/* 引入高级衬线体 */
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;1,400&display=swap');
+
+:root {
+    --main-color: #ffffff;
+    --sub-color: #cccccc;
+}
+
+/* 音乐播放器 */
+.player-container {
+    position: relative;
+    width: 100%;
+    user-select: none;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 唱片槽与遮罩 */
+.record-slot {
+    width: 100%;
+    height: 155px;
+    position: relative;
+    overflow: hidden;
+    /* 顶部的切口细线 */
+    border-top: 1px solid rgba(255,255,255,0.05);
+}
+
+/* 唱片主体 */
+.record-disk {
+    width: 290px;
+    height: 290px;
+    background: #0a0a0a;
+    border-radius: 50%;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: 10px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 12px 35px rgba(0,0,0,0.3);
+}
+
+/* 模拟黑胶纹理与光泽 */
+.vinyl-texture {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: radial-gradient(circle, 
+        transparent 38%, 
+        rgba(255,255,255,0.03) 39%, 
+        transparent 40%,
+        rgba(255,255,255,0.03) 55%,
+        transparent 56%);
+    /* 增加拉丝金属感光泽 */
+    background-image: 
+        repeating-radial-gradient(circle, #111 0, #111 1px, #0a0a0a 2px, #0a0a0a 3px);
+    opacity: 0.8;
+}
+
+.record-cover {
+    width: 155px;
+    height: 155px;
+    border-radius: 50%;
+    overflow: hidden;
+    z-index: 2;
+    border: 1px solid #000;
+}
+
+.record-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* 底部布局 */
+.player-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-top: 25px;
+    padding: 0 5px;
+}
+
+.controls {
+    display: flex;
+    gap: 28px;
+    align-items: center;
+}
+
+.icon-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    width: 20px;
+    height: 20px;
+    fill: var(--main-color);
+    display: flex;
+    align-items: center;
+    transition: opacity 0.3s;
+}
+
+.icon-btn:hover { opacity: 0.5; }
+
+/* 调整各图标大小 */
+.play-pause { width: 24px; height: 24px; }
+.heart { width: 18px; height: 18px; margin-left: 5px; }
+
+/* 文本排版 */
+.info { text-align: right; }
+
+.song-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 32px;
+    font-weight: 400;
+    margin: 0;
+    color: var(--main-color);
+    letter-spacing: -0.5px;
+}
+
+.artist {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-size: 17px;
+    margin: 4px 0 0;
+    color: var(--sub-color);
+}
+
+/* 旋转动画 */
+@keyframes rotate {
+    from { transform: translateX(-50%) rotate(0deg); }
+    to { transform: translateX(-50%) rotate(360deg); }
+}
+
+.rotate { animation: rotate 20s linear infinite; }
+.paused { animation-play-state: paused; }
 
 /* 第1行 - 通话小组件 (1行×4格) */
 .grid-row-1 {
@@ -2812,8 +3245,8 @@ body {
 
 /* 页面指示器容器 */
 .page-indicator-container {
-    position: fixed;
-    bottom: 100px;
+    position: absolute; /* 固定在 homescreen-inner 内部，而不是整个浏览器 */
+    bottom: 110px;
     left: 50%;
     transform: translateX(-50%);
     display: flex;
@@ -3374,9 +3807,8 @@ body {
 
 /* 底部Dock */
 .dock {
-    position: fixed;
+    position: absolute; /* 绑定在 homescreen-inner 底部这一行 */
     bottom: 20px;
-    bottom: calc(20px + env(safe-area-inset-bottom));
     left: 50%;
     transform: translateX(-50%);
     display: flex;
@@ -19624,4 +20056,150 @@ label {
     -webkit-backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.3);
     border-radius: 50%;
+}
+
+/* ==========================================================
+   Home 布局稳定化（解决极端比例“乱飞”）
+   - 通过固定设计尺寸 + 等比缩放，保证网格坐标不随视口畸变
+   - Dock/页面指示器改为同一 flex 流布局，始终贴底
+   - 左/右底部区域用 2 列网格，避免百分比 flex 导致的比例漂移
+   ========================================================== */
+
+.homescreen {
+    height: 100vh;
+    width: 100%;
+    overflow: hidden;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    box-sizing: border-box;
+    position: relative;
+}
+
+.homescreen-inner {
+    width: 430px;
+    height: 930px;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    position: absolute;
+    left: 50%;
+    top: auto;
+    bottom: 0;
+    --phone-scale: min(calc(100vw / 430px), calc(100vh / 930px));
+    transform: translateX(-50%) scale(var(--phone-scale));
+    transform-origin: center bottom;
+    padding: 0;
+}
+
+.home-pages {
+    width: 100%;
+    flex: 1 1 auto;
+    display: flex;
+    overflow: hidden;
+    transition: transform 0.3s ease;
+    box-sizing: border-box;
+    touch-action: none;
+    -webkit-overflow-scrolling: touch;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.home-pages::-webkit-scrollbar {
+    display: none;
+}
+
+.home-page {
+    width: 100%;
+    min-width: 100%;
+    height: 100%;
+    min-height: 100%;
+    flex-shrink: 0;
+    overflow: auto;
+    padding: 4% 4%;
+    box-sizing: border-box;
+    scrollbar-width: thin;
+    scrollbar-color: #000000 #f5f5f5;
+}
+
+/* 页面指示器：固定在舞台内靠近底部，但不压到第5-6行 */
+.page-indicator-container {
+    position: absolute;
+    left: 50%;
+    bottom: 110px;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    z-index: 99;
+    width: 100%;
+    padding: 0;
+}
+
+/* Dock：贴住舞台最底部中间 */
+.dock {
+    position: absolute;
+    left: 50%;
+    bottom: 20px;
+    transform: translateX(-50%);
+    width: auto;
+    min-width: 320px;
+    max-width: calc(100% - 32px);
+    padding: 12px 18px; /* 缩小，避免撑破“1行”高度 */
+    z-index: 100;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    gap: 24px;
+    margin: 0;
+}
+
+/* Hover 时不要再套用旧版 fixed 布局的 translateX(-50%) */
+.dock:hover {
+    transform: translateX(-50%) translateY(-4px) !important;
+}
+
+/* 第一页底部：左侧贴纸 右侧应用（严格 50/50） */
+.first-page-bottom-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: stretch;
+    justify-content: stretch;
+    height: 100%;
+    padding: 0;
+    gap: 0;
+}
+
+.first-page-bottom-content .sticker-widget {
+    width: 100%;
+    height: 100%;
+    flex: none;
+}
+
+.first-page-apps {
+    width: 100%;
+    height: 100%;
+    flex: none;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 16px;
+}
+
+/* 第二页底部：左侧应用 右侧胶囊（严格 50/50，高度铺满） */
+.app-grid-bottom-left {
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 50%;
+}
+
+.glass-capsules {
+    top: 0;
+    bottom: 0;
+    right: 0;
+    width: 50%;
 }

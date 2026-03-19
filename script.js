@@ -45,6 +45,27 @@ export function setupApp() {
     // 贴纸小组件
     const stickerWidgetUrl = ref(localStorage.getItem('stickerWidgetUrl') || 'https://img.heliar.top/file/1773774569024_retouch_2026031803084004.png');
     
+    // 胶囊框文字
+    const capsuleTexts = ref({
+        black: localStorage.getItem('capsuleTextBlack') || '缘悭一面',
+        gray: localStorage.getItem('capsuleTextGray') || '须臾故人'
+    });
+    
+    // 胶囊框文字编辑对话框
+    const showCapsuleEditDialog = ref(false);
+    const currentCapsuleType = ref('');
+    const capsuleEditText = ref('');
+    
+    // 灵动岛文字
+    const dashboardTexts = ref({
+        weekday: localStorage.getItem('dashboardWeekday') || '星期一',
+        slogan: localStorage.getItem('dashboardSlogan') || '✨ with you ★.',
+        weather: localStorage.getItem('dashboardWeather') || '北京 4°C 晴'
+    });
+    const showDashboardEditDialog = ref(false);
+    const currentDashboardTextType = ref('');
+    const dashboardEditText = ref('');
+    
     // 更换贴纸小组件图片
     const changeStickerWidgetImage = () => {
         const input = document.createElement('input');
@@ -163,6 +184,52 @@ export function setupApp() {
         localStorage.setItem('photoWidgetText1', photoWidgetEditText1.value);
         localStorage.setItem('photoWidgetText2', photoWidgetEditText2.value);
         showPhotoWidgetEditDialog.value = false;
+    };
+    
+    // 编辑胶囊框文字 - 打开对话框
+    const editCapsuleText = (type) => {
+        currentCapsuleType.value = type;
+        capsuleEditText.value = capsuleTexts.value[type];
+        showCapsuleEditDialog.value = true;
+    };
+    
+    // 关闭胶囊框文字编辑对话框
+    const closeCapsuleEditDialog = () => {
+        showCapsuleEditDialog.value = false;
+        currentCapsuleType.value = '';
+        capsuleEditText.value = '';
+    };
+    
+    // 保存胶囊框文字
+    const saveCapsuleText = () => {
+        if (currentCapsuleType.value) {
+            capsuleTexts.value[currentCapsuleType.value] = capsuleEditText.value;
+            localStorage.setItem(`capsuleText${currentCapsuleType.value.charAt(0).toUpperCase() + currentCapsuleType.value.slice(1)}`, capsuleEditText.value);
+            showCapsuleEditDialog.value = false;
+        }
+    };
+    
+    // 编辑灵动岛文字
+    const editDashboardText = (type) => {
+        currentDashboardTextType.value = type;
+        dashboardEditText.value = dashboardTexts.value[type];
+        showDashboardEditDialog.value = true;
+    };
+    
+    // 关闭灵动岛文字编辑对话框
+    const closeDashboardEditDialog = () => {
+        showDashboardEditDialog.value = false;
+        currentDashboardTextType.value = '';
+        dashboardEditText.value = '';
+    };
+    
+    // 保存灵动岛文字
+    const saveDashboardText = () => {
+        if (currentDashboardTextType.value) {
+            dashboardTexts.value[currentDashboardTextType.value] = dashboardEditText.value;
+            localStorage.setItem(`dashboard${currentDashboardTextType.value.charAt(0).toUpperCase() + currentDashboardTextType.value.slice(1)}`, dashboardEditText.value);
+            showDashboardEditDialog.value = false;
+        }
     };
     
     // 切换锁屏开关
@@ -955,17 +1022,6 @@ const saveFont = () => {
         const isHomeScreenVisible = computed(() => !isLockScreenVisible.value && !openedApp.value);
         
         const isAiTyping = ref(false);
-        const themeMode = ref(localStorage.getItem('themeMode') || 'light');
-        const themeWallpaper = ref(localStorage.getItem('themeWallpaper') || 'var(--bg-primary)');
-        const customWallpaperInput = ref('');
-        const wallpaperPresets = ref([
-            '#f5f5f5',                         // 默认亮色背景
-            'linear-gradient(145deg, #667eea 0%, #764ba2 100%)',
-            'linear-gradient(145deg, #f093fb 0%, #f5576c 100%)',
-            'linear-gradient(145deg, #4facfe 0%, #00f2fe 100%)',
-            'url(https://images.unsplash.com/photo-1557683316-973673baf926?w=300)',
-            'url(https://images.unsplash.com/photo-1557682250-33bd709cbe85?w=300)'
-        ]);
         const randomHexCode = ref('0x00000000');
         const isPlaying = ref(false);
         
@@ -2127,7 +2183,6 @@ const saveFont = () => {
         onMounted(() => {
             loadWorldbooks();
             loadPresets();
-            applyTheme();
             
             // 直播间观众数字随机变化
             setInterval(() => {
@@ -2160,65 +2215,7 @@ const saveFont = () => {
             currentDate.value = now.toLocaleDateString('en-CA');
         };
 
-        const setThemeMode = (mode) => {
-            themeMode.value = mode;
-            localStorage.setItem('themeMode', mode);
-            applyTheme();
-        };
-        
-        const setWallpaper = (wallpaper) => {
-            themeWallpaper.value = wallpaper;
-            localStorage.setItem('themeWallpaper', wallpaper);
-            applyTheme();
-        };
-        
-        const applyCustomWallpaper = () => {
-            if (customWallpaperInput.value.trim()) {
-                themeWallpaper.value = customWallpaperInput.value.trim();
-                localStorage.setItem('themeWallpaper', themeWallpaper.value);
-                applyTheme();
-                customWallpaperInput.value = '';
-            }
-        };
-        
-        const applyTheme = () => {
-            const root = document.documentElement;
-            // 设置主题模式类
-            if (themeMode.value === 'dark') {
-                root.classList.add('theme-dark');
-            } else if (themeMode.value === 'light') {
-                root.classList.remove('theme-dark');
-            } else if (themeMode.value === 'system') {
-                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                if (prefersDark) {
-                    root.classList.add('theme-dark');
-                } else {
-                    root.classList.remove('theme-dark');
-                }
-            }
-        
-            // 设置壁纸（直接应用到 #app 的背景）
-            const appElement = document.getElementById('app');
-            if (appElement) {
-                appElement.style.background = themeWallpaper.value;
-                appElement.style.backgroundSize = 'cover';
-                appElement.style.backgroundPosition = 'center';
-                appElement.style.backgroundRepeat = 'no-repeat';
-            }
-        };
 
-        // 监听系统主题变化
-        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-        const handleSystemThemeChange = (e) => {
-            if (themeMode.value === 'system') {
-                if (e.matches) {
-                    document.documentElement.classList.add('theme-dark');
-                } else {
-                    document.documentElement.classList.remove('theme-dark');
-                }
-            }
-        };
-        mediaQuery.addEventListener('change', handleSystemThemeChange);
 
         // Touch event variables for pull-to-refresh
         let startY = 0;
@@ -2627,7 +2624,6 @@ const saveFont = () => {
                 await loadSoulLinkGroups();
                 loadSoulLinkPet();
                 initDeviceStatus();
-                applyTheme(); 
                 
                 const savedUserAvatar = loadFromStorage('soulos_user_avatar');
                 if (savedUserAvatar) {
@@ -2643,7 +2639,6 @@ const saveFont = () => {
                 loadSoulLinkGroups();
                 loadSoulLinkPet();
                 initDeviceStatus();
-                applyTheme(); 
                 
                 const savedUserAvatar = loadFromStorage('soulos_user_avatar');
                 if (savedUserAvatar) {
@@ -7730,13 +7725,7 @@ const saveFont = () => {
             addTrajectoryPoint, removeTrajectoryPoint,
             handleTransferAction,
             // 主题：
-            themeMode,
-            themeWallpaper,
-            customWallpaperInput,
-            wallpaperPresets,
-            setThemeMode,
-            setWallpaper,
-            applyCustomWallpaper,
+
             // feed
             feed,
             // hub
@@ -7790,6 +7779,9 @@ const saveFont = () => {
             // call widget
             callWidgetSubtitle, showCallWidgetEdit, callWidgetEditInput, editCallWidgetSubtitle, saveCallWidgetSubtitle, closeCallWidgetEdit,
             currentDate, currentTime, weekdays, currentWeekday,
+            // capsule texts
+            capsuleTexts, showCapsuleEditDialog, currentCapsuleType, capsuleEditText, editCapsuleText, closeCapsuleEditDialog, saveCapsuleText,
+            dashboardTexts, showDashboardEditDialog, currentDashboardTextType, dashboardEditText, editDashboardText, closeDashboardEditDialog, saveDashboardText,
 
             // photo widget edit dialog
             showPhotoWidgetEditDialog, photoWidgetEditText1, photoWidgetEditText2, closePhotoWidgetEditDialog, savePhotoWidgetText,
@@ -7808,6 +7800,71 @@ const saveFont = () => {
             // font functions
             fonts, selectedFont, saveFont, lockFont, selectFont, loadFontCSS, importCustomFont, customFontCount, initFonts, showFontImportDialog, newFontName, newFontUrl, addFontByUrl,
         };
+
+        // 音乐播放器控制
+        const playBtn = document.getElementById('playBtn');
+        const disk = document.getElementById('disk');
+        const pauseIcon = document.getElementById('pauseIcon');
+        
+        let musicIsPlaying = true;
+        
+        // 播放图标的 SVG Path 数据
+        const playPath = "M8 5v14l11-7z";
+        // 暂停图标的 SVG Path 数据
+        const pausePath = "M6 19h4V5H6v14zm8-14v14h4V5h-4z";
+        
+        if (playBtn && disk && pauseIcon) {
+            playBtn.addEventListener('click', () => {
+                if (musicIsPlaying) {
+                    disk.classList.add('paused');
+                    const path = pauseIcon.querySelector('path');
+                    if (path) {
+                        path.setAttribute('d', playPath);
+                    }
+                } else {
+                    disk.classList.remove('paused');
+                    const path = pauseIcon.querySelector('path');
+                    if (path) {
+                        path.setAttribute('d', pausePath);
+                    }
+                }
+                musicIsPlaying = !musicIsPlaying;
+            });
+        }
+
+        // 灵动岛小组件更新函数
+        function updateDashboard() {
+            const now = new Date();
+            
+            // 1. 更新时钟
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            const clockElement = document.querySelector('.clock');
+            if (clockElement) {
+                clockElement.textContent = `${hours}:${minutes}:${seconds}`;
+            }
+            
+            // 2. 更新 AM/PM
+            const meridiemElement = document.querySelector('.meridiem');
+            if (meridiemElement) {
+                meridiemElement.textContent = now.getHours() >= 12 ? 'PM' : 'AM';
+            }
+            
+            // 3. 更新进度圆环 (基于当天的分钟进度)
+            const totalMinutesInDay = 24 * 60;
+            const currentMinutes = now.getHours() * 60 + now.getMinutes();
+            const progressDegree = (currentMinutes / totalMinutesInDay) * 360;
+            
+            const circle = document.querySelector('.progress-circle');
+            if (circle) {
+                circle.style.background = `conic-gradient(white 0deg ${progressDegree}deg, #333 ${progressDegree}deg 360deg)`;
+            }
+        }
+
+        // 每秒更新一次
+        setInterval(updateDashboard, 1000);
+        updateDashboard();
 
         console.log('final return object:', returnObject);
         

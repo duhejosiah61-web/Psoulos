@@ -12,7 +12,7 @@
     
     <title>简约手机</title>
     
-    <link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@400;500;600&family=Caveat:wght@400;500;600&display=swap">
     <link rel="stylesheet" href="style.css">
     
@@ -108,246 +108,249 @@
 
         <!-- 主屏幕 -->
         <div v-if="isHomeScreenVisible" class="homescreen">
-            <!-- 页面容器 -->
-            <div class="home-pages" ref="homePages" style="cursor: grab;">
-                <!-- 第一页 -->
-                <div class="home-page" :class="{ 'active': currentPage === 0 }">
-                    <div class="app-grid">
-                        <!-- 第一行 - 4x4照片小组件 -->
-                        <div class="app-widget widget-4x4 photo-widget" @click.stop>
-                            <div class="photo-widget-content">
-                                <!-- 顶部信息栏 -->
-                                <div class="photo-widget-header">
-                                    <div class="photo-widget-date">
-                                        <div class="photo-date-day">{{ photoWidgetDate.day }}</div>
-                                        <div class="photo-date-weekday">{{ photoWidgetDate.weekday }}</div>
+            <!-- 内部手机有效区域：固定宽度但无明显边框 -->
+            <div class="homescreen-inner">
+                <!-- 页面容器 -->
+                <div class="home-pages" ref="homePages" style="cursor: grab;">
+                    <!-- 第一页 -->
+                    <div class="home-page" :class="{ 'active': currentPage === 0 }">
+                    <div class="grid-6x4">
+                        <!-- 第1-4行：照片小组件 (4行×4格) -->
+                        <div class="grid-cell grid-row-1-4">
+                            <div class="photo-widget" @click.stop>
+                                <div class="photo-widget-content">
+                                    <!-- 顶部信息栏 -->
+                                    <div class="photo-widget-header">
+                                        <div class="photo-widget-date">
+                                            <div class="photo-date-day">{{ photoWidgetDate.day }}</div>
+                                            <div class="photo-date-weekday">{{ photoWidgetDate.weekday }}</div>
+                                        </div>
+                                        <div class="photo-widget-text" @click="editPhotoWidgetText">
+                                            <div class="photo-text-line1">{{ photoWidgetText.line1 }}</div>
+                                            <div class="photo-text-line2">{{ photoWidgetText.line2 }}</div>
+                                        </div>
                                     </div>
-                                    <div class="photo-widget-text" @click="editPhotoWidgetText">
-                                        <div class="photo-text-line1">{{ photoWidgetText.line1 }}</div>
-                                        <div class="photo-text-line2">{{ photoWidgetText.line2 }}</div>
+                                    <!-- 照片网格 -->
+                                    <div class="photo-widget-grid">
+                                        <div v-for="(photo, index) in photoWidgetPhotos" :key="index" 
+                                             class="photo-widget-item" 
+                                             @click="changePhotoWidgetImage(index)">
+                                            <img :src="photo.url" :alt="'Photo ' + (index + 1)" class="photo-widget-img">
+                                            <div class="photo-widget-overlay"></div>
                                     </div>
                                 </div>
-                                <!-- 照片网格 -->
-                                <div class="photo-widget-grid">
-                                    <div v-for="(photo, index) in photoWidgetPhotos" :key="index" 
-                                         class="photo-widget-item" 
-                                         @click="changePhotoWidgetImage(index)">
-                                        <img :src="photo.url" :alt="'Photo ' + (index + 1)" class="photo-widget-img">
-                                        <div class="photo-widget-overlay"></div>
+                        </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 第5-6行：贴纸和app (2行×4格) -->
+                        <div class="grid-cell grid-row-5-6">
+                            <div class="first-page-bottom-content">
+                                <!-- 左侧：贴纸小组件 -->
+                                <div class="sticker-widget" @click="changeStickerWidgetImage">
+                                    <div class="sticker-widget-content">
+                                        <img :src="stickerWidgetUrl" alt="Sticker" class="sticker-image">
                                     </div>
                                 </div>
-                            </div>
+                                
+                                <!-- 右侧：app图标 -->
+                                <div class="first-page-apps">
+                                    <div class="app-icon" @click="openApp('chat')">
+                                        <div class="app-icon-wrapper">
+                                            <i class="fa fa-comments app-icon-font"></i>
+                                        </div>
+                                        <div class="app-label">Chat</div>
+                                    </div>
+                                    <div class="app-icon" @click="openApp('hub')">
+                                        <div class="app-icon-wrapper">
+                                            <i class="fa fa-share-alt app-icon-font"></i>
+                                        </div>
+                                        <div class="app-label">Hub</div>
+                                    </div>
+                                    <div class="app-icon" @click="openApp('games')">
+                                        <div class="app-icon-wrapper">
+                                            <i class="fa fa-gamepad app-icon-font"></i>
+                                        </div>
+                                        <div class="app-label">Games</div>
+                                    </div>
+                                    <div class="app-icon" @click="openApp('ember')">
+                                        <div class="app-icon-wrapper">
+                                            <i class="fa fa-fire app-icon-font"></i>
+                                        </div>
+                                        <div class="app-label">Ember</div>
+                                    </div>
+                                </div>
                         </div>
-                        
-                        <!-- 第三行、第四行 - 贴纸小组件占据左侧两列 -->
-                        <div class="app-widget widget-2x2 sticker-widget" @click="changeStickerWidgetImage">
-                            <div class="sticker-widget-content">
-                                <img :src="stickerWidgetUrl" alt="Sticker" class="sticker-image">
-                            </div>
+                                </div>
                         </div>
-                        
-                        <!-- 第三行 -->
-                        <div class="app-icon" @click="openApp('chat')">
-                            <div class="app-icon-wrapper">
-                                <i class="fa fa-comments app-icon-font"></i>
-                            </div>
-                            <div class="app-label">Chat</div>
-                        </div>
-                        <div class="app-icon" @click="openApp('hub')">
-                            <div class="app-icon-wrapper">
-                                <i class="fa fa-share-alt app-icon-font"></i>
-                            </div>
-                            <div class="app-label">Hub</div>
-                        </div>
-                        
-                        <!-- 第四行 -->
-                        <!-- Feed组件占据第四行的左侧两列 -->
-                        <div class="app-icon" @click="openApp('games')">
-                            <div class="app-icon-wrapper">
-                                <i class="fa fa-gamepad app-icon-font"></i>
-                            </div>
-                            <div class="app-label">Games</div>
-                        </div>
-                        <div class="app-icon" @click="openApp('ember')">
-                            <div class="app-icon-wrapper">
-                                <i class="fa fa-fire app-icon-font"></i>
-                            </div>
-                            <div class="app-label">Ember</div>
-                        </div>
-                    </div>
                 </div>
                 
-                <!-- 第二页 - 6行×4格网格布局 -->
+                <!-- 第二页 -->
                 <div class="home-page page-2-grid" :class="{ 'active': currentPage === 1 }">
-                    <div class="app-grid grid-6x4">
-                        <!-- 第1行 - 通话小组件 (1行×4格) -->
-                        <div class="app-widget grid-row-1 call-widget">
-                            <div class="call-widget-content">
-                                <div class="call-avatar">
-                                    <img :src="selectedCharacter.avatarUrl || 'https://img.heliar.top/file/1773774569024_retouch_2026031803084004.png'" alt="Character Avatar">
-                                </div>
-                                <div class="call-info">
-                                    <div class="call-title" @click="showCharacterSelector = true">{{ selectedCharacter.nickname || selectedCharacter.name || '未命名角色' }}</div>
-                                    <div class="call-subtitle" @click="editCallWidgetSubtitle">
-                                        <span v-if="!showCallWidgetEdit">{{ callWidgetSubtitle }}</span>
+                    <div class="grid-6x4">
+                        <!-- 第1-2行：灵动岛小组件 -->
+                        <div class="grid-cell grid-row-1-2">
+                            <div class="dashboard-container">
+                                <div class="top-row">
+                                    <div class="pill-sm" @click="editDashboardText('weekday')">
+                                        <span>{{ dashboardTexts.weekday }}</span>
+                                        <svg class="icon-week" viewBox="0 0 24 24">
+                                            <rect x="3" y="4" width="18" height="18" rx="2" stroke="white" fill="none" stroke-width="2"/>
+                                            <path d="M3 10h18M7 2v4M17 2v4" stroke="white" stroke-width="2"/>
+                                            <text x="7" y="18" fill="white" font-size="6" font-family="Arial">WEEK</text>
+                                        </svg>
+                                    </div>
+                                    <div class="progress-circle">
+                                        <div class="inner-dark"></div>
                                     </div>
                                 </div>
-                                <div class="call-buttons">
-                                    <button class="call-btn decline">
-                                        <i class="fa fa-phone-slash"></i>
-                                    </button>
-                                    <button class="call-btn accept">
-                                        <i class="fa fa-phone"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
 
-                        <!-- 第2行 - 4个app (每行4格，每个app占1格) -->
-                        <div class="app-icon grid-row-2" @click="openApp('mate')">
-                            <div class="app-icon-wrapper">
-                                <i class="fa fa-user app-icon-font"></i>
+                                <div class="pill-lg">
+                                    <div class="avatar-section" @click="showCharacterSelector = true">
+                                        <img :src="selectedCharacter.avatarUrl || 'https://img.js.design/assets/smartFill/img342164da747808.jpg'" alt="avatar">
+                                    </div>
+                                    <div class="time-weather">
+                                        <div class="time-row">
+                                            <span class="meridiem">{{ currentTime.split(' ')[1] }}</span>
+                                            <span class="clock">{{ currentTime.split(' ')[0] }}</span>
+                                        </div>
+                                        <div class="weather-row" @click="editDashboardText('weather')">
+                                            <span>{{ dashboardTexts.weather }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="date-section">
+                                        <div class="slogan" @click="editDashboardText('slogan')">{{ dashboardTexts.slogan }}</div>
+                                        <div class="date-str">{{ currentDate }}</div>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="app-label">Mate</div>
                         </div>
-                        <div class="app-icon grid-row-2" @click="openApp('peek')">
-                            <div class="app-icon-wrapper">
-                                <i class="fa fa-eye app-icon-font"></i>
-                            </div>
-                            <div class="app-label">Peek</div>
-                        </div>
-                        <div class="app-icon grid-row-2" @click="openApp('feed')">
-                            <div class="app-icon-wrapper">
-                                <i class="fa fa-list app-icon-font"></i>
-                            </div>
-                            <div class="app-label">Feed</div>
-                        </div>
-                        <div class="app-icon grid-row-2" @click="openApp('nest')">
-                            <div class="app-icon-wrapper">
-                                <i class="fa fa-home app-icon-font"></i>
-                            </div>
-                            <div class="app-label">Nest</div>
-                        </div>
+                        
+                        <!-- 第3-4行：音乐组件 (2行×4格) -->
+                        <div class="grid-cell grid-row-3-4">
+                            <!-- 音乐组件 -->
+                            <div class="player-container">
+                                <div class="record-slot">
+                                    <div class="record-disk rotate" id="disk">
+                                        <div class="vinyl-texture"></div>
+                                        <div class="record-cover">
+                                            <img src="https://img.js.design/assets/smartFill/img342164da747808.jpg" alt="Cover">
+                                        </div>
+                                    </div>
+                                </div>
 
-                        <!-- 第3-4行 - 天气时间小组件 (2行×4格) -->
-                        <div class="app-widget grid-row-3-4 weather-time-widget">
-                            <div class="weather-time-content">
-                                <div class="weather-info">
-                                    <div class="location">金海市</div>
-                                    <div class="weather-source">气象局</div>
-                                    <div class="temperature">24°C 多云</div>
-                                </div>
-                                <div class="time-info">
-                                    <div class="date">{{ currentDate }}</div>
-                                    <div class="time">{{ currentTime }}</div>
-                                    <div class="weekday">
-                                        <span 
-                                            v-for="(day, index) in weekdays" 
-                                            :key="index"
-                                            class="weekday-item"
-                                            :class="{ active: index === currentWeekday }"
-                                        >{{ day }}</span>
+                                <div class="player-footer">
+                                    <div class="controls">
+                                        <button class="icon-btn">
+                                            <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+                                        </button>
+                                        <button class="icon-btn play-pause" id="playBtn">
+                                            <svg id="pauseIcon" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                                        </button>
+                                        <button class="icon-btn">
+                                            <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+                                        </button>
+                                        <button class="icon-btn heart">
+                                            <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                                        </button>
+                                    </div>
+
+                                    <div class="info">
+                                        <h1 class="song-name">The Middle</h1>
+                                        <p class="artist">Dream Tunes</p>
                                     </div>
                                 </div>
                             </div>
                         </div>
-
-                        <!-- 第5-6行 - 音乐播放器组件 (2行×4格) -->
-                        <div class="app-widget grid-row-5-6 music-widget" @click="openApp('music')">
-                            <div class="spotify-widget">
-                            <!-- 顶部LED点阵显示 -->
-                            <div class="led-display">
-                                <span class="led-text">MUSIC</span>
-                                <span class="led-icon">▶</span>
-                                <span class="led-text">RAP-2004</span>
-                            </div>
-                            <!-- 主要内容区域 -->
-                            <div class="music-content">
-                                <!-- 左侧黑胶唱片 -->
-                                <div class="vinyl-record">
-                                    <div class="vinyl-disc">
-                                        <div class="vinyl-center"></div>
-                                        <div class="vinyl-reflections">
-                                            <div class="vinyl-reflection r1"></div>
-                                            <div class="vinyl-reflection r2"></div>
-                                            <div class="vinyl-reflection r3"></div>
-                                            <div class="vinyl-reflection r4"></div>
-                                        </div>
+                        
+                        <!-- 第5-6行：app和胶囊框 (2行×4格) -->
+                        <div class="grid-cell grid-row-5-6">
+                            <div class="app-grid-bottom-left">
+                                <div class="app-icon" @click="openApp('mate')">
+                                    <div class="app-icon-wrapper">
+                                        <i class="fa fa-user app-icon-font"></i>
                                     </div>
+                                    <div class="app-label">Mate</div>
                                 </div>
-                                <!-- 右侧信息区域 -->
-                                <div class="music-info-panel">
-                                    <div class="music-info-header">
-                                        <div class="album-cover">
-                                            <img src="https://placehold.co/100x100/333/fff?text=Album" alt="Album Cover">
-                                        </div>
-                                        <div class="track-info">
-                                            <div class="track-title">Purple Hearts</div>
-                                            <div class="track-artist">Kendrick Lamar, Summer Walk...</div>
-                                        </div>
+                                <div class="app-icon" @click="openApp('peek')">
+                                    <div class="app-icon-wrapper">
+                                        <i class="fa fa-eye app-icon-font"></i>
                                     </div>
-                                    <div class="progress-section">
-                                        <div class="progress-bar-container">
-                                            <div class="progress-bar">
-                                                <div class="progress-fill" style="width: 70%;"></div>
-                                            </div>
-                                        </div>
-                                        <div class="time-section">
-                                            <span class="current-time">04:38</span>
-                                            <span class="total-time">05:29</span>
-                                        </div>
+                                    <div class="app-label">Peek</div>
+                                </div>
+                                <div class="app-icon" @click="openApp('feed')">
+                                    <div class="app-icon-wrapper">
+                                        <i class="fa fa-list app-icon-font"></i>
                                     </div>
+                                    <div class="app-label">Feed</div>
+                                </div>
+                                <div class="app-icon" @click="openApp('nest')">
+                                    <div class="app-icon-wrapper">
+                                        <i class="fa fa-home app-icon-font"></i>
+                                    </div>
+                                    <div class="app-label">Nest</div>
+                                </div>
+                            </div>
+                            
+                            <!-- 右侧胶囊框 -->
+                            <div class="glass-capsules">
+                                <div class="glass-capsule glass-black" @click="editCapsuleText('black')">
+                                    <div class="capsule-text">{{ capsuleTexts.black }}</div>
+                                </div>
+                                <div class="glass-capsule glass-gray" @click="editCapsuleText('gray')">
+                                    <div class="capsule-text">{{ capsuleTexts.gray }}</div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
-            
-            <!-- 页面指示器和翻页箭头 -->
-            <div class="page-indicator-container">
-                <button 
-                    class="page-nav-arrow left" 
-                    @click="prevPage"
-                    :disabled="currentPage === 0"
-                    v-show="currentPage > 0"
-                >
-                    <i class="fas fa-chevron-left"></i>
-                </button>
-                
-                <div class="page-indicator">
-                    <div class="indicator-dot" :class="{ 'active': currentPage === 0 }"></div>
-                    <div class="indicator-dot" :class="{ 'active': currentPage === 1 }"></div>
+                    </div>
                 </div>
                 
-                <button 
-                    class="page-nav-arrow right" 
-                    @click="nextPage"
-                    :disabled="currentPage === 1"
-                    v-show="currentPage < 1"
-                >
-                    <i class="fas fa-chevron-right"></i>
-                </button>
-            </div>
-        </div>
-        
-        <!-- Dock栏 -->
-        <div v-if="isHomeScreenVisible" class="dock">
-            <div class="dock-icon" @click="openApp('workshop')">
-                <i class="fa fa-wrench"></i>
-                <span>Workshop</span>
-            </div>
-            <div class="dock-icon" @click="openApp('console')">
-                <i class="fa fa-terminal"></i>
-                <span>Console</span>
-            </div>
-            <div class="dock-icon" @click="openApp('theme')">
-                <i class="fa fa-paint-brush"></i>
-                <span>Theme</span>
-            </div>
-            <div class="dock-icon" @click="openApp('notice')">
-                <i class="fa fa-bullhorn"></i>
-                <span>Notice</span>
+                <!-- 页面指示器和翻页箭头（固定在 homescreen-inner 内部） -->
+                <div class="page-indicator-container">
+                    <button 
+                        class="page-nav-arrow left" 
+                        @click="prevPage"
+                        :disabled="currentPage === 0"
+                        v-show="currentPage > 0"
+                    >
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    
+                    <div class="page-indicator">
+                        <div class="indicator-dot" :class="{ 'active': currentPage === 0 }"></div>
+                        <div class="indicator-dot" :class="{ 'active': currentPage === 1 }"></div>
+                    </div>
+                    
+                    <button 
+                        class="page-nav-arrow right" 
+                        @click="nextPage"
+                        :disabled="currentPage === 1"
+                        v-show="currentPage < 1"
+                    >
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+
+                <!-- Dock栏：作为第7行，固定在 homescreen-inner 底部 -->
+                <div class="dock" v-if="isHomeScreenVisible">
+                    <div class="dock-icon" @click="openApp('workshop')">
+                        <i class="fa fa-wrench"></i>
+                        <span>Workshop</span>
+                    </div>
+                    <div class="dock-icon" @click="openApp('console')">
+                        <i class="fa fa-terminal"></i>
+                        <span>Console</span>
+                    </div>
+                    <div class="dock-icon" @click="openApp('theme')">
+                        <i class="fa fa-paint-brush"></i>
+                        <span>Theme</span>
+                    </div>
+                    <div class="dock-icon" @click="openApp('notice')">
+                        <i class="fa fa-bullhorn"></i>
+                        <span>Notice</span>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -3903,6 +3906,63 @@
                 <div class="photo-widget-edit-footer">
                     <button class="photo-widget-edit-btn photo-widget-edit-cancel" @click="closePhotoWidgetEditDialog">取消</button>
                     <button class="photo-widget-edit-btn photo-widget-edit-save" @click="savePhotoWidgetText">保存</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 胶囊框文字编辑对话框 -->
+        <div v-if="showCapsuleEditDialog" class="photo-widget-edit-dialog" @click.self="closeCapsuleEditDialog">
+            <div class="photo-widget-edit-content">
+                <div class="photo-widget-edit-header">
+                    <h3>编辑胶囊文字</h3>
+                    <button class="photo-widget-edit-close" @click="closeCapsuleEditDialog">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="photo-widget-edit-body">
+                    <div class="photo-widget-edit-field">
+                        <label>{{ currentCapsuleType === 'black' ? '黑色胶囊' : '灰色胶囊' }}文字</label>
+                        <input 
+                            type="text" 
+                            v-model="capsuleEditText" 
+                            placeholder="请输入文字"
+                            maxlength="10"
+                        >
+                    </div>
+                </div>
+                <div class="photo-widget-edit-footer">
+                    <button class="photo-widget-edit-btn photo-widget-edit-cancel" @click="closeCapsuleEditDialog">取消</button>
+                    <button class="photo-widget-edit-btn photo-widget-edit-save" @click="saveCapsuleText">保存</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 灵动岛文字编辑对话框 -->
+        <div v-if="showDashboardEditDialog" class="photo-widget-edit-dialog" @click.self="closeDashboardEditDialog">
+            <div class="photo-widget-edit-content">
+                <div class="photo-widget-edit-header">
+                    <h3>编辑灵动岛文字</h3>
+                    <button class="photo-widget-edit-close" @click="closeDashboardEditDialog">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="photo-widget-edit-body">
+                    <div class="photo-widget-edit-field">
+                        <label>{{ 
+                            currentDashboardTextType === 'weekday' ? '星期文字' : 
+                            currentDashboardTextType === 'weather' ? '天气文字' : '口号文字' 
+                        }}</label>
+                        <input 
+                            type="text" 
+                            v-model="dashboardEditText" 
+                            placeholder="请输入文字"
+                            maxlength="20"
+                        >
+                    </div>
+                </div>
+                <div class="photo-widget-edit-footer">
+                    <button class="photo-widget-edit-btn photo-widget-edit-cancel" @click="closeDashboardEditDialog">取消</button>
+                    <button class="photo-widget-edit-btn photo-widget-edit-save" @click="saveDashboardText">保存</button>
                 </div>
             </div>
         </div>
