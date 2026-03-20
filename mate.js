@@ -9,7 +9,9 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
     // --- 状态管理 ---
     const currentTime = ref(new Date());
     const currentMode = ref(localStorage.getItem('mate_mode') || 'focus'); // focus, exercise, sleep
-    const selectedMateCharacterId = ref(Number(localStorage.getItem('mate_selected_char')) || null);
+    // 注意：不能用 `|| null`，否则 id=0 会被当成未选择
+    const savedMateCharIdRaw = Number(localStorage.getItem('mate_selected_char'));
+    const selectedMateCharacterId = ref(Number.isNaN(savedMateCharIdRaw) ? null : savedMateCharIdRaw);
     const mateAIVoice = ref(null);
     const isGeneratingAIVoice = ref(false);
     
@@ -535,8 +537,8 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
     });
 
     const selectedCharacter = computed(() => {
-        if (!selectedMateCharacterId.value || !characters.value) return null;
-        return characters.value.find(c => c.id === selectedMateCharacterId.value);
+        if ((selectedMateCharacterId.value === null || selectedMateCharacterId.value === undefined) || !characters.value) return null;
+        return characters.value.find(c => Number(c.id) === Number(selectedMateCharacterId.value));
     });
     
     // --- 方法 ---
@@ -559,7 +561,7 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
         }
 
         // 周期性 AI 提醒 (每隔大约 3-5 分钟)
-        if ((currentMode.value === 'focus' || currentMode.value === 'exercise') && selectedMateCharacterId.value && activeProfile.value) {
+        if ((currentMode.value === 'focus' || currentMode.value === 'exercise') && selectedMateCharacterId.value !== null && selectedMateCharacterId.value !== undefined && activeProfile.value) {
             // 这里简单模拟，实际可以使用计数器
             if (Math.random() > 0.998) { // 极低概率触发，模拟长间隔
                 generatePeriodicAIComment();
@@ -692,7 +694,7 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
     const cycleCharacter = () => {
         if (!characters.value || characters.value.length === 0) return;
         
-        const currentIndex = characters.value.findIndex(c => c.id === selectedMateCharacterId.value);
+        const currentIndex = characters.value.findIndex(c => Number(c.id) === Number(selectedMateCharacterId.value));
         const nextIndex = (currentIndex + 1) % characters.value.length;
         selectedMateCharacterId.value = characters.value[nextIndex].id;
         saveToLocal();
@@ -1430,7 +1432,7 @@ ${recentMessages || '最近没有聊天。'}
         const duration = Math.floor((new Date() - (sleepStartTime.value || new Date())) / (1000 * 60));
         sleepDuration.value = duration;
         
-        if (selectedMateCharacterId.value && activeProfile.value) {
+        if (selectedMateCharacterId.value !== null && selectedMateCharacterId.value !== undefined && activeProfile.value) {
             await generateSleepDiary();
         }
         
@@ -1588,6 +1590,8 @@ ${recentMessages || '最近没有聊天。'}
         generateStudyEncouragement,
         setTargetSleepDuration,
         generateSleepEncouragement,
-        generateCharacterReply
+        generateCharacterReply,
+        // 提供给模板：角色选择变更后持久化
+        saveToLocal
     };
 }

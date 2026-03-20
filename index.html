@@ -25,7 +25,11 @@
     </script>
 </head>
 <body>
-    <div id="app" v-cloak>
+    <div
+        id="app"
+        v-cloak
+        :class="{ 'home-notch-off': !enableNotchAdaptation }"
+    >
         <!-- 锁屏毛玻璃背景 -->
         <div v-if="isLockScreenVisible" class="lock-screen-background-blur"></div>
         <!-- 锁屏界面 -->
@@ -97,9 +101,9 @@
         </svg>
         
         <!-- 顶部状态栏 -->
-        <div class="status-bar">
-            <span>{{ currentTime }}</span>
-            <div class="status-right">
+        <div v-if="!enableHideStatusBar" class="status-bar">
+            <span :style="{ color: homeTextColorInput || homeTextColor || '#000000' }">{{ currentTime }}</span>
+            <div class="status-right" :style="{ color: homeTextColorInput || homeTextColor || '#000000' }">
                 <i class="fa fa-signal"></i>
                 <i class="fa fa-wifi"></i>
                 <i class="fa fa-battery-full"></i>
@@ -107,7 +111,19 @@
         </div>
 
         <!-- 主屏幕 -->
-        <div v-if="isHomeScreenVisible" class="homescreen">
+        <div
+            v-if="isHomeScreenVisible"
+            class="homescreen"
+            :class="{ 'home-glass-mode': enableHomeGlass }"
+            :style="{
+                backgroundImage: homeWallpaperInput ? ('url(' + homeWallpaperInput + ')') : 'none',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat',
+                backgroundColor: 'transparent',
+                color: homeTextColorInput || homeTextColor || '#000000'
+            }"
+        >
             <!-- 内部手机有效区域：固定宽度但无明显边框 -->
             <div class="homescreen-inner">
                 <!-- 页面容器 -->
@@ -180,6 +196,7 @@
                                         <div class="app-label">Ember</div>
                                     </div>
                                 </div>
+
                         </div>
                                 </div>
                         </div>
@@ -228,37 +245,49 @@
                         
                         <!-- 第3-4行：音乐组件 (2行×4格) -->
                         <div class="grid-cell grid-row-3-4">
-                            <!-- 音乐组件 -->
-                            <div class="player-container">
-                                <div class="record-slot">
-                                    <div class="record-disk" id="disk">
-                                        <div class="vinyl-texture"></div>
-                                        <div class="record-cover">
-                                            <img src="https://img.js.design/assets/smartFill/img342164da747808.jpg" alt="Cover">
-                                        </div>
-                                    </div>
+                            <!-- 音乐组件：替换为你图里的“耳机线+日期文案”样式（整图背景） -->
+                            <div class="music-widget-hero" @click.stop>
+                                <!-- 左侧：歌名/歌手（上） -->
+                                <div class="music-hero-songinfo">
+                                    <h1 class="song-name">The Middle</h1>
+                                    <p class="artist">Dream Tunes</p>
                                 </div>
 
-                                <div class="player-footer">
-                                    <div class="controls">
-                                        <button class="icon-btn">
-                                            <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
-                                        </button>
-                                        <button class="icon-btn play-pause" id="playBtn">
-                                            <svg id="pauseIcon" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-                                        </button>
-                                        <button class="icon-btn">
-                                            <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
-                                        </button>
-                                        <button class="icon-btn heart">
-                                            <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-                                        </button>
-                                    </div>
+                                <!-- 中间：耳机线（分左右两列各一半） -->
+                                <div class="music-hero-earphone music-hero-earphone-left" aria-hidden="true"></div>
+                                <div class="music-hero-earphone music-hero-earphone-right" aria-hidden="true"></div>
 
-                                    <div class="info">
-                                        <h1 class="song-name">The Middle</h1>
-                                        <p class="artist">Dream Tunes</p>
-                                    </div>
+                                <!-- 左侧：播放/暂停/收藏/下一首（下） -->
+                                <div class="music-hero-controls">
+                                    <button class="icon-btn" type="button" aria-label="previous">
+                                        <!-- skip-back -->
+                                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                                            <path d="M11 6v12l-8-6 8-6z"/>
+                                            <path d="M13 6h2v12h-2z"/>
+                                        </svg>
+                                    </button>
+
+                                    <button class="icon-btn play-pause" id="playBtn" type="button" aria-label="play/pause">
+                                        <svg id="pauseIcon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                                    </button>
+
+                                    <button class="icon-btn" type="button" aria-label="next">
+                                        <!-- skip-forward -->
+                                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                                            <path d="M13 6v12l8-6-8-6z"/>
+                                            <path d="M9 6h2v12H9z"/>
+                                        </svg>
+                                    </button>
+
+                                    <button class="icon-btn heart" type="button" aria-label="favorite">
+                                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                                    </button>
+                                </div>
+
+                                <!-- 右侧：日期 -->
+                                <div class="music-hero-date">
+                                    <div class="music-date-month">{{ currentMonthEn }}</div>
+                                    <div class="music-date-day">{{ currentDayOfMonth }}</div>
                                 </div>
                             </div>
                         </div>
@@ -307,7 +336,10 @@
                 </div>
                 
                 <!-- 页面指示器和翻页箭头（固定在 homescreen-inner 内部） -->
-                <div class="page-indicator-container">
+                <div
+                    class="page-indicator-container"
+                    :style="{ color: homeTextColorInput || homeTextColor || '#000000' }"
+                >
                     <button 
                         class="page-nav-arrow left" 
                         @click="prevPage"
@@ -333,7 +365,11 @@
                 </div>
 
                 <!-- Dock栏：作为第7行，固定在 homescreen-inner 底部 -->
-                <div class="dock" v-if="isHomeScreenVisible">
+                <div
+                    class="dock"
+                    v-if="isHomeScreenVisible"
+                    :style="{ color: homeTextColorInput || homeTextColor || '#000000' }"
+                >
                     <div class="dock-icon" @click="openApp('workshop')">
                         <i class="fa fa-wrench"></i>
                         <span>Workshop</span>
@@ -2169,28 +2205,6 @@
             </div>
             
             <div class="app-content mate-content" @scroll="mate.handleScroll">
-                <!-- AI Companion Picker -->
-                <div class="mate-companion-section">
-                    <div v-if="!mate.selectedMateCharacterId" class="no-companion" @click="mate.showAddEventModal = true">
-                        <i class="fas fa-user-plus"></i>
-                        <span>选择陪伴角色</span>
-                    </div>
-                    <div v-else class="active-companion" @click="mate.showAddEventModal = true">
-                        <img :src="mate.selectedCharacter?.avatarUrl || 'https://placehold.co/100x100?text=?'" class="companion-avatar">
-                        <span class="companion-name">{{ mate.selectedCharacter?.nickname || mate.selectedCharacter?.name || 'Companion' }}</span>
-                    </div>
-                    <select v-model="mate.selectedMateCharacterId" class="companion-select-hidden" @change="mate.saveToLocal">
-                        <option :value="null">选择角色</option>
-                        <option v-for="char in characters" :key="char.id" :value="char.id">
-                            {{ char.nickname || char.name }}
-                        </option>
-                    </select>
-                    
-                    <div v-if="mate.mateAIVoice" class="mate-ai-bubble">
-                        <div class="bubble-content">{{ mate.mateAIVoice }}</div>
-                    </div>
-                </div>
-                
                 <!-- Grid Layout -->
                 <div class="mate-grid">
                     <!-- Focus Module -->
@@ -3608,76 +3622,6 @@
                 <div style="width: 40px;"></div>
             </div>
             <div class="app-content theme-content">
-                <!-- 主题模式卡片 -->
-                <div class="card theme-card">
-                    <div class="theme-card-header">
-                        <i class="fas fa-palette"></i>
-                        <span>主题模式</span>
-                    </div>
-                    <div class="theme-mode-grid">
-                        <button class="theme-mode-btn" :class="{ active: themeMode === 'light' }" @click="setThemeMode('light')">
-                            <div class="mode-icon">☀️</div>
-                            <div class="mode-label">亮色</div>
-                            <div class="mode-desc">清晰明亮</div>
-                        </button>
-                        <button class="theme-mode-btn" :class="{ active: themeMode === 'dark' }" @click="setThemeMode('dark')">
-                            <div class="mode-icon">🌙</div>
-                            <div class="mode-label">暗色</div>
-                            <div class="mode-desc">护眼舒适</div>
-                        </button>
-                        <button class="theme-mode-btn" :class="{ active: themeMode === 'system' }" @click="setThemeMode('system')">
-                            <div class="mode-icon">💻</div>
-                            <div class="mode-label">跟随系统</div>
-                            <div class="mode-desc">自动切换</div>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- 壁纸选择卡片 -->
-                <div class="card theme-card">
-                    <div class="theme-card-header">
-                        <i class="fas fa-images"></i>
-                        <span>壁纸选择</span>
-                    </div>
-                    <div class="wallpaper-grid">
-                        <div v-for="(wallpaper, index) in wallpaperPresets" :key="index" 
-                             class="wallpaper-item" 
-                             :class="{ active: themeWallpaper === wallpaper }"
-                             @click="setWallpaper(wallpaper)">
-                            <div class="wallpaper-preview" :style="{ background: wallpaper }">
-                                <div class="wallpaper-check" v-if="themeWallpaper === wallpaper">
-                                    <i class="fas fa-check"></i>
-                                </div>
-                            </div>
-                            <div class="wallpaper-name">预设 {{ index + 1 }}</div>
-                        </div>
-                    </div>
-                    <div class="theme-hint">
-                        <i class="fas fa-hand-pointer"></i>
-                        <span>点击预览图应用壁纸</span>
-                    </div>
-                </div>
-
-                <!-- 自定义壁纸卡片 -->
-                <div class="card theme-card">
-                    <div class="theme-card-header">
-                        <i class="fas fa-magic"></i>
-                        <span>自定义壁纸</span>
-                    </div>
-                    <div class="custom-wallpaper-form">
-                        <div class="input-group">
-                            <input type="text" class="theme-input" v-model="customWallpaperInput" placeholder="输入图片URL 或 颜色值 (#fff, rgba)">
-                            <button class="theme-btn theme-btn-primary" @click="applyCustomWallpaper">
-                                <i class="fas fa-check"></i> 应用
-                            </button>
-                        </div>
-                        <div class="theme-hint">
-                            <i class="fas fa-info-circle"></i>
-                            <span>支持图片URL、CSS颜色值、渐变（如 linear-gradient(...)）</span>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- 锁屏设置卡片 -->
                 <div class="card theme-card">
                     <div class="theme-card-header">
@@ -3822,6 +3766,143 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- 主题设置（全局字体 + 主界面壁纸/文字颜色） -->
+                    <div class="card theme-card">
+                        <div class="theme-card-header">
+                            <i class="fas fa-font"></i>
+                            <span>主题设置</span>
+                        </div>
+
+                        <div class="setting-item setting-item-full">
+                            <div class="setting-info">
+                                <div class="setting-label">全局字体</div>
+                                <div class="setting-desc">锁屏以外的文字</div>
+                            </div>
+
+                            <div class="font-setting">
+                                <div class="font-cards-container">
+                                    <div
+                                        v-for="font in fonts"
+                                        :key="font.fontId"
+                                        class="font-card"
+                                        :class="{ active: globalSelectedFont === font.fontFamily }"
+                                        @click="selectGlobalFont(font)"
+                                        :style="{ fontFamily: font.fontFamily }"
+                                    >
+                                        <div class="font-card-row font-card-name">{{ font.displayName }}</div>
+                                        <div class="font-card-row font-card-english">ABCabc</div>
+                                        <div class="font-card-row font-card-number">123</div>
+                                    </div>
+                                </div>
+
+                                <div class="font-actions">
+                                    <div class="font-import">
+                                        <input
+                                            ref="globalFontFileInput"
+                                            type="file"
+                                            accept=".ttf"
+                                            @change="importCustomFont"
+                                            style="display: none;"
+                                        >
+                                        <button
+                                            class="font-import-btn"
+                                            @click="globalFontFileInput && globalFontFileInput.click()"
+                                        >导入字体</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <div class="setting-label">主界面壁纸</div>
+                                <div class="setting-desc">设置主界面背景图片</div>
+                            </div>
+                            <div class="lock-wallpaper-setting">
+                                <input
+                                    type="text"
+                                    class="lock-wallpaper-input"
+                                    v-model="homeWallpaperInput"
+                                    placeholder="输入图片URL"
+                                >
+                                <button class="lock-wallpaper-save-btn" @click="saveHomeWallpaper">保存</button>
+                            </div>
+                        </div>
+
+                        <!-- 主界面毛玻璃开关 -->
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <div class="setting-label">毛玻璃开关</div>
+                                <div class="setting-desc">开启后主界面相关区域全毛玻璃</div>
+                            </div>
+                            <div class="setting-toggle" @click="toggleHomeGlass">
+                                <div class="toggle-slider" :class="{ active: enableHomeGlass }">
+                                    <div class="toggle-thumb"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 状态栏隐藏 -->
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <div class="setting-label">状态栏隐藏</div>
+                                <div class="setting-desc">开启后隐藏顶部时间/信号电量</div>
+                            </div>
+                            <div class="setting-toggle" @click="toggleHideStatusBar">
+                                <div class="toggle-slider" :class="{ active: enableHideStatusBar }">
+                                    <div class="toggle-thumb"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 苹果刘海屏适配 -->
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <div class="setting-label">苹果刘海屏适配</div>
+                                <div class="setting-desc">根据安全区域自动调整顶部位置</div>
+                            </div>
+                            <div class="setting-toggle" @click="toggleNotchAdaptation">
+                                <div class="toggle-slider" :class="{ active: enableNotchAdaptation }">
+                                    <div class="toggle-thumb"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <div class="setting-label">文字颜色</div>
+                                <div class="setting-desc">设置主界面/全局文字颜色</div>
+                            </div>
+                            <div class="lock-color-setting">
+                                <input type="color" class="lock-color-input" v-model="homeTextColorInput">
+                                <button class="lock-color-save-btn" @click="saveHomeTextColor">保存</button>
+                            </div>
+                        </div>
+
+                        <div
+                            class="home-main-preview-phone"
+                            :class="{ 'home-glass-mode': enableHomeGlass }"
+                            :style="{
+                                backgroundImage: homeWallpaperInput ? ('url(' + homeWallpaperInput + ')') : 'none',
+                                color: homeTextColorInput,
+                                fontFamily: globalSelectedFont || 'inherit'
+                            }"
+                        >
+                            <div class="home-main-preview-status">
+                                <span class="home-main-preview-time">12:34</span>
+                                <span class="home-main-preview-icons">▮▮▮  WiFi  ▮▮▮</span>
+                            </div>
+
+                            <div class="home-main-preview-grid">
+                                <div class="home-main-preview-photo"> </div>
+                                <div class="home-main-preview-sticker-left"> </div>
+                                <div class="home-main-preview-app-right"> </div>
+                                <div class="home-main-preview-dock">Dock</div>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
             </div>
@@ -3998,29 +4079,6 @@
                             <i v-if="selectedCharacter.id === char.id" class="fas fa-check" style="color: #000; font-size: 18px;"></i>
                         </div>
                     </div>
-                </div>
-            </div>
-        
-        <!-- 角色选择器 -->
-        <div class="character-selector" v-if="showCharacterSelector">
-            <div class="character-selector-content">
-                <h3>选择角色</h3>
-                <div class="character-selector-list">
-                    <div 
-                        v-for="char in characters" 
-                        :key="char.id"
-                        class="character-selector-item"
-                        @click="selectCharacter(char)"
-                    >
-                        <img :src="char.avatarUrl || 'https://placehold.co/150x150/333/fff?text=Character'" alt="Character">
-                        <div class="character-selector-item-info">
-                            <div class="character-selector-item-name">{{ char.nickname || char.name || '未命名角色' }}</div>
-                            <div class="character-selector-item-desc">{{ char.description || '无描述' }}</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="character-selector-buttons">
-                    <button @click="showCharacterSelector = false">取消</button>
                 </div>
             </div>
         </div>

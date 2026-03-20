@@ -1137,19 +1137,242 @@ body {
     grid-row: 3 / 5;
 }
 
-/* 第5-6行：预留空间 */
-.grid-row-5-6 {
+/* 第二页第3-4行：音乐小组件（图上“耳机线+日期文案”整图背景） */
+.grid-row-3-4 .music-widget-hero {
+    width: 100%;
+    height: 100%;
+    border-radius: 34px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    /* 交给 ::before 做透明玻璃底，这里保持透明避免叠加过浓 */
+    background: transparent;
+
+    /* 内部再做一套 4列x2行，把“中间耳机线占两列”做成裁切 */
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+
+    /* 让玻璃/透明层级稳定 */
+    isolation: isolate;
+}
+
+.grid-row-3-4 .music-widget-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    /* 黑色透明底：不做渐变，只做玻璃质感 */
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    z-index: 0;
+}
+
+/* 开启毛玻璃时：音乐组件恢复半透明玻璃底 */
+.home-glass-mode .grid-row-3-4 .music-widget-hero::before {
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.grid-row-3-4 .music-hero-songinfo,
+.grid-row-3-4 .music-hero-controls,
+.grid-row-3-4 .music-hero-date {
+    position: relative;
+    z-index: 2;
+}
+
+.grid-row-3-4 .music-hero-songinfo {
+    grid-column: 1 / 2;
+    grid-row: 1 / 2;
+    align-self: start;
+    justify-self: start;
+    padding-left: 14px;
+    padding-top: 12px;
+    padding-right: 6px;
+}
+
+.grid-row-3-4 .music-hero-controls {
+    grid-column: 1 / 2;
+    grid-row: 2 / 3;
+    align-self: end;
+    justify-self: start;
+    padding-left: 18px;
+    padding-bottom: 14px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.grid-row-3-4 .music-hero-date {
+    grid-column: 4 / 5;
+    grid-row: 1 / 3;
+    align-self: center;
+    justify-self: end;
+    padding-right: 10px;
+    padding-left: 10px;
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transform: translateX(-8px);
+}
+
+.grid-row-3-4 .music-hero-songinfo .song-name {
+    font-size: 32px !important;
+    letter-spacing: -0.9px !important;
+    color: rgba(0, 0, 0, 0.92) !important;
+    text-shadow: 0 2px 10px rgba(255, 255, 255, 0.18) !important;
+}
+
+.grid-row-3-4 .music-hero-songinfo .artist {
+    font-size: 15px !important;
+    margin-top: 6px !important;
+    font-style: italic;
+    color: rgba(255, 255, 255, 0.58) !important;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+}
+
+.grid-row-3-4 .music-date-month {
+    font-family: 'Playfair Display', serif;
+    font-weight: 400;
+    font-size: 18px;
+    color: rgba(255, 255, 255, 0.92);
+}
+
+.grid-row-3-4 .music-date-day {
+    font-family: 'Playfair Display', serif;
+    font-weight: 600;
+    font-size: 62px;
+    line-height: 1;
+    letter-spacing: -2px;
+    color: rgba(255, 255, 255, 0.98);
+}
+
+.grid-row-3-4 .music-hero-earphone {
+    /* 固定为“底图”装饰：不参与布局，避免按钮高度变化导致形变 */
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background-image: url('assets/music-earphone-line.png');
+    background-repeat: no-repeat;
+    /* 关键：让每个 1/4 列里显示整张图的一半 */
+    background-size: 200% 100%;
+    /* 灰色滤镜 + 轻微阴影 */
+    filter: grayscale(1) saturate(0) brightness(1.06) drop-shadow(0 4px 10px rgba(0, 0, 0, 0.14));
+    opacity: 0.92;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.grid-row-3-4 .music-hero-earphone-left {
+    left: 25%;
+    width: 25%;
+    background-position: left center;
+}
+
+.grid-row-3-4 .music-hero-earphone-right {
+    left: 50%;
+    width: 25%;
+    background-position: right center;
+}
+
+/* 精修：音乐组件的按键（更像半透明手机玻璃按钮） */
+.grid-row-3-4 .music-hero-controls {
+    padding: 0 0 14px 18px; /* 让按钮整体往右一点 */
+    gap: 10px;
+    transform: translateX(10px);
+}
+
+.grid-row-3-4 .music-hero-controls .icon-btn {
+    width: 56px !important;
+    height: 56px !important;
+    border-radius: 20px;
+    /* 只保留图标：按钮本体背景完全透明 */
+    background: transparent !important;
+    border: 0 !important;
+    outline: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: none !important;
+
+    /* 去掉浏览器默认 button 外观 */
+    appearance: none !important;
+    -webkit-appearance: none !important;
+}
+
+.grid-row-3-4 .music-hero-controls .icon-btn svg {
+    width: 26px;
+    height: 26px;
+    display: block;
+    fill: rgba(0, 0, 0, 0.92);
+}
+
+.grid-row-3-4 .music-hero-controls .icon-btn svg path {
+    fill: rgba(0, 0, 0, 0.92) !important;
+}
+
+.grid-row-3-4 .music-hero-controls .icon-btn:hover {
+    transform: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.grid-row-3-4 .music-hero-controls .icon-btn:active {
+    transform: none !important;
+}
+
+.grid-row-3-4 .music-hero-controls button[aria-label="next"] {
+    position: relative;
+    transform: translateY(16px) !important;
+}
+
+.grid-row-3-4 .music-hero-controls button[aria-label="next"]:hover {
+    transform: translateY(16px) !important;
+}
+
+.grid-row-3-4 .music-hero-controls button[aria-label="next"]:active {
+    transform: translateY(16px) !important;
+}
+
+.grid-row-3-4 .music-hero-controls .icon-btn.heart {
+    position: relative;
+    transform: translateY(16px) !important;
+}
+
+.grid-row-3-4 .music-hero-controls .icon-btn.heart:hover {
+    transform: translateY(16px) !important;
+}
+
+.grid-row-3-4 .music-hero-controls .icon-btn.heart:active {
+    transform: translateY(16px) !important;
+}
+
+.grid-row-3-4 .music-hero-controls .icon-btn:focus,
+.grid-row-3-4 .music-hero-controls .icon-btn:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+    border: 0 !important;
+}
+
+/* 第5-6行（第一页）：预留空间（呼吸感上下对称） */
+.home-page:not(.page-2-grid) .grid-row-5-6 {
     grid-column: 1 / 5;
     grid-row: 5 / 7;
-    /* 给底部贴纸+app 留出“呼吸感”，避免贴得太紧 */
-    --home-bottom-breath: clamp(10px, 1.6vh, 18px);
+    /* 给底部贴纸+app 留出“呼吸感”，并让它更靠下 */
+    --home-bottom-breath: clamp(14px, 2.2vh, 26px);
     padding-top: var(--home-bottom-breath);
+    padding-bottom: var(--home-bottom-breath);
     box-sizing: border-box;
 }
 
-/* 保证底部内容不被 padding 顶挤出格子：高度随内边距同步缩小 */
-.grid-row-5-6 .first-page-bottom-content {
-    height: calc(100% - var(--home-bottom-breath));
+/* 保证底部内容不被 padding 压缩：高度随上下内边距同步缩小 */
+.home-page:not(.page-2-grid) .grid-row-5-6 .first-page-bottom-content {
+    height: calc(100% - (var(--home-bottom-breath) * 2));
     box-sizing: border-box;
 }
 
@@ -1159,6 +1382,12 @@ body {
     grid-template-columns: 1fr 1fr;
     align-items: stretch;
     justify-items: stretch;
+
+    /* 让第二页底部内容高度/“呼吸感”跟第一页一致 */
+    --home-bottom-breath: clamp(14px, 2.2vh, 26px);
+    padding-top: var(--home-bottom-breath);
+    padding-bottom: var(--home-bottom-breath);
+    box-sizing: border-box;
 }
 
 .page-2-grid .app-grid-bottom-left {
@@ -1167,7 +1396,7 @@ body {
     bottom: auto !important;
     left: auto !important;
     width: 100%;
-    height: 100%;
+    height: calc(100% - (var(--home-bottom-breath) * 2));
 }
 
 .page-2-grid .glass-capsules {
@@ -1176,8 +1405,8 @@ body {
     bottom: auto !important;
     right: auto !important;
     width: 100%;
-    height: 100%;
-    justify-content: flex-end;
+    height: calc(100% - (var(--home-bottom-breath) * 2));
+    justify-content: center; /* 与左侧2x2 app垂直对齐 */
     align-items: flex-end;
 }
 
@@ -1219,9 +1448,15 @@ body {
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,600&family=Inter:wght@400;600&display=swap');
 
 :root {
+  /* 让灵动岛/胶囊背景变为真正“半透明玻璃”，底图可以透出来 */
   --panel-bg: #000000;
   --text-white: #ffffff;
   --text-dim: rgba(255, 255, 255, 0.7);
+}
+
+/* home-glass-mode：主界面毛玻璃开关开启时生效 */
+.home-glass-mode {
+  --panel-bg: rgba(0, 0, 0, 0.55);
 }
 
 /* 灵动岛小组件 */
@@ -1255,8 +1490,9 @@ body {
   gap: 10px;
   font-family: "Microsoft YaHei", sans-serif;
   font-size: 14px;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .icon-week { 
@@ -1294,9 +1530,23 @@ body {
   display: flex;
   align-items: center;
   box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+  border: 1px solid rgba(255, 255, 255, 0);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-sizing: border-box;
+}
+
+/* 开启毛玻璃时，灵动岛恢复半透明+模糊 */
+.home-glass-mode .pill-sm {
+  border: 1px solid rgba(255, 255, 255, 0.22);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  box-sizing: border-box;
+}
+
+.home-glass-mode .pill-lg {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 /* 左侧圆形图片 */
@@ -1405,13 +1655,18 @@ body {
 .glass-capsule {
     padding: 14px 28px;
     border-radius: 50px;
-    backdrop-filter: blur(15px);
-    -webkit-backdrop-filter: blur(15px);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     border: 1px solid rgba(255, 255, 255, 0.3);
     transition: transform 0.3s ease, box-shadow 0.3s ease;
     cursor: pointer;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
     max-width: 160px;
+}
+
+.home-glass-mode .glass-capsule {
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
 }
 
 .glass-capsule:hover {
@@ -1428,6 +1683,14 @@ body {
 /* 灰色胶囊 */
 .glass-gray {
     background: rgba(68, 68, 68, 0.7);
+}
+
+.home-glass-mode .glass-black {
+    background: rgba(0, 0, 0, 0.55);
+}
+
+.home-glass-mode .glass-gray {
+    background: rgba(68, 68, 68, 0.38);
 }
 
 /* 胶囊文字 */
@@ -1725,6 +1988,7 @@ body {
     width: 100%;
     aspect-ratio: 1 / 1;
     max-width: 100%;
+    /* 默认：不开玻璃时使用实心黑底 */
     background: #000000;
     border: 1.5px solid #000000;
     border-radius: 14px;
@@ -1735,6 +1999,17 @@ body {
     margin-bottom: 6px;
     position: relative;
     box-sizing: border-box;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+.home-glass-mode .app-icon-wrapper {
+    /* 开玻璃时：黑色半透明 + 毛玻璃 */
+    background: rgba(0, 0, 0, 0.22);
+    border: 1.5px solid rgba(0, 0, 0, 0.35);
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.20);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
 }
 
 .app-icon-svg {
@@ -3383,6 +3658,15 @@ body {
     background: rgba(0, 0, 0, 0.6);
 }
 
+/* 毛玻璃开启时：页面指示器也用更亮的点，避免底图偏暗看不清 */
+.home-glass-mode .indicator-dot {
+    background: rgba(255, 255, 255, 0.35);
+}
+
+.home-glass-mode .indicator-dot.active {
+    background: rgba(255, 255, 255, 0.7);
+}
+
 /* 页面指示器容器 */
 .page-indicator-container {
     position: absolute; /* 固定在 homescreen-inner 内部，而不是整个浏览器 */
@@ -3402,8 +3686,8 @@ body {
     border-radius: 50%;
     border: 2px solid rgba(0, 0, 0, 0.3);
     background: rgba(255, 255, 255, 0.8);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -3411,6 +3695,20 @@ body {
     transition: all 0.3s ease;
     font-size: 14px;
     color: #000000;
+}
+
+/* 开启主界面毛玻璃：翻页箭头为黑色半透明玻璃 */
+.home-glass-mode .page-nav-arrow {
+    background: rgba(0, 0, 0, 0.22);
+    border-color: rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    color: inherit !important;
+}
+
+.home-glass-mode .page-nav-arrow:hover {
+    background: rgba(0, 0, 0, 0.30);
+    border-color: rgba(255, 255, 255, 0.26);
 }
 
 .page-nav-arrow:hover {
@@ -3747,6 +4045,7 @@ body {
     --border-color: #000000;
     --text-primary: #000000;
     --text-secondary: #666666;
+    --global-text-color: #000000;
 }
 
 /* Status Bar */
@@ -3759,13 +4058,22 @@ body {
     padding-top: env(safe-area-inset-top);
     font-size: 14px; 
     font-weight: 500; 
-    color: #000000; 
+    color: inherit;
     z-index: 100; 
     position: absolute; 
     top: 0; 
     left: 0; 
     right: 0; 
     font-family: 'Inter', Arial, sans-serif;
+}
+
+/* home-notch-off：关闭刘海安全区偏移（主要用于让顶部元素不额外下移） */
+.home-notch-off .status-bar {
+    padding-top: 0 !important;
+}
+
+.home-notch-off .homescreen {
+    padding-top: 0 !important;
 }
 .status-right { display: flex; gap: 12px; }
 
@@ -3777,6 +4085,154 @@ body {
     position: relative;
     -webkit-overflow-scrolling: touch;
     background: transparent;
+}
+
+/* 主界面文字颜色：继承 homescreen 容器颜色，强制覆盖写死颜色（不影响锁屏） */
+#app .homescreen *:not(i):not(.fa):not(.fas):not(.far):not(.fab):not(button):not(input):not(textarea):not(svg):not(path) {
+    color: inherit !important;
+}
+
+/* 主题设置预览 */
+.home-theme-preview{
+    margin-top: 14px;
+    border-radius: 16px;
+    padding: 14px 16px;
+    min-height: 92px;
+    background: rgba(0,0,0,0.06);
+    border: 1px solid rgba(0,0,0,0.10);
+    box-shadow: 0 10px 28px rgba(0,0,0,0.08);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 6px;
+}
+.home-theme-preview-time{
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.4px;
+    line-height: 1.1;
+}
+.home-theme-preview-title{
+    font-size: 16px;
+    font-weight: 600;
+    opacity: 0.9;
+    line-height: 1.2;
+}
+
+/* 主界面预览：主题设置里展示整体效果（壁纸+顶部文字颜色+字体） */
+.home-main-preview-phone{
+    width: 100%;
+    max-width: 240px;
+    aspect-ratio: 9 / 16;
+    border-radius: 26px;
+    margin-top: 14px;
+    padding: 14px 14px 12px 14px;
+    position: relative;
+    overflow: hidden;
+    background-size: cover;
+    background-position: center;
+    background-color: rgba(0,0,0,0.06);
+    box-shadow: 0 18px 50px rgba(0,0,0,0.18);
+    border: 1px solid rgba(255,255,255,0.12);
+}
+
+.home-main-preview-phone::before{
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.18);
+    pointer-events: none;
+}
+
+.home-main-preview-phone > *{
+    position: relative;
+    z-index: 1;
+}
+
+.home-main-preview-status{
+    height: 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 0.2px;
+    padding: 0 6px;
+}
+
+.home-main-preview-time{
+    font-size: 15px;
+}
+
+.home-main-preview-icons{
+    font-size: 12px;
+    opacity: 0.85;
+}
+
+.home-main-preview-grid{
+    margin-top: 10px;
+    height: calc(100% - 40px);
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-auto-rows: 1fr;
+    gap: 7px;
+    padding: 0 6px 4px 6px;
+}
+
+.home-main-preview-photo{
+    grid-column: 1 / 5;
+    grid-row: 1 / 3;
+    border-radius: 14px;
+    background: rgba(255,255,255,0.20);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border: 1px solid rgba(255,255,255,0.18);
+}
+
+.home-main-preview-sticker-left{
+    grid-column: 1 / 3;
+    grid-row: 3 / 5;
+    border-radius: 14px;
+    background: rgba(255,255,255,0.16);
+    border: 1px solid rgba(255,255,255,0.12);
+}
+
+.home-main-preview-app-right{
+    grid-column: 3 / 5;
+    grid-row: 3 / 5;
+    border-radius: 14px;
+    background: rgba(255,255,255,0.16);
+    border: 1px solid rgba(255,255,255,0.12);
+}
+
+.home-main-preview-dock{
+    grid-column: 1 / 5;
+    grid-row: 5 / 6;
+    border-radius: 14px;
+    background: rgba(255,255,255,0.14);
+    border: 1px solid rgba(255,255,255,0.10);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    opacity: 0.95;
+}
+
+/* 预览：开启毛玻璃时也同步显示玻璃质感 */
+.home-glass-mode .home-main-preview-photo{
+    background: rgba(0, 0, 0, 0.22);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,255,255,0.18);
+}
+
+.home-glass-mode .home-main-preview-dock{
+    background: rgba(0, 0, 0, 0.22);
+    border: 1px solid rgba(255,255,255,0.14);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
 }
 
 /* Hero 插图区域 */
@@ -3961,12 +4417,25 @@ body {
     border-radius: 40px;
     transition: all 0.3s ease;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     z-index: 100;
     width: auto;
     min-width: 320px;
     max-width: calc(100% - 32px);
+}
+
+/* 开启主界面毛玻璃：Dock 变为黑色半透明毛玻璃 */
+.home-glass-mode .dock {
+    background: rgba(0, 0, 0, 0.22);
+    border: 1.5px solid rgba(255, 255, 255, 0.14);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 18px 50px rgba(0,0,0,0.25);
+}
+
+.home-glass-mode .dock:hover {
+    background: rgba(0, 0, 0, 0.28);
 }
 
 .dock:hover {
@@ -4018,6 +4487,19 @@ body {
 .dock-icon:hover span {
     font-weight: 600;
     color: #000000;
+}
+
+/* 毛玻璃开启时，让 Dock 图标文字跟随当前主题文字色 */
+.home-glass-mode .dock-icon {
+    color: inherit !important;
+}
+
+.home-glass-mode .dock-icon span {
+    color: inherit !important;
+}
+
+.home-glass-mode .dock-icon:hover span {
+    color: inherit !important;
 }
 
 /* App Placeholder */
@@ -17949,11 +18431,19 @@ label {
     height: 8px;
     -webkit-appearance: none;
     appearance: none;
-    background: #E8E8E8;
-    border-radius: 4px;
+    background: #E8E8E8 !important;
+    border-radius: 4px !important;
     outline: none;
     cursor: pointer;
     margin: 12px 0;
+    padding: 0 !important;
+    border: 0 !important;
+}
+
+.console-slider::-webkit-slider-runnable-track {
+    height: 4px !important;
+    background: #E8E8E8 !important;
+    border-radius: 4px !important;
 }
 
 .console-slider::-webkit-slider-thumb {
@@ -17962,7 +18452,7 @@ label {
     width: 24px;
     height: 24px;
     background: #000000;
-    border-radius: 50%;
+    border-radius: 50% !important;
     cursor: pointer;
     box-shadow: 2px 2px 4px rgba(0,0,0,0.2);
     transition: all 0.2s ease;
@@ -17977,10 +18467,16 @@ label {
     width: 24px;
     height: 24px;
     background: #000000;
-    border-radius: 50%;
+    border-radius: 50% !important;
     cursor: pointer;
     border: none;
     box-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+}
+
+.console-slider::-moz-range-track {
+    height: 4px !important;
+    background: #E8E8E8 !important;
+    border-radius: 4px !important;
 }
 
 .temperature-value {
@@ -17992,6 +18488,14 @@ label {
     font-size: 14px;
     font-weight: 600;
     border-radius: 20px;
+    flex: 0 0 auto;
+    white-space: nowrap;
+    text-align: center;
+    display: inline-flex;
+    flex-grow: 0;
+    flex-shrink: 0;
+    width: fit-content;
+    max-width: 140px;
 }
 
 .temperature-hint {
@@ -18020,6 +18524,42 @@ label {
     color: #888888;
     line-height: 1.5;
     text-align: center;
+}
+
+/* 温度拉条适配：避免温度 badge 在很窄时变成黑色长方形 */
+@media (max-width: 760px) {
+    .console-label {
+        flex-wrap: wrap;
+        row-gap: 8px;
+        align-items: flex-start;
+    }
+    .temperature-value {
+        margin-left: 0 !important;
+        max-width: 110px;
+        padding: 3px 10px;
+        font-size: 12px;
+    }
+    .console-slider {
+        height: 4px !important;
+        margin: 8px 0 0 0;
+        background: #E8E8E8 !important;
+        border-radius: 4px !important;
+        display: block;
+        padding: 0 !important;
+        border: 0 !important;
+    }
+
+    .console-slider::-webkit-slider-runnable-track {
+        height: 4px !important;
+        background: #E8E8E8 !important;
+        border-radius: 4px !important;
+    }
+
+    .console-slider::-moz-range-track {
+        height: 4px !important;
+        background: #E8E8E8 !important;
+        border-radius: 4px !important;
+    }
 }
 
 /* Responsive */

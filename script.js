@@ -16,15 +16,19 @@ export function setupApp() {
     // 锁屏状态
     const enableLockScreen = ref(localStorage.getItem('enableLockScreen') !== 'false');
     const isLockScreenVisible = ref(enableLockScreen.value);
+
+    // Theme（非锁屏）相关：清空主版本缓存，方便你重做这一块
+    // 注意：锁屏相关 key 不动
+    try {
+        localStorage.removeItem('themeMode');
+        localStorage.removeItem('themeWallpaper');
+    } catch (e) {
+        // ignore
+    }
     
     // 页面切换
     const currentPage = ref(0);
     const homePages = ref(null);
-    let touchStartX = 0;
-    let touchEndX = 0;
-    let mouseStartX = 0;
-    let mouseEndX = 0;
-    let isDragging = false;
     
     // 照片小组件
     const photoWidgetDate = ref({
@@ -332,11 +336,16 @@ const fonts = ref([
     }
 ]);
 const selectedFont = ref(localStorage.getItem('lockFont') || 'CustomFont1');
+// 全局字体（锁屏以外）
+const globalSelectedFont = ref(localStorage.getItem('globalFont') || 'CustomFont1');
 const loadedFonts = ref(new Set());
 const customFontCount = ref(8);
 const showFontImportDialog = ref(false);
 const newFontName = ref('');
 const newFontUrl = ref('');
+
+// 主界面全局字体：从本地导入 .ttf
+const globalFontFileInput = ref(null);
 
 // 动态加载TTF字体
 const loadFontCSS = (font) => {
@@ -392,11 +401,83 @@ const loadFontCSS = (font) => {
     }, 1000);
 };
 
+// 加载全局字体（锁屏区域不会被这些选择器命中）
+const loadGlobalFontCSS = (font) => {
+    console.log('加载全局字体:', font.fontFamily, 'URL:', font.url);
+
+    const oldStyle = document.getElementById('global-font-style');
+    if (oldStyle) oldStyle.remove();
+
+    const style = document.createElement('style');
+    style.id = 'global-font-style';
+    style.textContent = `
+        @font-face {
+            font-family: '${font.fontFamily}';
+            src: url('${font.url}') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+
+        /* 锁屏区域不命中：只覆盖主页/应用内的文字 */
+        #app .home-main-preview-phone{
+            font-family: '${font.fontFamily}', sans-serif !important;
+        }
+
+        /* 覆盖组件里写死的 font-family（排除图标/输入/按钮以免破坏图标） */
+        #app .homescreen *:not(i):not(.fa):not(.fas):not(.far):not(.fab):not(button):not(input):not(textarea),
+        #app .home-pages *:not(i):not(.fa):not(.fas):not(.far):not(.fab):not(button):not(input):not(textarea),
+        #app .app-view *:not(i):not(.fa):not(.fas):not(.far):not(.fab):not(button):not(input):not(textarea),
+        #app .app-content *:not(i):not(.fa):not(.fas):not(.far):not(.fab):not(button):not(input):not(textarea),
+        #app .dock *:not(i):not(.fa):not(.fas):not(.far):not(.fab):not(button):not(input):not(textarea),
+        #app .page-indicator-container *:not(i):not(.fa):not(.fas):not(.far):not(.fab):not(button):not(input):not(textarea) {
+            font-family: '${font.fontFamily}', sans-serif !important;
+        }
+    `;
+    document.head.appendChild(style);
+};
+
 // 锁屏样式相关
 const lockWallpaper = ref(localStorage.getItem('lockWallpaper') || 'https://img.heliar.top/file/1773753630799_1773753603638.png');
 const lockWallpaperInput = ref(lockWallpaper.value);
 const lockDateTimeColor = ref(localStorage.getItem('lockDateTimeColor') || '#000000');
 const lockFont = ref(localStorage.getItem('lockFont') || 'CustomFont1');
+
+// 主界面样式相关（不覆盖锁屏）
+const homeWallpaper = ref(localStorage.getItem('homeWallpaper') || '');
+const homeWallpaperInput = ref(homeWallpaper.value);
+const homeTextColor = ref(localStorage.getItem('homeTextColor') || '#000000');
+const homeTextColorInput = ref(homeTextColor.value);
+
+const saveHomeWallpaper = () => {
+    homeWallpaper.value = homeWallpaperInput.value;
+    localStorage.setItem('homeWallpaper', homeWallpaperInput.value);
+};
+
+const saveHomeTextColor = () => {
+    homeTextColor.value = homeTextColorInput.value;
+    localStorage.setItem('homeTextColor', homeTextColorInput.value);
+};
+
+// 主界面毛玻璃开关（控制 dock / 翻页键 / 灵动岛 / 胶囊 / app 图标底板）
+const enableHomeGlass = ref(localStorage.getItem('enableHomeGlass') !== 'false');
+const toggleHomeGlass = () => {
+    enableHomeGlass.value = !enableHomeGlass.value;
+    localStorage.setItem('enableHomeGlass', enableHomeGlass.value ? 'true' : 'false');
+};
+
+// 状态栏隐藏开关
+const enableHideStatusBar = ref(localStorage.getItem('enableHideStatusBar') === 'true');
+const toggleHideStatusBar = () => {
+    enableHideStatusBar.value = !enableHideStatusBar.value;
+    localStorage.setItem('enableHideStatusBar', enableHideStatusBar.value ? 'true' : 'false');
+};
+
+// 苹果刘海屏适配开关（控制顶部 safe-area 偏移）
+const enableNotchAdaptation = ref(localStorage.getItem('enableNotchAdaptation') !== 'false');
+const toggleNotchAdaptation = () => {
+    enableNotchAdaptation.value = !enableNotchAdaptation.value;
+    localStorage.setItem('enableNotchAdaptation', enableNotchAdaptation.value ? 'true' : 'false');
+};
 
 // 导入自定义字体
 const importCustomFont = (event) => {
@@ -443,6 +524,13 @@ const selectFont = (font) => {
     loadFontCSS(font);
     console.log('selectedFont:', selectedFont.value);
     console.log('字体URL:', font.url);
+};
+
+// 选择全局字体（锁屏不受影响）
+const selectGlobalFont = (font) => {
+    globalSelectedFont.value = font.fontFamily;
+    localStorage.setItem('globalFont', globalSelectedFont.value);
+    loadGlobalFontCSS(font);
 };
 
 // 通过URL添加字体
@@ -508,202 +596,8 @@ onMounted(() => {
     if (homePagesElement) {
         console.log('成功获取homePages元素');
         
-        // 绑定触摸事件 - 只有滑动才能换页，点击不换页
-        let hasMoved = false;
-        
-        homePagesElement.addEventListener('touchstart', (e) => {
-            // 检查是否点击了对话输入框或聊天气泡
-            const target = e.touches[0].target;
-            if (target.classList && (target.classList.contains('chat-message-input') || target.classList.contains('chat-bubble') || target.classList.contains('chat-message'))) {
-                return;
-            }
-            console.log('触摸开始:', e.touches[0].clientX);
-            touchStartX = e.touches[0].clientX;
-            touchEndX = touchStartX;
-            hasMoved = false;
-        }, { passive: true });
-        
-        homePagesElement.addEventListener('touchmove', (e) => {
-            // 检查是否在对话输入框或聊天气泡上移动
-            const target = e.touches[0].target;
-            if (target.classList && (target.classList.contains('chat-message-input') || target.classList.contains('chat-bubble') || target.classList.contains('chat-message'))) {
-                return;
-            }
-            touchEndX = e.touches[0].clientX;
-            const diffX = touchEndX - touchStartX;
-            if (Math.abs(diffX) > 5) {
-                hasMoved = true;
-                // 水平滑动时阻止默认行为，防止页面滚动
-                if (e.cancelable) {
-                    e.preventDefault();
-                }
-            }
-        }, { passive: false });
-        
-        homePagesElement.addEventListener('touchend', (e) => {
-            // 检查是否在对话输入框或聊天气泡上释放
-            const target = e.changedTouches[0].target;
-            if (target.classList && (target.classList.contains('chat-message-input') || target.classList.contains('chat-bubble') || target.classList.contains('chat-message'))) {
-                return;
-            }
-            console.log('触摸结束 - 开始:', touchStartX, '结束:', touchEndX, '是否移动:', hasMoved);
-            
-            if (!hasMoved) {
-                console.log('只是点击，不切换页面');
-                touchStartX = 0;
-                touchEndX = 0;
-                hasMoved = false;
-                return;
-            }
-            
-            const diff = touchStartX - touchEndX;
-            const threshold = 30;
-            
-            console.log('滑动距离:', diff, '阈值:', threshold);
-            
-            if (Math.abs(diff) > threshold) {
-                if (diff > 0) {
-                    console.log('向左滑动，切换到下一页');
-                    if (currentPage.value < 1) {
-                        currentPage.value++;
-                        updateHomePagePosition();
-                    }
-                } else {
-                    console.log('向右滑动，切换到上一页');
-                    if (currentPage.value > 0) {
-                        currentPage.value--;
-                        updateHomePagePosition();
-                    }
-                }
-            } else {
-                console.log('滑动距离不够，不切换页面');
-            }
-            
-            touchStartX = 0;
-            touchEndX = 0;
-            hasMoved = false;
-        });
-        
-        let mouseHasMoved = false;
-        
-        homePagesElement.addEventListener('mousedown', (e) => {
-            // 检查是否点击了对话输入框或聊天气泡
-            if (e.target.classList && (e.target.classList.contains('chat-message-input') || e.target.classList.contains('chat-bubble') || e.target.classList.contains('chat-message'))) {
-                return;
-            }
-            console.log('鼠标按下:', e.clientX);
-            mouseStartX = e.clientX;
-            mouseEndX = mouseStartX;
-            isDragging = true;
-            mouseHasMoved = false;
-            e.target.style.cursor = 'grabbing';
-        });
-        
-        homePagesElement.addEventListener('mousemove', (e) => {
-            if (!isDragging) return;
-            // 检查是否在对话输入框或聊天气泡上移动
-            if (e.target.classList && (e.target.classList.contains('chat-message-input') || e.target.classList.contains('chat-bubble') || e.target.classList.contains('chat-message'))) {
-                return;
-            }
-            mouseEndX = e.clientX;
-            if (Math.abs(mouseEndX - mouseStartX) > 5) {
-                mouseHasMoved = true;
-            }
-        });
-        
-        homePagesElement.addEventListener('mouseup', (e) => {
-            // 检查是否在对话输入框或聊天气泡上释放
-            if (e.target.classList && (e.target.classList.contains('chat-message-input') || e.target.classList.contains('chat-bubble') || e.target.classList.contains('chat-message'))) {
-                return;
-            }
-            console.log('鼠标释放:', mouseStartX, mouseEndX, '是否移动:', mouseHasMoved);
-            if (!isDragging) return;
-            
-            if (!mouseHasMoved) {
-                console.log('只是点击，不切换页面');
-                mouseStartX = 0;
-                mouseEndX = 0;
-                isDragging = false;
-                mouseHasMoved = false;
-                e.target.style.cursor = 'grab';
-                return;
-            }
-            
-            const diff = mouseStartX - mouseEndX;
-            const threshold = 30;
-            
-            console.log('鼠标拖动距离:', diff, '阈值:', threshold);
-            
-            if (Math.abs(diff) > threshold) {
-                if (diff > 0) {
-                    console.log('向左拖动，切换到下一页');
-                    if (currentPage.value < 1) {
-                        currentPage.value++;
-                        updateHomePagePosition();
-                    }
-                } else {
-                    console.log('向右拖动，切换到上一页');
-                    if (currentPage.value > 0) {
-                        currentPage.value--;
-                        updateHomePagePosition();
-                    }
-                }
-            } else {
-                console.log('拖动距离不够，不切换页面');
-            }
-            
-            mouseStartX = 0;
-            mouseEndX = 0;
-            isDragging = false;
-            mouseHasMoved = false;
-            e.target.style.cursor = 'grab';
-        });
-        
-        homePagesElement.addEventListener('mouseleave', (e) => {
-            if (isHabitInput(e.target)) {
-                return;
-            }
-            if (isDragging) {
-                console.log('鼠标离开:', mouseStartX, mouseEndX, '是否移动:', mouseHasMoved);
-                
-                // 如果没有移动（只是点击），不切换页面
-                if (!mouseHasMoved) {
-                    mouseStartX = 0;
-                    mouseEndX = 0;
-                    isDragging = false;
-                    mouseHasMoved = false;
-                    e.target.style.cursor = 'grab';
-                    return;
-                }
-                
-                const diff = mouseStartX - mouseEndX;
-                const threshold = 30; // 滑动阈值
-                
-                console.log('鼠标拖动距离:', diff, '阈值:', threshold);
-                
-                if (Math.abs(diff) > threshold) {
-                    if (diff > 0) {
-                        console.log('向左拖动，切换到下一页');
-                        if (currentPage.value < 1) {
-                            currentPage.value++;
-                            updateHomePagePosition();
-                        }
-                    } else {
-                        console.log('向右拖动，切换到上一页');
-                        if (currentPage.value > 0) {
-                            currentPage.value--;
-                            updateHomePagePosition();
-                        }
-                    }
-                }
-                
-                mouseStartX = 0;
-                mouseEndX = 0;
-                isDragging = false;
-                mouseHasMoved = false;
-                e.target.style.cursor = 'grab';
-            }
-        });
+        // 已移除：滑动/拖拽切换主屏页面的逻辑
+        // 现在只保留翻页键（prevPage / nextPage）切换页面。
     } else {
         console.log('无法获取homePages元素');
     }
@@ -876,6 +770,7 @@ const saveFont = () => {
     const currentDate = ref('');
     const currentDay = ref('');
     const currentMonth = ref('');
+    const currentMonthEn = ref('');
     const currentDayOfMonth = ref('');
     
     // 更新时间
@@ -898,6 +793,10 @@ const saveFont = () => {
         // 月份
         const months = ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'];
         currentMonth.value = months[now.getMonth()];
+
+        // 月份（英文，用于音乐组件日期占位）
+        const monthsEn = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        currentMonthEn.value = monthsEn[now.getMonth()];
         
         // 日期
         currentDayOfMonth.value = now.getDate().toString();
@@ -2677,6 +2576,14 @@ const saveFont = () => {
         // 角色信息相关
         const showCharacterSelector = ref(false);
         const selectedCharacterId = ref(localStorage.getItem('selectedCharacterId') || null);
+
+        // 每次打开“角色选择弹窗”都刷新 workshop 角色列表，
+        // 避免你在别处新增角色后，当前内存的 characters 没及时同步。
+        watch(showCharacterSelector, (val) => {
+            if (val) {
+                loadCharacters();
+            }
+        });
         const selectedCharacter = computed(() => {
             if (characters.value.length === 0) {
                 return { nickname: '未命名角色', name: '未命名角色', avatarUrl: '', bindTime: null, affection: 0 };
@@ -7589,7 +7496,9 @@ const saveFont = () => {
             console.log('初始化字体...');
             // 加载默认字体
             const savedFont = localStorage.getItem('lockFont');
+            const savedGlobalFont = localStorage.getItem('globalFont');
             let defaultFont;
+            let defaultGlobalFont;
             
             if (savedFont) {
                 defaultFont = fonts.value.find(font => font.fontFamily === savedFont);
@@ -7604,6 +7513,18 @@ const saveFont = () => {
                 loadFontCSS(defaultFont);
                 console.log('默认字体:', defaultFont.fontFamily);
             }
+
+            // 加载默认全局字体（不覆盖锁屏）
+            if (savedGlobalFont) {
+                defaultGlobalFont = fonts.value.find(font => font.fontFamily === savedGlobalFont);
+            }
+
+            if (!defaultGlobalFont) {
+                defaultGlobalFont = fonts.value[0];
+                globalSelectedFont.value = defaultGlobalFont.fontFamily;
+            }
+            // 默认不自动加载全局字体，避免主界面因字体差异发生布局形变。
+            // 只有用户在“主题设置”里手动选择全局字体后，才会应用。
             console.log('初始化完成');
         };
         
@@ -7647,7 +7568,7 @@ const saveFont = () => {
             goBackInChat: exitSoulLinkChat,
 
             // Core
-            currentTime, currentDate, currentDay, currentMonth, currentDayOfMonth, randomHexCode, openedApp, currentScreen, deviceBatteryText, deviceSignalText,
+            currentTime, currentDate, currentDay, currentMonth, currentMonthEn, currentDayOfMonth, randomHexCode, openedApp, currentScreen, deviceBatteryText, deviceSignalText,
             isHomeScreenVisible,
             // Music Player
             isPlaying, togglePlayPause, playPrevious, playNext,
@@ -7797,13 +7718,34 @@ const saveFont = () => {
             chineseDate, fullDate, lockSignature, signatureSetting, saveSignature,
             // lock screen style functions
             lockWallpaper, lockWallpaperInput, saveLockWallpaper, lockDateTimeColor, saveLockDateTimeColor,
+            // home (non-lockscreen) style functions
+            homeWallpaper, homeWallpaperInput, saveHomeWallpaper, homeTextColor, homeTextColorInput, saveHomeTextColor,
+            enableHomeGlass, toggleHomeGlass,
+            enableHideStatusBar, toggleHideStatusBar,
+            enableNotchAdaptation, toggleNotchAdaptation,
             // font functions
-            fonts, selectedFont, saveFont, lockFont, selectFont, loadFontCSS, importCustomFont, customFontCount, initFonts, showFontImportDialog, newFontName, newFontUrl, addFontByUrl,
+            fonts,
+            selectedFont,
+            globalSelectedFont,
+            saveFont,
+            lockFont,
+            selectFont,
+            selectGlobalFont,
+            loadFontCSS,
+            loadGlobalFontCSS,
+            importCustomFont,
+            globalFontFileInput,
+            customFontCount,
+            initFonts,
+            showFontImportDialog,
+            newFontName,
+            newFontUrl,
+            addFontByUrl,
         };
 
         // 音乐播放器控制
         const playBtn = document.getElementById('playBtn');
-        const disk = document.getElementById('disk');
+        const disk = document.getElementById('disk'); // 新版音乐组件不一定存在唱片圆盘
         const pauseIcon = document.getElementById('pauseIcon');
         
         let musicIsPlaying = true;
@@ -7813,16 +7755,16 @@ const saveFont = () => {
         // 暂停图标的 SVG Path 数据
         const pausePath = "M6 19h4V5H6v14zm8-14v14h4V5h-4z";
         
-        if (playBtn && disk && pauseIcon) {
+        if (playBtn && pauseIcon) {
             playBtn.addEventListener('click', () => {
                 if (musicIsPlaying) {
-                    disk.classList.add('paused');
+                    if (disk) disk.classList.add('paused');
                     const path = pauseIcon.querySelector('path');
                     if (path) {
                         path.setAttribute('d', playPath);
                     }
                 } else {
-                    disk.classList.remove('paused');
+                    if (disk) disk.classList.remove('paused');
                     const path = pauseIcon.querySelector('path');
                     if (path) {
                         path.setAttribute('d', pausePath);
