@@ -20753,7 +20753,7 @@ label {
    ========================================================== */
 
 .homescreen {
-    height: 100vh;
+    height: 100dvh;
     width: 100%;
     overflow: hidden;
     padding: 0;
@@ -20776,8 +20776,12 @@ label {
     top: auto;
     bottom: 0;
     /* 预留底部 UI（翻页器 + Dock）高度，避免遮住第5-6行 */
-    --home-bottom-gap: clamp(120px, 18vh, 190px);
-    --phone-scale: min(calc(100vw / 430px), calc(100vh / 930px));
+    --home-bottom-gap: clamp(120px, calc(18vh + env(safe-area-inset-bottom)), 190px);
+    /* 关键：用 100dvh 并扣掉顶部/底部安全区，确保横屏宽屏也能完整显示 */
+    --phone-scale: min(
+        calc(100vw / 430px),
+        calc((100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) / 930px)
+    );
     transform: translateX(-50%) scale(var(--phone-scale));
     transform-origin: center bottom;
     padding: 0;
@@ -20817,7 +20821,7 @@ label {
 .page-indicator-container {
     position: absolute !important;
     left: 50% !important;
-    bottom: 110px !important;
+    bottom: calc(110px + env(safe-area-inset-bottom)) !important;
     transform: translateX(-50%) !important;
     display: flex;
     align-items: center;
@@ -20833,7 +20837,7 @@ label {
 .dock {
     position: absolute !important;
     left: 50% !important;
-    bottom: 20px !important;
+    bottom: calc(20px + env(safe-area-inset-bottom)) !important;
     transform: translateX(-50%) !important;
     width: auto;
     min-width: 320px;

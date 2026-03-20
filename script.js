@@ -36,8 +36,8 @@ export function setupApp() {
         weekday: ''
     });
     const photoWidgetText = ref({
-        line1: localStorage.getItem('photoWidgetText1') || '小则乖宝，想你啦^o^',
-        line2: localStorage.getItem('photoWidgetText2') || '他好酷，好可爱，我好喜欢^ω^'
+        line1: localStorage.getItem('photoWidgetText1') || 'the storm is',
+        line2: localStorage.getItem('photoWidgetText2') || 'COMING'
     });
     const photoWidgetPhotos = ref([
         { url: localStorage.getItem('photoWidgetPhoto0') || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=300&fit=crop' },
