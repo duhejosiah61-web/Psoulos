@@ -61,7 +61,8 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    padding: 4% 0;
+    /* 给固定在底部的按钮留出空间，避免和密码键重合 */
+    padding: 4% 0 calc(clamp(90px, 12vh, 130px) + env(safe-area-inset-bottom));
     box-sizing: border-box;
     z-index: 1000;
     transition: transform 0.3s ease-out;
@@ -423,13 +424,16 @@
 
 /* 底部操作按钮 */
 .lock-bottom-controls {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: env(safe-area-inset-bottom);
     display: flex;
     justify-content: space-around;
     align-items: center;
     padding: 0 4%;
-    margin-top: auto;
-
-    margin-bottom: 40px;
+    margin: 0;
+    z-index: 5;
 }
 
 .lock-bottom-btn {
@@ -1034,7 +1038,7 @@ body {
     flex-direction: column;
     position: relative; /* 让内部绝对定位元素以它为参照 */
     /* 为上方6行网格预留出底部一行 Dock 的空间，让 6×4 区域不会被遮挡 */
-    padding-bottom: 160px;
+    padding-bottom: calc(160px + env(safe-area-inset-bottom));
     box-sizing: border-box;
 }
 
@@ -2315,12 +2319,13 @@ body {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    filter: grayscale(100%) contrast(1.1) brightness(1.05);
+    /* 去掉照片小组件灰色滤镜：保持原图颜色 */
+    filter: none;
     transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .photo-widget-item:hover .photo-widget-img {
-    filter: grayscale(0%) contrast(1.15) brightness(1.1);
+    filter: none;
     transform: scale(1.1);
 }
 
@@ -2737,7 +2742,7 @@ body {
 }
 
 .sticker-widget img {
-    filter: grayscale(100%) !important;
+    filter: none !important;
 }
 
 .call-info {
@@ -3670,7 +3675,7 @@ body {
 /* 页面指示器容器 */
 .page-indicator-container {
     position: absolute; /* 固定在 homescreen-inner 内部，而不是整个浏览器 */
-    bottom: 110px;
+    bottom: calc(110px + env(safe-area-inset-bottom));
     left: 50%;
     transform: translateX(-50%);
     display: flex;
@@ -3770,7 +3775,8 @@ body {
 .sparkle-3 {
     width: 20px;
     height: 20px;
-    bottom: 30%;
+    top: 62%;
+    bottom: auto;
     left: 12%;
     animation: sparkle-float 9s ease-in-out infinite;
 }
@@ -3778,7 +3784,8 @@ body {
 .sparkle-4 {
     width: 28px;
     height: 28px;
-    bottom: 15%;
+    top: 70%;
+    bottom: auto;
     right: 8%;
     animation: sparkle-float 11s ease-in-out infinite reverse;
 }
@@ -4404,7 +4411,7 @@ body {
 /* 底部Dock */
 .dock {
     position: absolute; /* 绑定在 homescreen-inner 底部这一行 */
-    bottom: 20px;
+    bottom: calc(20px + env(safe-area-inset-bottom));
     left: 50%;
     transform: translateX(-50%);
     display: flex;
