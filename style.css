@@ -73,13 +73,13 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    margin: 35px 0;
+    margin: 25px 0;
 }
 
 .lock-password-input {
     display: flex;
     gap: 20px;
-    margin-bottom: 40px;
+    margin-bottom: 28px;
 }
 
 .lock-password-dot {
@@ -172,7 +172,7 @@
 /* 主时间显示 */
 .lock-time {
     text-align: center;
-    margin: 12% 0 8%;
+    margin: 10% 0 6%;
     animation: fadeIn 1s ease-out;
 }
 
