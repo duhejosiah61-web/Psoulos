@@ -2809,6 +2809,349 @@ const saveFont = () => {
             '🌸', '💮', '🏵', '🌹', '🥀', '🌺', '🌻', '🌼'
         ]);
         const stickerPacks = ref(JSON.parse(localStorage.getItem('stickerPacks') || '[]'));
+        // 这四个系列你说是“空的”，需要先从本地缓存里删掉（避免后续被当成已存在包而跳过合并）
+        try {
+            const dropStickerPackNames = ['狗皇帝', '呆猫八条', '绿萝卜', '这狗'];
+            if (Array.isArray(stickerPacks.value)) {
+                stickerPacks.value = stickerPacks.value.filter(p => p?.name && !dropStickerPackNames.includes(p.name));
+                localStorage.setItem('stickerPacks', JSON.stringify(stickerPacks.value));
+            }
+        } catch (e) {
+            // ignore: localStorage 在某些环境下不可用/受限
+        }
+        // ===== 内置表情包（把用户给的 xxx.txt 直接内置进来）=====
+        // 规则：xxx.txt 的 xxx 就是表情包系列名；文件内容行格式： 名称: URL
+        // 注意：由于浏览器对本地文件读取有限制，这里选择直接把文本内置到前端脚本中。
+        const builtinStickerPackTexts = {
+            狗皇帝: `嘿嘿: https://files.catbox.moe/5sflvj.jpg
+传旨: https://files.catbox.moe/jmrdo2.jpg
+国色天香: https://files.catbox.moe/a409v5.jpg
+皇帝驾到: https://files.catbox.moe/s1ebsc.jpg
+要对朕心怀感激: https://files.catbox.moe/61i8ja.jpg
+甚好: https://files.catbox.moe/nslzhe.jpg
+给朕上贡: https://files.catbox.moe/ptzk03.jpg
+皇上饶命: https://files.catbox.moe/rqn1o1.jpg
+你好香: https://files.catbox.moe/5z0oru.jpg
+遵旨: https://files.catbox.moe/zzca7c.jpg
+俺是小皇帝: https://files.catbox.moe/jjsx9f.jpg
+龙颜不悦: https://files.catbox.moe/rycskd.jpg
+既见朕，为何不跪: https://files.catbox.moe/ywrr53.jpg
+爱卿平身: https://files.catbox.moe/zq5evj.jpg
+龙颜大悦: https://files.catbox.moe/8wibyb.jpg
+朕考考你: https://files.catbox.moe/tj3faj.jpg
+朕，知晓一切: https://files.catbox.moe/dz17wc.jpg
+斩立决: https://files.catbox.moe/xm2c37.jpg
+朕知道了，退下吧: https://files.catbox.moe/8xh473.jpg
+朕参见奴才: https://files.catbox.moe/538d1p.jpg
+何错之有: https://files.catbox.moe/l2ya3f.jpg
+赏心悦目: https://files.catbox.moe/8pwn00.jpg
+重赏: https://files.catbox.moe/ejo4f9.jpg
+给我: https://files.catbox.moe/046qeg.jpg
+胆大包天: https://files.catbox.moe/xjldze.gif
+竟有此事: https://files.catbox.moe/crle9n.gif
+陛下圣明: https://files.catbox.moe/ad4ybt.gif
+朕天下第一帅: https://files.catbox.moe/pfig6w.gif
+请用膳: https://files.catbox.moe/lddsbr.gif
+翻牌子: https://files.catbox.moe/lkp1xn.gif
+关怀: https://files.catbox.moe/aoefan.gif
+朕乏了: https://files.catbox.moe/8bi978.gif
+上早八: https://files.catbox.moe/rbaj4o.gif
+息怒: https://files.catbox.moe/6j2als.gif
+什么意思: https://files.catbox.moe/pgraco.gif
+不干了: https://files.catbox.moe/3v5nb1.gif
+好: https://files.catbox.moe/vlpble.gif
+追随你: https://files.catbox.moe/vhsmxx.gif
+告退: https://files.catbox.moe/kwadrn.gif
+这就去: https://files.catbox.moe/12x6ge.gif
+做掉他: https://files.catbox.moe/fq2p6o.gif
+您吉祥: https://files.catbox.moe/s5zjgp.png
+皇上驾到: https://files.catbox.moe/l23gio.gif
+俺是小奴才: https://files.catbox.moe/p8ckto.png
+召唤: https://files.catbox.moe/8f8270.gif
+准了: https://files.catbox.moe/0vc6kq.gif
+你可知罪: https://files.catbox.moe/nhh2h6.gif
+知错了: https://files.catbox.moe/zq5yqt.gif`,
+            恶俗: `禁止发春:https://i.postimg.cc/C55TvMDF/tlal8l.jpg
+摸男人奶子:https://i.postimg.cc/Jn2DYngZ/2rtcpa.gif 
+皮拍子打逼:https://i.postimg.cc/pT6hcT7D/5h8d07.gif
+舔屁股拍屁股:https://i.postimg.cc/vBNg2Bjv/7je3j4-(1).gif 
+捆绑做爱:https://i.postimg.cc/Tww5cmkD/asupa5.gif
+躯体化手在裤子里撸管:https://i.postimg.cc/855fbWyr/Camera-XHS-17641935050941040g2sg31nqasfhemmj05p0ida2kidjp2mgo16o.jpg
+萎:https://i.postimg.cc/Kzz35L98/Camera-XHS-17641936274441040g2sg314bsa4f7688g5pgjt7c3creborucbfg.jpg
+打屁屁:https://i.postimg.cc/j5Fw359y/i0sd31.gif
+发大水了:https://i.postimg.cc/wvvRkJW1/ikmlgo.jpg
+假鸡吧插屁股:https://i.postimg.cc/G258g2NH/kl6eau.gif
+我要吃奶还要边吃边摸:https://i.postimg.cc/0QQKCmtb/rzu623.jpg
+抽插:https://i.postimg.cc/vBNg2Bj2/xmj-1764192317618-jpg.gif
+嘬你胸:https://i.postimg.cc/8s8FDYTD/xmj-1764192324926-jpg.gif
+弹奶子:https://i.postimg.cc/9z34Vkcc/xmj-1764192328297-jpg.gif
+掐脖子干:https://i.postimg.cc/ydbgpd52/xmj-1764192337549-jpg.gif
+再骚扰我就掐你小鸡鸡:https://i.postimg.cc/sfP9DPt8/img-1764196381687008FUyibgy1i5ekbim01gg303k03kjsz.gif
+你想干什么:https://i.postimg.cc/C1TkwdJz/img-1764196367264008FUyibgy1i5ekbh3j7ag303e02ojry.gif 
+拿针扎病人皮眼:https://i.postimg.cc/nzbBnMTZ/img-1764196405759007d4Yz2ly1i5ekzd7476g303k03k0t3.gif
+小样，整不死你:https://i.postimg.cc/hjWTKhMX/img-1764196410573007d4Yz2ly1i5ekze13a0g303k03kq38.gif 
+帅哥哥我等你呐:https://i.postimg.cc/tTQW97Dg/img-1764196425401008s-L2t-Egy1i5ekx6qvbxg303k03kmxe.gif`,
+            呆猫八条: `　　比中指：https://files.catbox.moe/wkbqwn.jpeg
+咬你/啃你：https://files.catbox.moe/u2fq1v.jpeg
+思考：https://files.catbox.moe/kpucr6.jpeg
+不要啊！：https://files.catbox.moe/ahvwuh.jpeg
+给你爱心：https://files.catbox.moe/hpnlwp.jpeg
+老实：https://files.catbox.moe/y64cpm.jpeg
+躺下哭泣：https://files.catbox.moe/lbgejb.jpeg
+后退发抖：https://files.catbox.moe/z6f4k6.jpeg
+气炸毛了：https://files.catbox.moe/cz2pxs.jpeg
+摇尾巴：https://files.catbox.moe/5zjtvn.jpeg
+咬衣服/别走！：https://files.catbox.moe/2gcvw9.jpeg
+哇塞！/真的吗：https://files.catbox.moe/2xa81l.jpeg
+卑职明白：https://files.catbox.moe/9rn1o7.jpeg
+阴沉思考：https://files.catbox.moe/zcy509.jpeg
+爱心：https://files.catbox.moe/w8mhob.jpeg
+拍了拍地板/你过来：https://files.catbox.moe/d82a7g.jpeg
+心里想刀人但是不敢：https://files.catbox.moe/u93koe.jpeg
+已经这样了，那还能怎么办？：https://files.catbox.moe/g71x1n.jpeg
+汗流浃背吐舌头：https://files.catbox.moe/g71x1n.jpeg
+我不去！：https://files.catbox.moe/nzwasb.jpeg
+汗流浃背：https://files.catbox.moe/z2kati.jpeg
+三个点：https://files.catbox.moe/o1o8oa.jpeg
+上班好累：https://files.catbox.moe/x12vzk.jpeg
+是的主人！：https://files.catbox.moe/006sie.jpeg
+舔你的手指：https://files.catbox.moe/t6lkjn.jpeg
+嘬一口：https://files.catbox.moe/t6lkjn.jpeg
+嘬一口：https://files.catbox.moe/g42360.jpeg
+疑惑：https://files.catbox.moe/qa30h6.jpeg
+害羞脸红：https://files.catbox.moe/m7arrf.jpeg
+混乱：https://files.catbox.moe/allc2d.jpeg
+比耶：https://files.catbox.moe/ypoph0.jpeg
+思考：https://files.catbox.moe/ybcmzc.jpeg
+摸头：https://files.catbox.moe/pf1slc.jpeg
+OK：https://files.catbox.moe/chifv5.jpeg
+操：https://files.catbox.moe/0w66zs.jpeg
+爱心：https://files.catbox.moe/pqq8o5.jpeg
+探头：https://files.catbox.moe/tzvjev.jpeg
+我来了：https://files.catbox.moe/p65yds.jpeg
+阴沉憋屈：https://files.catbox.moe/0anepb.jpeg
+贴贴蹭蹭：https://files.catbox.moe/nz40cm.jpeg
+揉揉脸：https://files.catbox.moe/wvj6ec.jpeg
+阻拦：https://files.catbox.moe/og7zsy.jpeg
+哭着打电话：https://files.catbox.moe/u1q149.jpeg
+捏捏脸但还是生气：https://files.catbox.moe/pgrf0c.jpeg
+呜呜被打了：https://files.catbox.moe/wjvwnl.jpeg
+呜呜我错了：https://files.catbox.moe/wjvwnl.jpeg
+不要啊：https://files.catbox.moe/p647hu.jpeg
+亲一口：https://files.catbox.moe/nyhlde.jpeg
+星星眼：https://files.catbox.moe/9lysji.jpeg
+憋到脸红：https://files.catbox.moe/ia2bj9.jpeg
+啊好吃好吃：https://files.catbox.moe/2d8dpy.jpeg
+逃走：https://files.catbox.moe/y79thp.JPG
+卖萌：https://files.catbox.moe/d0blm1.JPG
+哭哭发抖：https://files.catbox.moe/4o2pcn.JPG
+盯：https://files.catbox.moe/darjw1.JPG
+爆哭：https://files.catbox.moe/hqnnbx.JPG
+委屈：https://files.catbox.moe/emwjh9.JPG
+我恨：https://files.catbox.moe/ra2cjm.JPG
+超级委屈：https://files.catbox.moe/91tj5k.JPG
+蹭蹭：https://files.catbox.moe/piwn04.JPG
+疑惑：https://files.catbox.moe/wymjg4.JPG
+被看扁了：https://files.catbox.moe/i5qm1w.JPG
+被骂了：https://files.catbox.moe/g49f9h.JPG
+被骂了但不服：https://files.catbox.moe/g49f9h.JPG
+累趴了：https://files.catbox.moe/1vgqbr.JPG
+牵手：https://files.catbox.moe/tnef99.JPG
+对着手机笑：https://files.catbox.moe/jv7981.JPG
+期待：https://files.catbox.moe/6z3c67.JPG
+惊讶：https://files.catbox.moe/rd02w8.JPG
+太心动了：https://files.catbox.moe/q4y1rq.JPG
+心虚：https://files.catbox.moe/ybu9yt.JPG
+你在做啥坏事：https://files.catbox.moe/t34915.JPG
+阴沉地亮出刀：https://files.catbox.moe/bx1bkr.jpeg
+讨好：https://files.catbox.moe/8u2k76.JPG`,
+            发疯文学: `就不说话了: https://s3plus.meituan.net/opapisdk/op_ticket_1_5677168484_1768242335410_qdqqd_cuttdo.gif
+遇到难回答的问题: https://s3plus.meituan.net/opapisdk/op_ticket_1_885190757_1768242338198_qdqqd_wv26dl.gif
+你总是这样: https://s3plus.meituan.net/opapisdk/op_ticket_1_885190757_1768242341586_qdqqd_05mz36.gif
+爱你老己: https://s3plus.meituan.net/opapisdk/op_ticket_1_5677168484_1768242344132_qdqqd_zihtpa.gif
+闺闺: https://s3plus.meituan.net/opapisdk/op_ticket_1_885190757_1768242346688_qdqqd_65vu2p.gif
+没招了: https://s3plus.meituan.net/opapisdk/op_ticket_1_885190757_1768242347956_qdqqd_f7zad8.gif
+我要找人弄你: https://s3plus.meituan.net/opapisdk/op_ticket_1_885190757_1768242349185_qdqqd_7f7brl.gif
+我有的是力气和手段: https://s3plus.meituan.net/opapisdk/op_ticket_1_5677168484_1768242350529_qdqqd_yyds9w.gif
+可以了不想再听了: https://s3plus.meituan.net/opapisdk/op_ticket_1_885190757_1768242351848_qdqqd_73oh3z.gif
+太坏了准备更坏: https://s3plus.meituan.net/opapisdk/op_ticket_1_5673241091_1768242353136_qdqqd_vrszsx.gif
+好狗: https://s3plus.meituan.net/opapisdk/op_ticket_1_5677168484_1768242354465_qdqqd_u7r13k.gif
+真棒: https://s3plus.meituan.net/opapisdk/op_ticket_1_5673241091_1768242356503_qdqqd_d7l01k.gif
+没有这个义务: https://s3plus.meituan.net/opapisdk/op_ticket_1_5677168484_1768242357841_qdqqd_0pdoue.gif
+不知道: https://s3plus.meituan.net/opapisdk/op_ticket_1_5677168484_1768242359115_qdqqd_8q1fth.gif
+消息很难回吗: https://s3plus.meituan.net/opapisdk/op_ticket_1_5677168484_1768242360569_qdqqd_x90qvt.gif
+受着: https://s3plus.meituan.net/opapisdk/op_ticket_1_5677168484_1768242361820_qdqqd_6lqqhi.gif
+你无敌了: https://s3plus.meituan.net/opapisdk/op_ticket_1_5673241091_1768242363056_qdqqd_admhzd.gif
+这对吗: https://s3plus.meituan.net/opapisdk/op_ticket_1_885190757_1768242364304_qdqqd_1rbcff.gif
+蠢蠢的很安心: https://s3plus.meituan.net/opapisdk/op_ticket_1_885190757_1768242365582_qdqqd_1y2326.gif
+天塌了: https://s3plus.meituan.net/opapisdk/op_ticket_1_5673241091_1768242366782_qdqqd_6uq7pb.gif
+诡秘在吗: https://s3plus.meituan.net/opapisdk/op_ticket_1_5677168484_1768242368010_qdqqd_sx79te.gif
+是不是笑脸给多了: https://s3plus.meituan.net/opapisdk/op_ticket_1_5677168484_1768242369167_qdqqd_w3vh6z.gif
+好了不许说话: https://s3plus.meituan.net/opapisdk/op_ticket_1_5677168484_1768242370357_qdqqd_hpzlom.gif
+你想毁了我吗: https://s3plus.meituan.net/opapisdk/op_ticket_1_885190757_1768242371503_qdqqd_ibik1r.gif
+0帧起手: https://s3plus.meituan.net/opapisdk/op_ticket_1_5673241091_1768242372851_qdqqd_u4wvup.gif
+装货: https://s3plus.meituan.net/opapisdk/op_ticket_1_885190757_1768242373994_qdqqd_bs5pdv.gif
+那可太有生活了: https://s3plus.meituan.net/opapisdk/op_ticket_1_885190757_1768242375773_qdqqd_exu5c1.gif
+那很对了: https://s3plus.meituan.net/opapisdk/op_ticket_1_885190757_1768242376938_qdqqd_cprncy.gif
+那很坏了: https://s3plus.meituan.net/opapisdk/op_ticket_1_885190757_1768242378174_qdqqd_r4rs9e.gif
+俺不中嘞: https://s3plus.meituan.net/opapisdk/op_ticket_1_5673241091_1768242379359_qdqqd_5trlwx.gif
+都不容易: https://s3plus.meituan.net/opapisdk/op_ticket_1_5673241091_1768242380520_qdqqd_mgud6s.gif
+蒜鸟蒜鸟: https://s3plus.meituan.net/opapisdk/op_ticket_1_5673241091_1768242381625_qdqqd_fy7sl2.gif`,
+            我鸟都不鸟你: `我鸟都不鸟你：https://i.postimg.cc/T2BJPTzt/Screenshot-2025-12-19-14-57-05-451-com-xingin-xhs-edit.jpg
+我想鸟鸟：https://i.postimg.cc/Qt2KjdFY/Screenshot-2025-12-19-14-57-34-364-com-xingin-xhs-edit.jpg
+我鸟你身上：https://i.postimg.cc/26Z39N0S/Screenshot-2025-12-19-14-57-47-345-com-xingin-xhs-edit.jpg
+不许鸟：https://i.postimg.cc/522ydCPf/Screenshot-2025-12-19-14-57-58-040-com-xingin-xhs-edit.jpg
+你打我撒：https://i.postimg.cc/cLLCynDJ/Screenshot-2025-12-19-14-59-37-774-com-xingin-xhs-edit.jpg
+加油，你是最胖的：https://i.postimg.cc/MpnwmbPn/Screenshot-2025-12-19-14-59-45-200-com-xingin-xhs-edit.jpg
+你鸟鸟我：https://i.postimg.cc/QCdwxhvc/Screenshot-2025-12-19-15-00-16-153-com-xingin-xhs-edit.jpg
+我们不鸟你：https://i.postimg.cc/tTXm29R0/Screenshot-2025-12-19-15-00-30-404-com-xingin-xhs-edit.jpg
+不鸟我的下场：https://i.postimg.cc/vZfqy4Dj/Screenshot-2025-12-19-15-00-43-421-com-xingin-xhs-edit.jpg`,
+            绿萝卜: `开心的跳舞:https://files.catbox.moe/rifquh.gif
+收到敬礼:https://files.catbox.moe/x57pt9.gif
+好耶（飞奔）:https://files.catbox.moe/rv50e5.gif
+呜呜（大哭）:https://files.catbox.moe/2a4qkv.gif
+委屈🥺：https://files.catbox.moe/ehb859.gif
+送花:https://files.catbox.moe/slytma.gif
+开心：https://files.catbox.moe/cirfzj.gif
+哇！真的吗:https://files.catbox.moe/0f5y9j.gif
+气嘟嘟:https://files.catbox.moe/bfk8cx.gif
+包在我身上(OK）:https://files.catbox.moe/wsqbt1.gif
+自闭:https://files.catbox.moe/ma1ksa.gif
+不开心:https://files.catbox.moe/kz3sxe.gif
+哭哭:https://files.catbox.moe/wl0qzq.gif
+捂脸哭(假哭）:https://files.catbox.moe/emu99k.gif
+眼神亮晶晶:https://files.catbox.moe/urdfkq.gif
+心动:https://files.catbox.moe/9x1o38.gif
+飞吻:https://files.catbox.moe/xrfvlx.gif
+生气:https://files.catbox.moe/ltf11x.gif
+放屁:https://files.catbox.moe/sodmp7.gif
+耍赖:https://files.catbox.moe/9m913y.gif
+咦！（震惊）:https://files.catbox.moe/j270y8.gif
+疑惑:https://files.catbox.moe/td6tla.gif
+不行:https://files.catbox.moe/xp0nx5.gif
+棒:https://files.catbox.moe/xp0nx5.gif
+OK:https://files.catbox.moe/z7rstl.gif
+打你:https://files.catbox.moe/ccdwsh.gif
+害羞:https://files.catbox.moe/im1fb1.jpeg
+灵魂出窍:https://files.catbox.moe/oitobi.jpeg
+冒冷汗:https://files.catbox.moe/88rj5h.jpeg
+思考:https://files.catbox.moe/se13r7.jpeg
+发怒:https://files.catbox.moe/1ym8s2.jpeg
+幸灾乐祸:https://files.catbox.moe/t2sq0v.jpeg
+飞奔:https://files.catbox.moe/lyohwx.jpeg
+飘来:https://files.catbox.moe/9tz3ri.jpeg
+不愿醒来:https://files.catbox.moe/hbkdex.jpeg`,
+            棉花糖小狗: `略略略：https://img.58sb.cn/file/img/jktb7oi4.jpg
+舔舔你：https://img.58sb.cn/file/img/8hlgSoU0.jpg
+看我看我：https://img.58sb.cn/file/img/C5o7L9vf.jpg
+我开动了：https://img.58sb.cn/file/img/9BfsP3oQ.jpg
+送你小花：https://img.58sb.cn/file/img/3Oovm4eE.jpg
+小狗生气：https://img.58sb.cn/file/img/JqZ2CtQm.jpg
+我看看怎么个事儿：https://img.58sb.cn/file/img/DHuBi8oO.jpg
+好运好运~：https://img.58sb.cn/file/img/HmtXpOFl.jpg
+余额不足了：https://img.58sb.cn/file/img/eeeXyq1w.jpg
+眼睛亮亮地看你：https://img.58sb.cn/file/img/J0i5Gliv.jpg
+可怜兮兮：https://img.58sb.cn/file/img/oAKFBM9z.jpg
+理理我呀：https://img.58sb.cn/file/img/Xe1qez0v.jpg
+没招了：https://img.58sb.cn/file/img/178mHGOm.jpg
+我真的生气了：https://img.58sb.cn/file/img/2HgR6OJA.jpg
+哦哦哦不哭：https://img.58sb.cn/file/img/vyGpcOA1.jpg
+挠挠下巴：https://img.58sb.cn/file/img/G92zvD5g.jpg
+和我玩：https://img.58sb.cn/file/img/sia6U5Rb.jpg
+暗示你：https://img.58sb.cn/file/img/0wkGpJo3.jpg
+我鸟都不鸟你：https://img.58sb.cn/file/img/5VUgRc3S.jpg
+我就这么静静看着：https://img.58sb.cn/file/img/KlNcTsET.jpg`,
+            这狗: `玫瑰 https://files.catbox.moe/545b2b.gif
+呆萌 https://files.catbox.moe/fhwab8.gif
+开心 https://files.catbox.moe/k30x10.gif
+收到 https://files.catbox.moe/4xolcf.gif
+幸福 https://files.catbox.moe/rsuln5.gif
+幸运 https://files.catbox.moe/yldelv.gif
+嘬嘬 https://files.catbox.moe/l84x07.gif
+流泪 https://files.catbox.moe/95ybre.gif
+阴暗 https://files.catbox.moe/zk1pl5.gif
+思考 https://files.catbox.moe/mqttit.gif
+挠屁屁 https://files.catbox.moe/ws1yse.gif
+摇尾巴 https://files.catbox.moe/33pn02.gif
+亲亲 https://files.catbox.moe/6azpdx.gif
+星星眼 https://files.catbox.moe/6s5kb9.gif
+猎杀时刻 https://files.catbox.moe/irrrj4.gif
+嚼嚼 https://files.catbox.moe/5rz6rh.gif
+苦涩 https://files.catbox.moe/x2av3c.gif
+奇怪 https://files.catbox.moe/iwpx4b.gif
+灿烂 https://files.catbox.moe/67s7q4.gif
+比耶 https://files.catbox.moe/0ern4o.gif
+委屈 https://files.catbox.moe/rrpca3.gif
+生气 https://files.catbox.moe/2qfv9t.gif
+饿了 https://files.catbox.moe/mbo9qa.gif
+特别好 https://files.catbox.moe/dsnpip.gif`,
+            小章鱼: `疑问 https://i.postimg.cc/ZR6qJDzZ/IMG-4278.gif
+OK https://i.postimg.cc/B62vJwf4/IMG-4279.gif
+开心/哼歌/雀跃 https://i.postimg.cc/sX5230CV/IMG-4280.gif
+惊吓 https://i.postimg.cc/8C25Qg3X/IMG-4281.gif
+偷亲 https://i.postimg.cc/N03MqvVS/IMG-4282.gif
+睡觉 https://i.postimg.cc/8C25Qg3x/IMG-4283.gif
+震惊 https://i.postimg.cc/FKMR5Xq2/IMG-4284.gif
+慌张 https://i.postimg.cc/MT1Gzr2L/IMG-4286.gif
+流泪/悲伤 https://i.postimg.cc/HxbLTPDh/IMG-4287.gif
+开心到跳起 https://i.postimg.cc/0Q7N9HRT/IMG-4289.gif
+期待/按捺不住 https://i.postimg.cc/C1bKw6pV/IMG-4290.gif
+害怕/恐惧 https://i.postimg.cc/HLqxD1Kw/IMG-4291.gif
+鞠躬/麻烦你了 https://i.postimg.cc/TPzwMvSc/IMG-4292.gif
+随歌起舞 https://i.postimg.cc/fbGLnQFK/IMG-4293.gif
+冒爱心 https://i.postimg.cc/43DdkRMw/IMG-4294.gif
+崇拜/期待 https://i.postimg.cc/g0CJFb5s/IMG-4295.gif
+贴贴摸头 https://i.postimg.cc/0QdbY25t/IMG-4702.gif
+害怕/瑟瑟发抖 https://i.postimg.cc/RFzWJnm8/IMG-4703.gif
+可愛いね（好可爱呀） https://i.postimg.cc/ydzD3SKG/IMG-4705.gif
+どれくらい好き？（有多喜欢我？） https://i.postimg.cc/tRks7TMZ/IMG-4706.gif
+ごめんね（对不起） https://i.postimg.cc/DZd8ryfc/IMG-4707.gif
+はあ...（哈啊...）/叹气 https://i.postimg.cc/fWCVkLr0/IMG-4708.gif
+不安だよー（我很不安哦—） https://i.postimg.cc/c1hv6Hb7/IMG-4709.gif
+会いたいよー（想见你哦—） https://i.postimg.cc/1RB84tjc/IMG-4710.gif
+ちゅ（啾）/飞吻 https://i.postimg.cc/pVCmyT68/IMG-4711.gif
+ほんとに好き？（真的喜欢我吗？） https://i.postimg.cc/59gXj0RB/IMG-4712.gif
+OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
+ほんとにへいき？（真的不要紧吗？/真的没事吗？） https://i.postimg.cc/3RHk0Dh1/IMG-4715.gif
+お疲れ様（辛苦了） https://i.postimg.cc/7P95b6Wx/IMG-4716.gif
+ちゅー（啾）/亲亲 https://i.postimg.cc/QCfCz47G/IMG-4717.gif
+やだやだー！（不要不要—！）/闹别扭 https://i.postimg.cc/59gXj0RN/IMG-4718.gif
+ぷん！（哼！）/不理你了！ https://i.postimg.cc/T20Khw41/IMG-4719.gif
+走近凝视/震慑 https://i.postimg.cc/FFpY1RB1/IMG-4720.gif
+好きだよっ（喜欢哦） https://i.postimg.cc/0jVj4WwW/IMG-4721.gif
+好きって言って？（说喜欢我？） https://i.postimg.cc/ZnwnQ7dM/IMG-4722.gif
+いつもありがと（一直以来都很感谢你） https://i.postimg.cc/sxTxL6hL/IMG-4723.gif
+幸せ～（好幸福~） https://i.postimg.cc/fy8yP29p/IMG-4724.gif
+默默流泪 https://i.postimg.cc/qq1qFbKf/IMG-4725.gif
+やったー！（太好了！） https://i.postimg.cc/PJSJ73wL/IMG-4726.gif
+疯狂发送爱心 https://i.postimg.cc/3NtNqSvj/IMG-4727.gif
+会いたいよ—（呜呜呜好想见你啊—） https://i.postimg.cc/GtXtf7yJ/IMG-4728.gif
+どこにいるの？（去哪里了？TT） https://i.postimg.cc/C5c52Pq4/IMG-4729.gif
+誰といるの？（和谁在一起？TT） https://i.postimg.cc/d353fHyB/IMG-4730.gif
+さみちいよー（好寂寞啊—TT） https://i.postimg.cc/kGTGH1bb/IMG-4731.gif
+どうしたの？（怎么了？TT） https://i.postimg.cc/fyzkBnJx/IMG-4733.gif
+うふーん（泣）/（呜呜TT）/哭泣 https://i.postimg.cc/cCx6XyrB/IMG-4734.gif
+ぎゅってして（抱紧我~TT） https://i.postimg.cc/PJSJ73w8/IMG-4735.gif
+おやしゅみー（晚安—） https://i.postimg.cc/BbStM9XZ/IMG-4736.gif
+いつ会えるの？（什么时候能见面？TT） https://i.postimg.cc/3N8Wn5dx/IMG-4737.gif
+幸せー（好幸福—）/贴贴充电、补充能量 https://i.postimg.cc/gjzrNFnJ/IMG-4738.gif
+亲吻/kiss https://i.postimg.cc/cCx6XyrK/IMG-4739.gif
+疲れちゃった（累坏了）/能量不足 https://i.postimg.cc/d3sD4PLT/IMG-4740.gif
+だいしゅき（最喜欢你） https://i.postimg.cc/mDNtY22g/IMG-4741.gif
+了解ですっ！！（明白了！！） https://i.postimg.cc/rmCK1FF8/IMG-4742.gif
+？/疑惑 https://i.postimg.cc/W36hGbbb/IMG-4743.gif
+愤怒/气势强大/威慑 https://i.postimg.cc/4yfnBkmX/IMG-4745.gif
+鼓掌 https://i.postimg.cc/fLjJcTWF/IMG-4746.gif
+ありがとうございます！（谢谢！） https://i.postimg.cc/mDNtY2Z0/IMG-4747.gif
+お疲れ様です！（辛苦了！） https://i.postimg.cc/cHMrR44S/IMG-4748.gif
+がんばって！（加油！） https://i.postimg.cc/pTYpfXXx/IMG-4749.gif
+一般路过/滑走 https://i.postimg.cc/xCycvTTV/IMG-4750.gif
+(つд⊂)ｴｰﾝ（诶——） https://i.postimg.cc/mDNtY2Zn/IMG-4751.gif
+偷看冒爱心 https://i.postimg.cc/k4FBQXMT/IMG-4752.gif
+贴贴 https://i.postimg.cc/Hx4VwsWv/IMG-4753.gif
+！？/震惊 https://i.postimg.cc/3RCdXJrS/IMG-4754.gif
+ごめんなさい（对不起） https://i.postimg.cc/fLjJcTW1/IMG-4755.gif`
+        };
         const showStickerImportPanel = ref(false);
         const stickerImportText = ref('');
         const newPackName = ref('');
@@ -3114,8 +3457,9 @@ const saveFont = () => {
             if (!text) return null;
             
             // 匹配 [购买:商品名:价格] 或 [帮买请求:商品名:价格]
-            const buyPattern = /\[购买:([^:]+):([\d.]+)\]/;
-            const helpBuyPattern = /\[帮买请求:([^:]+):([\d.]+)\]/;
+            // 兼容空格、可选货币符号（¥/￥）
+            const buyPattern = /\[\s*购买\s*:\s*([^:\]]+?)\s*:\s*(?:[¥￥])?\s*([\d]+(?:\.[\d]+)?)\s*\]/;
+            const helpBuyPattern = /\[\s*帮买请求\s*:\s*([^:\]]+?)\s*:\s*(?:[¥￥])?\s*([\d]+(?:\.[\d]+)?)\s*\]/;
             
             const buyMatch = text.match(buyPattern);
             if (buyMatch) {
@@ -3972,14 +4316,55 @@ const saveFont = () => {
                 const activeGroup = isGroupChat ? activeGroupChat.value : null;
                 if (isGroupChat && !activeGroup) return;
 
-                const newMsg = {
-                    id: Date.now(),
-                    sender: 'user',
-                    text: text,
-                    timestamp: Date.now(),
-                    isLogOnly: false,
-                    isReplied: false
-                };
+                // 支持用户直接发送“购物卡片”文本，自动转换成卡片消息类型
+                // 这样聊天 UI 才能渲染 order/helpBuy 卡片，也方便 AI 读取同一套格式。
+                const shoppingCard = extractAiShoppingCard(text);
+                let newMsg;
+                if (shoppingCard) {
+                    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    if (shoppingCard.type === 'buy') {
+                        newMsg = {
+                            id: Date.now(),
+                            sender: 'user',
+                            messageType: 'order',
+                            platform: '购物',
+                            item: shoppingCard.item,
+                            price: shoppingCard.price,
+                            status: '已下单',
+                            eta: '2-3天',
+                            text: text, // 方便撤回/编辑/显示最近消息
+                            timestamp: Date.now(),
+                            isLogOnly: false,
+                            isReplied: false,
+                            time: timeStr
+                        };
+                    } else if (shoppingCard.type === 'helpBuy') {
+                        newMsg = {
+                            id: Date.now(),
+                            sender: 'user',
+                            messageType: 'helpBuy',
+                            item: shoppingCard.item,
+                            price: shoppingCard.price,
+                            isPurchased: false,
+                            text: text, // 方便撤回/编辑/显示最近消息
+                            timestamp: Date.now(),
+                            isLogOnly: false,
+                            isReplied: false,
+                            time: timeStr
+                        };
+                    }
+                }
+
+                if (!newMsg) {
+                    newMsg = {
+                        id: Date.now(),
+                        sender: 'user',
+                        text: text,
+                        timestamp: Date.now(),
+                        isLogOnly: false,
+                        isReplied: false
+                    };
+                }
 
                 if (replyContextForPrompt) {
                     newMsg.replyTo = replyContextForPrompt;
@@ -4499,7 +4884,9 @@ const saveFont = () => {
                                 });
                             }
                             // 移除购物卡片标记后的剩余文字
-                            const remainingText = trimmedText.replace(/\[(?:购买|帮买请求):[^:]+:[\d.]+\]/g, '').trim();
+                            const remainingText = trimmedText
+                                .replace(/\[\s*(?:购买|帮买请求)\s*:\s*[^:\]]+\s*:\s*(?:[¥￥])?\s*[\d.]+\s*\]/g, '')
+                                .trim();
                             if (remainingText) {
                                 pushMessageToActiveChat({
                                     id: Date.now() + index + 1,
@@ -5179,8 +5566,12 @@ const saveFont = () => {
                 }
                 text = parts.length > 0 ? `定位 ${parts.join(' | ')}` : '定位';
             } else if (msg.messageType === 'helpBuy') {
-                const status = msg.isPurchased ? '已购买' : '等待中';
-                text = `[帮买请求] 商品: ${msg.item}, 价格: ¥${msg.price}, 状态: ${status}`;
+                // 让AI上下文和“购物卡片功能”提示词格式完全一致
+                // 标准化成： [帮买请求:商品名:价格]
+                text = `[帮买请求:${msg.item}:${msg.price}]`;
+            } else if (msg.messageType === 'order') {
+                // 兼容AI读取“购买卡片”
+                text = `[购买:${msg.item}:${msg.price}]`;
             } else if (msg.messageType === 'share') {
                 text = `[分享] 来源: ${msg.source}, 内容: ${msg.content}`;
                 console.log('Share card context built:', text);
@@ -7343,7 +7734,10 @@ const saveFont = () => {
             const stickers = [];
             const lines = text.split('\n');
             lines.forEach(line => {
-                const match = line.match(/^(.+?)[:：]\s*[`']?(https?:\/\/[^\s`']+)[`']?/);
+                // 支持两种格式：
+                // 1) 名称: https://xxx（或全角冒号）
+                // 2) 名称 https://xxx（用空格分隔）
+                const match = line.match(/^(.+?)(?:[:：]|\s+)\s*[`']?(https?:\/\/[^\s`']+)[`']?/);
                 if (match) {
                     stickers.push({
                         name: match[1].trim(),
@@ -7353,6 +7747,102 @@ const saveFont = () => {
             });
             return stickers;
         };
+
+        // 自动加载你给的“基础表情包.txt”
+        // 目的：避免把 500+ 行内置进 script.js，同时也让“删除空包 + 重新导入”一次完成。
+        const ensureBaseStickerPackLoaded = async () => {
+            const basePackName = '基础表情包';
+            // 用当前页面 URL 做相对定位，避免 script.js 放子目录导致路径不对
+            const basePackFileUrl = new URL('基础表情包.txt', window.location.href).toString();
+
+            const existingIdx = (stickerPacks.value || []).findIndex(p => p?.name === basePackName);
+            const existing = existingIdx >= 0 ? stickerPacks.value[existingIdx] : null;
+            const hasNonEmpty = !!existing?.stickers?.length;
+            if (hasNonEmpty) return;
+
+            try {
+                const res = await fetch(basePackFileUrl);
+                if (!res.ok) return;
+                const rawText = await res.text();
+                const stickers = parseStickerImport(rawText);
+                if (!stickers || stickers.length === 0) return;
+
+                if (existingIdx >= 0) {
+                    stickerPacks.value[existingIdx] = {
+                        ...existing,
+                        stickers
+                    };
+                } else {
+                    stickerPacks.value.push({
+                        id: `builtin-${basePackName}`,
+                        name: basePackName,
+                        stickers
+                    });
+                }
+
+                try {
+                    localStorage.setItem('stickerPacks', JSON.stringify(stickerPacks.value));
+                } catch (e) {
+                    // ignore
+                }
+            } catch (e) {
+                // 如果你是 file:// 打开，fetch 可能失败；这时控制台会有提示
+                console.warn('Failed to load 基础表情包.txt:', e);
+            }
+        };
+
+        ensureBaseStickerPackLoaded();
+
+        // 将内置表情包合并进 stickerPacks（保留用户本地导入，不重复添加同名系列）
+        const mergeBuiltinStickerPacks = () => {
+            if (!builtinStickerPackTexts || typeof builtinStickerPackTexts !== 'object') return;
+            let changed = false;
+            // 跳过你指定要删除的“空包”，避免后续合并又把它们加回来
+            const skipBuiltinPackNames = new Set(['狗皇帝', '呆猫八条', '绿萝卜', '这狗']);
+            const packIndexByName = new Map(
+                (stickerPacks.value || [])
+                    .map((p, idx) => [p?.name, idx])
+                    .filter(([name]) => !!name)
+            );
+
+            for (const [packName, rawText] of Object.entries(builtinStickerPackTexts)) {
+                if (skipBuiltinPackNames.has(packName)) continue;
+                const stickers = parseStickerImport(rawText);
+                if (!stickers || stickers.length === 0) continue;
+
+                if (packIndexByName.has(packName)) {
+                    // 如果之前用户导入过但解析结果为空，则补齐 stickers
+                    const idx = packIndexByName.get(packName);
+                    const existing = stickerPacks.value[idx];
+                    const isEmpty = !existing?.stickers || existing.stickers.length === 0;
+                    if (isEmpty) {
+                        stickerPacks.value[idx] = {
+                            ...existing,
+                            stickers
+                        };
+                        changed = true;
+                    }
+                    continue;
+                }
+
+                stickerPacks.value.push({
+                    id: `builtin-${packName}`,
+                    name: packName,
+                    stickers
+                });
+                packIndexByName.set(packName, stickerPacks.value.length - 1);
+                changed = true;
+            }
+            if (changed) {
+                try {
+                    localStorage.setItem('stickerPacks', JSON.stringify(stickerPacks.value));
+                } catch (e) {
+                    // ignore: localStorage 可能在某些环境下不可用
+                }
+            }
+        };
+
+        mergeBuiltinStickerPacks();
 
         const importStickerPack = () => {
             if (!stickerImportText.value.trim() || !newPackName.value.trim()) return;
