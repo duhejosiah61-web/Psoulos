@@ -73,7 +73,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    margin: 50px 0;
+    margin: 35px 0;
 }
 
 .lock-password-input {
@@ -172,7 +172,7 @@
 /* 主时间显示 */
 .lock-time {
     text-align: center;
-    margin: 15% 0 12%;
+    margin: 12% 0 8%;
     animation: fadeIn 1s ease-out;
 }
 
