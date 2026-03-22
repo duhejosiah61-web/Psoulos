@@ -44,10 +44,30 @@ async function savePostToIndexedDB(post) {
     return new Promise((resolve, reject) => {
         const transaction = feedDB.transaction(['posts'], 'readwrite');
         const store = transaction.objectStore('posts');
-        
+
+        // IndexedDB 不能直接保存 Vue 响应式代理对象，先转成可结构化克隆的普通对象
+        let safePost;
+        try {
+            safePost = JSON.parse(JSON.stringify(post));
+        } catch (e) {
+            safePost = {
+                id: post?.id || Date.now(),
+                author: post?.author || '',
+                avatar: post?.avatar || '',
+                content: post?.content || '',
+                images: Array.isArray(post?.images) ? [...post.images] : [],
+                imageDescriptions: Array.isArray(post?.imageDescriptions) ? [...post.imageDescriptions] : [],
+                time: post?.time || '刚刚',
+                likes: Array.isArray(post?.likes) ? [...post.likes] : [],
+                comments: Array.isArray(post?.comments) ? JSON.parse(JSON.stringify(post.comments)) : [],
+                isLiked: !!post?.isLiked,
+                isFavorited: !!post?.isFavorited
+            };
+        }
+
         const request = store.put({
-            ...post,
-            timestamp: post.id
+            ...safePost,
+            timestamp: safePost.id
         });
         
         request.onsuccess = () => {
@@ -257,18 +277,27 @@ export function useFeed(profiles, activeProfile) {
                             'Content-Type': 'application/json'
                         }
                     });
-                    
+
                     clearTimeout(timeoutId);
-                    
+
                     if (response.ok) {
+                        const contentType = (response.headers.get('content-type') || '').toLowerCase();
+                        if (!contentType.includes('application/json')) {
+                            // 某些端点会返回 HTML（例如登录页/错误页），此时跳过 API 数据
+                            throw new Error(`Feed API 返回非 JSON 内容: ${contentType || 'unknown'}`);
+                        }
                         const apiData = await response.json();
                         const processedApiPosts = apiData.map(post => ({
                             ...post,
                             isLiked: post.likes && post.likes.includes(CURRENT_USER_NAME),
                             isFavorited: post.isFavorited || false
                         }));
-                        
-                        posts.value = [...localPosts, ...processedApiPosts].sort((a, b) => {
+
+                        // 合并时按 id 去重：优先保留本地帖子（含本地评论/回复），避免退出 feed 后“回复丢失”
+                        const merged = new Map();
+                        processedApiPosts.forEach(p => merged.set(String(p.id), p));
+                        localPosts.forEach(p => merged.set(String(p.id), p));
+                        posts.value = Array.from(merged.values()).sort((a, b) => {
                             return (b.id || 0) - (a.id || 0);
                         });
                     } else {
@@ -280,7 +309,13 @@ export function useFeed(profiles, activeProfile) {
                     if (fetchErr.name === 'AbortError') {
                         console.warn('Feed API request timed out, using local posts only');
                     } else {
-                        console.warn('Feed API error:', fetchErr);
+                        // 非 JSON（例如返回 HTML 页面）时，静默降级到本地数据，避免误报为“错误”
+                        const msg = String(fetchErr?.message || fetchErr || '');
+                        if (msg.includes('非 JSON')) {
+                            console.info(`Feed API fallback to local: ${msg}`);
+                        } else {
+                            console.warn(`Feed API error: ${msg}`);
+                        }
                     }
                     posts.value = localPosts.sort((a, b) => {
                         return (b.id || 0) - (a.id || 0);
@@ -506,6 +541,8 @@ export function useFeed(profiles, activeProfile) {
             console.warn('Missing data for comment generation');
             return;
         }
+        // 锁定目标帖子，避免异步期间 modal 被关闭导致 commentTargetPost 变 null
+        const targetPost = { ...commentTargetPost.value };
 
         // Handle both ref and raw array
         const charsArray = Array.isArray(characters) ? characters : (characters.value || []);
@@ -538,7 +575,7 @@ export function useFeed(profiles, activeProfile) {
             const randomComment = mockComments[Math.floor(Math.random() * mockComments.length)];
             
             roleAction('comment', {
-                postId: commentTargetPost.value.id,
+                postId: targetPost.id,
                 author: character.nickname || character.name,
                 content: randomComment
             });
@@ -555,9 +592,9 @@ export function useFeed(profiles, activeProfile) {
         try {
             // Construct context from post
             const postContext = `
-动态作者：${commentTargetPost.value.author}
-动态内容：${commentTargetPost.value.content}
-配图描述：${commentTargetPost.value.imageDescriptions ? commentTargetPost.value.imageDescriptions.join(', ') : '无'}
+动态作者：${targetPost.author}
+动态内容：${targetPost.content}
+配图描述：${targetPost.imageDescriptions ? targetPost.imageDescriptions.join(', ') : '无'}
             `.trim();
 
             const systemPrompt = `你正在扮演角色【${character.nickname || character.name}】。
@@ -601,7 +638,7 @@ ${postContext}
             // Submit the comment directly
             if (content) {
                 roleAction('comment', {
-                    postId: commentTargetPost.value.id,
+                    postId: targetPost.id,
                     author: character.nickname || character.name,
                     content: content
                 });

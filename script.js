@@ -3,11 +3,10 @@
 // =========================================================================
 import { ref, computed, onMounted, watch, reactive } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
 import { useFeed } from './feed.js';
-import { useHub } from './hub.js';
 import { useMate } from './mate.js';
 import { useNotice } from './notice.js';
 import { useGames } from './games.js';
-
+import { useLive } from './live.js';
 
 
 export function setupApp() {
@@ -29,6 +28,7 @@ export function setupApp() {
     // 页面切换
     const currentPage = ref(0);
     const homePages = ref(null);
+  
     
     // 照片小组件
     const photoWidgetDate = ref({
@@ -628,7 +628,7 @@ const prevPage = () => {
 // 下一页
 const nextPage = () => {
     console.log('点击下一页按钮');
-    if (currentPage.value < 1) {
+    if (currentPage.value < 2) {
         currentPage.value++;
     }
 };
@@ -921,6 +921,7 @@ const saveFont = () => {
         const isHomeScreenVisible = computed(() => !isLockScreenVisible.value && !openedApp.value);
         
         const isAiTyping = ref(false);
+        const focusedOsMessageId = ref(null);
         const randomHexCode = ref('0x00000000');
         const isPlaying = ref(false);
         
@@ -2082,17 +2083,6 @@ const saveFont = () => {
         onMounted(() => {
             loadWorldbooks();
             loadPresets();
-            
-            // 直播间观众数字随机变化
-            setInterval(() => {
-                const viewerCountEl = document.getElementById('viewerCount');
-                if (viewerCountEl) {
-                    const currentCount = parseInt(viewerCountEl.textContent.replace(/,/g, ''));
-                    const change = Math.floor(Math.random() * 21) - 10; // -10 to +10
-                    const newCount = Math.max(100, currentCount + change);
-                    viewerCountEl.textContent = newCount.toLocaleString();
-                }
-            }, 3000);
         });
 
         // --- COMPUTED PROPERTIES ---
@@ -2107,13 +2097,44 @@ const saveFont = () => {
             return 'invalid';
         });
 
-        // --- METHODS ---
-        const updateTime = () => {
-            const now = new Date();
-            currentTime.value = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-            currentDate.value = now.toLocaleDateString('en-CA');
-        };
+        const live = useLive(characters, activeProfile, profiles, availableModels);
+        const {
+            liveWaveBars,
+            liveOnlineCount,
+            activeLiveRoomId,
+            liveMicMuted,
+            liveElapsedSeconds,
+            liveInput,
+            liveMessages,
+            liveHostSpeechByRoom,
+            liveDanmakuByRoom,
+            liveHostSpeechLoading,
+            liveBgmPlaying,
+            liveBgmAudioRef,
+            LIVE_BGM_URL,
+            liveRooms,
+            activeLiveRoom,
+            activeLiveHost,
+            activeLiveMessages,
+            liveElapsedText,
+            activeLiveHostSpeech,
+            activeLiveHostSpeechHistory,
+            liveHostHistoryOpen,
+            switchLiveRoom,
+            toggleLiveMic,
+            sendLiveGift,
+            sendLiveMessage,
+            toggleLiveBgm,
+            onLiveBgmPlay,
+            onLiveBgmPause,
+            startBatchFetch,
+            clearLivePlaybackAndBatch,
+            toggleLiveHostHistory,
+            closeLiveHostHistory,
+            formatLiveHostHistoryTime
+        } = live;
 
+  
 
 
         // Touch event variables for pull-to-refresh
@@ -2124,20 +2145,9 @@ const saveFont = () => {
             startY = e.touches[0].clientY;
         };
         
-        const handleTouchMove = (e) => {
-            if (openedApp.value !== 'hub') return;
-            
-            const content = e.target.closest('.hub-content');
-            if (content && content.scrollTop === 0 && e.touches[0].clientY > startY) {
-                pullDistance.value = Math.min(e.touches[0].clientY - startY, 100);
-                e.preventDefault();
-            }
-        };
+        const handleTouchMove = () => {};
         
-        const handleTouchEnd = (e) => {
-            if (openedApp.value === 'hub' && pullDistance.value > 50) {
-                hub.refreshPosts();
-            }
+        const handleTouchEnd = () => {
             pullDistance.value = 0;
         };
         
@@ -2511,9 +2521,7 @@ const saveFont = () => {
             }
 
             updateTime();
-            setInterval(updateTime, 1000);
             generateRandomHex();
-            setInterval(generateRandomHex, 500);
             loadCharacters();
             
             initDB().then(async () => {
@@ -2560,6 +2568,13 @@ const saveFont = () => {
             }
             if (valApp !== 'workshop') {
                 editingCharacter.value = null;
+            }
+            clearLivePlaybackAndBatch();
+            if (valApp !== 'live') {
+                closeLiveHostHistory();
+            }
+            if (valApp === 'live') {
+                setTimeout(() => startBatchFetch(), 450);
             }
         });
 
@@ -2701,11 +2716,231 @@ const saveFont = () => {
         };
 
         // Initialize App Hooks with Dependencies
-        const hub = reactive(useHub({ activeProfile, characters }));
         const mate = reactive(useMate(soulLinkMessages, characters, activeProfile));
         const feed = reactive(useFeed(profiles, activeProfile));
         const notice = reactive(useNotice());
         const games = reactive(useGames());
+
+        // --- Console：全量备份（localStorage + SoulOS_DB / FeedDB，思路类似 kmain 里 JSON 导出） ---
+        const SOULOS_BACKUP_SLOT_KEY = 'soulos_backup_slot_v1';
+        const backupExporting = ref(false);
+        const backupImporting = ref(false);
+        const backupLastSavedHint = ref('');
+        const soulosBackupFileInput = ref(null);
+
+        const collectAllLocalStorageEntries = () => {
+            const entries = {};
+            try {
+                for (let i = 0; i < localStorage.length; i++) {
+                    const k = localStorage.key(i);
+                    if (k) entries[k] = localStorage.getItem(k);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+            return entries;
+        };
+
+        const dumpIdbDatabase = (dbName, storeNames) =>
+            new Promise((resolve, reject) => {
+                const req = indexedDB.open(dbName);
+                req.onerror = () => reject(req.error);
+                req.onsuccess = () => {
+                    const database = req.result;
+                    const run = async () => {
+                        const out = {};
+                        try {
+                            for (const sn of storeNames) {
+                                if (!database.objectStoreNames.contains(sn)) continue;
+                                out[sn] = await new Promise((res, rej) => {
+                                    const tx = database.transaction(sn, 'readonly');
+                                    const r = tx.objectStore(sn).getAll();
+                                    r.onsuccess = () => res(r.result || []);
+                                    r.onerror = () => rej(r.error);
+                                });
+                            }
+                            return out;
+                        } finally {
+                            database.close();
+                        }
+                    };
+                    run().then(resolve).catch(reject);
+                };
+            });
+
+        const restoreIdbDatabase = (dbName, storesData) => {
+            if (!storesData || typeof storesData !== 'object' || storesData._error) return Promise.resolve();
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open(dbName);
+                req.onerror = () => reject(req.error);
+                req.onsuccess = () => {
+                    const database = req.result;
+                    const run = async () => {
+                        try {
+                            for (const [sn, records] of Object.entries(storesData)) {
+                                if (sn.startsWith('_') || !database.objectStoreNames.contains(sn) || !Array.isArray(records)) continue;
+                                await new Promise((res, rej) => {
+                                    const tx = database.transaction(sn, 'readwrite');
+                                    tx.onerror = () => rej(tx.error);
+                                    tx.oncomplete = () => res();
+                                    const store = tx.objectStore(sn);
+                                    const clr = store.clear();
+                                    clr.onerror = () => rej(clr.error);
+                                    clr.onsuccess = () => {
+                                        for (const rec of records) {
+                                            store.put(rec);
+                                        }
+                                    };
+                                });
+                            }
+                        } finally {
+                            database.close();
+                        }
+                    };
+                    run().then(resolve).catch(reject);
+                };
+            });
+        };
+
+        const buildSoulOsBackupPackage = async () => {
+            const indexedDBPart = {};
+            try {
+                indexedDBPart.SoulOS_DB = await dumpIdbDatabase('SoulOS_DB', ['soulLinkMessages', 'soulLinkGroups', 'archivedChats', 'settings']);
+            } catch (e) {
+                console.warn('[Backup] SoulOS_DB', e);
+                indexedDBPart.SoulOS_DB = { _error: String(e.message || e) };
+            }
+            try {
+                indexedDBPart.FeedDB = await dumpIdbDatabase('FeedDB', ['posts']);
+            } catch (e) {
+                console.warn('[Backup] FeedDB', e);
+                indexedDBPart.FeedDB = { _error: String(e.message || e) };
+            }
+            return {
+                v: 2,
+                app: 'SoulOS-phone',
+                exportedAt: new Date().toISOString(),
+                localStorage: collectAllLocalStorageEntries(),
+                indexedDB: indexedDBPart
+            };
+        };
+
+        const applySoulOsBackupPayload = async (pkg) => {
+            if (!pkg || typeof pkg !== 'object') {
+                addConsoleLog('备份数据无效。', 'error');
+                return;
+            }
+            if (!window.confirm('确定用此备份覆盖当前数据？\n\n建议先导出一份当前备份；恢复后会自动刷新页面。')) {
+                return;
+            }
+            backupImporting.value = true;
+            try {
+                if (pkg.localStorage && typeof pkg.localStorage === 'object') {
+                    for (const [k, v] of Object.entries(pkg.localStorage)) {
+                        if (v === null || v === undefined) continue;
+                        localStorage.setItem(k, String(v));
+                    }
+                }
+                if (pkg.indexedDB && typeof pkg.indexedDB === 'object') {
+                    await restoreIdbDatabase('SoulOS_DB', pkg.indexedDB.SoulOS_DB);
+                    await restoreIdbDatabase('FeedDB', pkg.indexedDB.FeedDB);
+                }
+                addConsoleLog('数据已恢复，正在刷新…', 'success');
+                setTimeout(() => { window.location.reload(); }, 500);
+            } catch (e) {
+                addConsoleLog('恢复失败：' + (e.message || e), 'error');
+            } finally {
+                backupImporting.value = false;
+            }
+        };
+
+        const downloadSoulOsBackup = async () => {
+            if (backupExporting.value || backupImporting.value) return;
+            backupExporting.value = true;
+            try {
+                addConsoleLog('正在打包完整备份（含 IndexedDB）…', 'info');
+                const pkg = await buildSoulOsBackupPackage();
+                const json = JSON.stringify(pkg);
+                try {
+                    localStorage.setItem(SOULOS_BACKUP_SLOT_KEY, json);
+                    backupLastSavedHint.value = `本地备份槽已更新 · ${new Date().toLocaleString()}`;
+                } catch (e) {
+                    backupLastSavedHint.value = '';
+                    addConsoleLog('备份槽写入失败（可能超出容量）：' + e.message, 'warn');
+                }
+                const blob = new Blob([json], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+                a.href = url;
+                a.download = `SoulOS-备份-${stamp}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                addConsoleLog('备份已下载，请妥善保存 JSON 文件。', 'success');
+            } catch (e) {
+                addConsoleLog('导出失败：' + (e.message || e), 'error');
+            } finally {
+                backupExporting.value = false;
+            }
+        };
+
+        const saveSoulOsBackupSlotOnly = async () => {
+            if (backupExporting.value || backupImporting.value) return;
+            backupExporting.value = true;
+            try {
+                addConsoleLog('正在写入本地备份槽…', 'info');
+                const pkg = await buildSoulOsBackupPackage();
+                localStorage.setItem(SOULOS_BACKUP_SLOT_KEY, JSON.stringify(pkg));
+                backupLastSavedHint.value = `本地备份槽已更新 · ${new Date().toLocaleString()}`;
+                addConsoleLog('已写入本地备份槽（仅存本浏览器）。', 'success');
+            } catch (e) {
+                addConsoleLog('写入失败：' + (e.message || e), 'error');
+            } finally {
+                backupExporting.value = false;
+            }
+        };
+
+        const restoreSoulOsFromSlot = async () => {
+            if (backupExporting.value || backupImporting.value) return;
+            const raw = localStorage.getItem(SOULOS_BACKUP_SLOT_KEY);
+            if (!raw) {
+                addConsoleLog('本地备份槽为空，请先执行备份。', 'warn');
+                return;
+            }
+            let pkg;
+            try {
+                pkg = JSON.parse(raw);
+            } catch {
+                addConsoleLog('备份槽内容不是有效 JSON。', 'error');
+                return;
+            }
+            await applySoulOsBackupPayload(pkg);
+        };
+
+        const triggerSoulOsBackupImport = () => {
+            soulosBackupFileInput.value?.click();
+        };
+
+        const handleSoulOsBackupImport = async (event) => {
+            const file = event.target.files && event.target.files[0];
+            event.target.value = '';
+            if (!file) return;
+            if (backupExporting.value || backupImporting.value) return;
+            try {
+                const pkg = JSON.parse(await file.text());
+                await applySoulOsBackupPayload(pkg);
+            } catch (e) {
+                addConsoleLog('读取或解析备份文件失败：' + (e.message || e), 'error');
+            }
+        };
+
+        try {
+            if (localStorage.getItem(SOULOS_BACKUP_SLOT_KEY)) {
+                backupLastSavedHint.value = '本地备份槽中已有数据，可从槽恢复';
+            }
+        } catch { /* ignore */ }
 
         const soulLinkGroups = ref([]);
         const soulLinkPet = ref({
@@ -3588,6 +3823,15 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
             return history.filter(m => m && m.sender === 'user' && !m.isReplied && !m.isSystem && !m.isHidden);
         };
 
+        const parseReplyAndOs = (raw) => {
+            if (!raw || typeof raw !== 'string') return { content: '', osContent: null };
+            const replyMatch = raw.match(/\[REPLY\]([\s\S]*?)\[\/REPLY\]/i);
+            const osMatch = raw.match(/\[OS\]([\s\S]*?)\[\/OS\]/i);
+            const content = replyMatch ? replyMatch[1].trim() : raw.replace(/\[OS\][\s\S]*?\[\/OS\]/gi, '').replace(/\[REPLY\][\s\S]*?\[\/REPLY\]/gi, '').trim() || raw.trim();
+            const osContent = osMatch ? osMatch[1].trim() : null;
+            return { content, osContent };
+        };
+
         const markMessagesReplied = (history, ids) => {
             if (!Array.isArray(ids) || ids.length === 0) return;
             history.forEach(m => {
@@ -3646,6 +3890,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
             }
             // 加载当前角色的聊天设置
             loadChatMenuSettings();
+            markActiveChatAiMessagesRead();
             scrollToBottom();
         };
         
@@ -3688,6 +3933,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
             if (activeGroupChat.value && !Array.isArray(activeGroupChat.value.history)) {
                 activeGroupChat.value.history = [];
             }
+            markActiveChatAiMessagesRead();
             scrollToBottom();
         };
 
@@ -3733,7 +3979,11 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
         });
 
         const getLastMessage = (charId) => {
-            const msgs = soulLinkMessages.value[charId] || [];
+            let msgs = soulLinkMessages.value[charId] || [];
+            const group = soulLinkGroups.value.find(g => String(g.id) === String(charId));
+            if (group && Array.isArray(group.history)) {
+                msgs = group.history;
+            }
             if (!msgs.length) return '';
             const lastMsg = msgs[msgs.length - 1];
             if (lastMsg.messageType === 'image') return '[图片]';
@@ -3746,10 +3996,65 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
         };
 
         const formatLastMsgTime = (charId) => {
-            const msgs = soulLinkMessages.value[charId] || [];
+            let msgs = soulLinkMessages.value[charId] || [];
+            const group = soulLinkGroups.value.find(g => String(g.id) === String(charId));
+            if (group && Array.isArray(group.history)) {
+                msgs = group.history;
+            }
             if (!msgs.length) return '';
             const lastMsg = msgs[msgs.length - 1];
             return new Date(lastMsg.timestamp || Date.now()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        };
+
+        const markActiveChatAiMessagesRead = () => {
+            if (!soulLinkActiveChat.value) return;
+            const history = getActiveChatHistory();
+            let changed = false;
+            history.forEach(m => {
+                if (m && m.sender === 'ai' && m.isReadByUser === false) {
+                    m.isReadByUser = true;
+                    changed = true;
+                }
+            });
+            if (changed) {
+                syncActiveChatState();
+                persistActiveChat();
+            }
+        };
+
+        const getUnrepliedCountForChar = (charId) => {
+            // 正在查看该聊天时不显示角标
+            if (soulLinkActiveChatType.value === 'character' && String(soulLinkActiveChat.value) === String(charId)) {
+                return 0;
+            }
+            const msgs = soulLinkMessages.value[charId] || [];
+            return msgs.filter(m => m && m.sender === 'ai' && m.isReadByUser === false && !m.isSystem && !m.isHidden).length;
+        };
+
+        const getUnrepliedCountForGroup = (groupId) => {
+            // 正在查看该群聊时不显示角标
+            if (soulLinkActiveChatType.value === 'group' && String(soulLinkActiveChat.value) === String(groupId)) {
+                return 0;
+            }
+            const group = soulLinkGroups.value.find(g => String(g.id) === String(groupId));
+            const msgs = group && Array.isArray(group.history) ? group.history : [];
+            return msgs.filter(m => m && m.sender === 'ai' && m.isReadByUser === false && !m.isSystem && !m.isHidden).length;
+        };
+
+        const totalUnrepliedCount = computed(() => {
+            let total = 0;
+            characters.value.forEach(c => {
+                total += getUnrepliedCountForChar(c.id);
+            });
+            soulLinkGroups.value.forEach(g => {
+                total += getUnrepliedCountForGroup(g.id);
+            });
+            return total;
+        });
+
+        const formatUnreadCount = (count) => {
+            const n = Number(count) || 0;
+            return n > 99 ? '99+' : String(n);
         };
 
         const formatMessageDate = (timestamp) => {
@@ -4452,7 +4757,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                 } else {
                     systemPrompt += `成员A、成员B、成员C\n`;
                 }
-                systemPrompt += `\n# 行为规则\n1. 回复要简短自然，像真实群聊一样。\n2. 每次回复只扮演其中一名群成员。\n3. 回复格式为「成员名: 内容」。\n4. 可以用emoji和口语表达。\n5. 根据每个成员的人设来扮演他们的说话风格和性格特点。\n\n`;
+                systemPrompt += `\n# 行为规则\n1. 回复要简短自然，像真实群聊一样。\n2. 每次回复只扮演其中一名群成员。\n3. 回复格式为「成员名: 内容」。\n4. 可以用emoji和口语表达。\n5. 根据每个成员的人设来扮演他们的说话风格和性格特点。\n6. 回复格式：[REPLY]正式内容[/REPLY] [OS]内心独白（可选，需有反差感）[/OS]\n\n`;
                 if (availableStickers.length > 0) {
                     systemPrompt += `你可以发送表情包来表达情感！使用格式：[表情名] 或 [表情:表情名]。可用的表情包有：${availableStickers.map(s => s.name).join('、')}。当情绪适合时自然地发送表情包。\n\n`;
                 }
@@ -4520,12 +4825,19 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                     systemPrompt += `# 开场\n这是你们的第一次对话。你可以从以下开场白中选择一个打招呼：\n${replacedOpeningLines.join('\n')}\n\n`;
                 }
                 systemPrompt += `现在，请以${charName}的身份，自然地回复对方。记住：简短、真实、有人情味。`;
+                systemPrompt += `\n\n# 回复格式（重要）\n每次回复请使用以下格式：\n[REPLY]你展示给对方看的正式回复内容[/REPLY] [OS]此时此刻你内心真实的独白，语气要与表面回复有反差感[/OS]\n例如：[REPLY]好的呀，没问题～[/REPLY] [OS]其实我有点烦但不好意思说...[/OS]\n如果暂时没有内心独白，可省略 [OS]...[/OS] 部分。`;
+                const myPosts = (feed.posts?.value ?? feed.posts ?? []).filter(p => p && (p.author === '我' || p.author === 'Me')).slice(0, 2);
+                if (myPosts.length) {
+                    systemPrompt += `\n\n用户最近发的朋友圈：\n${myPosts.map((p, i) => `${i+1}. ${(p.content || '').slice(0, 80)}${(p.content||'').length>80?'...':''}`).join('\n')}\n你可以用 [评论我的动态] 评论内容 来评论上述某条动态。`;
+                }
+                systemPrompt += `\n你可以根据最近聊天内容自主发动态，格式为：[发布朋友圈] 动态内容。也可以评论我的朋友圈，格式为：[评论我的动态] 评论内容。无需每次都发，只有当情绪/话题合适时再发。`;
                 if (availableStickers.length > 0) {
                     systemPrompt += `\n\n你可以发送表情包来表达情感！使用格式：[表情名] 或 [表情:表情名]。可用的表情包有：${availableStickers.map(s => s.name).join('、')}。当情绪适合时自然地发送表情包，有时可以连续发多个表情包来表达强烈情感。`;
                 }
                 systemPrompt += `\n\n# 购物卡片功能（重要）\n\n## 发送购物卡片\n你可以发送购物卡片给用户，格式如下：\n- 购买卡片：[购买:商品名:价格] - 表示你买了东西送给用户\n- 帮买卡片：[帮买请求:商品名:价格] - 表示你想让用户帮你买东西\n\n例如：\n- [购买:小熊饼干:15] - 你买了小熊饼干送给用户\n- [帮买请求:笔记本:25] - 你想让用户帮你买笔记本\n\n## 接收帮买请求\n当用户发送帮买请求卡片时，如果你愿意帮Ta买，直接回复"好的，我帮你买！"即可。`;
             } else {
                 systemPrompt = '你是一个友好的朋友，正在通过SoulLink聊天。请像真人一样自然、简短地对话，每次1-3句话即可。可以用emoji和口语化表达。';
+                systemPrompt += '\n回复格式：[REPLY]正式内容[/REPLY] [OS]内心独白（可选）[/OS]';
                 systemPrompt += '\n如果要发照片，请用"[图片] 照片内容描述"的格式。';
                 if (availableStickers.length > 0) {
                     systemPrompt += `\n你可以发送表情包来表达情感！使用格式：[表情名] 或 [表情:表情名]。可用的表情包有：${availableStickers.map(s => s.name).join('、')}。当情绪适合时自然地发送表情包，有时可以连续发多个表情包来表达强烈情感。`;
@@ -4633,22 +4945,67 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                     }
                 }
                 
+                // 角色自主发动态 [发布朋友圈]
+                if (/\[发布朋友圈\]|【发布朋友圈】|\(发布朋友圈\)/.test(reply)) {
+                    const postMatch = reply.match(/(?:\[|【|\()发布朋友圈(?:\]|】|\))\s*([\s\S]+?)(?=(\[|【|\(|\[REPLY\]|\[OS\]|$))/);
+                    if (postMatch && postMatch[1].trim()) {
+                        const char = currentChatType === 'character' ? characters.value.find(c => String(c.id) === String(currentChatId)) : null;
+                        if (char) {
+                            feed.roleAction('post', {
+                                author: char.nickname || char.name,
+                                avatar: char.avatarUrl,
+                                content: postMatch[1].trim(),
+                                images: []
+                            });
+                        }
+                    }
+                }
+                // 角色自主评论我的动态 [评论我的动态]
+                if (/\[评论我的动态\]|【评论我的动态】|\(评论我的动态\)/.test(reply)) {
+                    const commentMatch = reply.match(/(?:\[|【|\()评论我的动态(?:\]|】|\))\s*([\s\S]+?)(?=(\[|【|\(|\[REPLY\]|\[OS\]|$))/);
+                    if (commentMatch && commentMatch[1].trim()) {
+                        const postsArr = feed.posts?.value ?? feed.posts ?? [];
+                        const myPost = Array.isArray(postsArr) ? postsArr.find(p => p && (p.author === '我' || p.author === 'Me')) : null;
+                        if (myPost) {
+                            let authorName = 'TA';
+                            if (currentChatType === 'character') {
+                                const char = characters.value.find(c => String(c.id) === String(currentChatId));
+                                if (char) authorName = char.nickname || char.name;
+                            } else if (currentChatType === 'group') {
+                                const group = soulLinkGroups.value.find(g => String(g.id) === String(currentChatId));
+                                authorName = group?.members?.[0]?.name || group?.name || 'TA';
+                            }
+                            feed.roleAction('comment', {
+                                postId: myPost.id,
+                                author: authorName,
+                                content: commentMatch[1].trim()
+                            });
+                        }
+                    }
+                }
+                // 从回复中移除 feed 指令，避免显示在气泡中
+                reply = reply
+                    .replace(/(?:\[|【|\()发布朋友圈(?:\]|】|\))\s*[\s\S]*?(?=\[|【|\(|$)/gi, '')
+                    .replace(/(?:\[|【|\()评论我的动态(?:\]|】|\))\s*[\s\S]*?(?=\[|【|\(|$)/gi, '')
+                    .trim();
+                
                 isAiTyping.value = false;
                 const separator = '---';
+                const targetGroup = currentChatType === 'group' ? soulLinkGroups.value.find(g => String(g.id) === String(currentChatId)) : null;
+                const pushToTarget = (m) => pushMessageToTargetChat(currentChatId, currentChatType, m);
                 const appendAiMessage = (rawText, index = 0) => {
-                    // 检查当前聊天ID是否与发送请求时的聊天ID一致
-                    if (soulLinkActiveChat.value !== currentChatId || soulLinkActiveChatType.value !== currentChatType) {
-                        console.log('聊天窗口已切换，消息将不会发送到当前窗口');
+                    const { content: parsedContent, osContent } = parseReplyAndOs(rawText);
+                    const trimmedText = parsedContent.trim();
+                    if (!trimmedText && !osContent) return;
+                    if (!trimmedText && osContent) {
+                        pushToTarget({ id: Date.now() + index, sender: 'ai', text: '\u200b', osContent, osRevealed: true, timestamp: Date.now() });
                         return;
                     }
-                    
-                    const trimmedText = rawText.trim();
-                    if (!trimmedText) return;
                     if (isGroupChat) {
                         const parsed = parseGroupReply(trimmedText);
                         if (!parsed.content) return;
                         
-                        const activeGroup = activeGroupChat.value;
+                        const activeGroup = targetGroup || activeGroupChat.value;
                         let senderAvatar = '';
                         if (activeGroup && Array.isArray(activeGroup.members)) {
                             const member = activeGroup.members.find(m => m.name === parsed.senderName);
@@ -4661,7 +5018,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                         if (transferSegments) {
                             transferSegments.forEach((segment, offset) => {
                                 if (segment.type === 'transfer') {
-                                    pushMessageToActiveChat({
+                                    pushToTarget({
                                         id: Date.now() + index + offset,
                                         sender: 'ai',
                                         senderName: parsed.senderName,
@@ -4674,7 +5031,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                                         timestamp: Date.now()
                                     });
                                 } else {
-                                    pushMessageToActiveChat({
+                                    pushToTarget({
                                         id: Date.now() + index + offset,
                                         sender: 'ai',
                                         senderName: parsed.senderName,
@@ -4688,7 +5045,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                         }
                         const transfer = extractAiTransfer(parsed.content);
                         if (transfer) {
-                            pushMessageToActiveChat({
+                            pushToTarget({
                                 id: Date.now() + index,
                                 sender: 'ai',
                                 senderName: parsed.senderName,
@@ -4706,7 +5063,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                         if (segments) {
                             segments.forEach((segment, offset) => {
                                 if (segment.type === 'image') {
-                                    pushMessageToActiveChat({
+                                    pushToTarget({
                                         id: Date.now() + index + offset,
                                         sender: 'ai',
                                         senderName: parsed.senderName,
@@ -4717,7 +5074,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                                         timestamp: Date.now()
                                     });
                                 } else {
-                                    pushMessageToActiveChat({
+                                    pushToTarget({
                                         id: Date.now() + index + offset,
                                         sender: 'ai',
                                         senderName: parsed.senderName,
@@ -4731,7 +5088,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                         }
                         const imageDesc = extractAiImageDescription(parsed.content);
                         if (imageDesc) {
-                            pushMessageToActiveChat({
+                            pushToTarget({
                                 id: Date.now() + index,
                                 sender: 'ai',
                                 senderName: parsed.senderName,
@@ -4748,7 +5105,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                         if (stickerSegments) {
                             stickerSegments.forEach((segment, offset) => {
                                 if (segment.type === 'sticker') {
-                                    pushMessageToActiveChat({
+                                    pushToTarget({
                                         id: Date.now() + index + offset,
                                         sender: 'ai',
                                         senderName: parsed.senderName,
@@ -4760,7 +5117,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                                         timestamp: Date.now()
                                     });
                                 } else {
-                                    pushMessageToActiveChat({
+                                    pushToTarget({
                                         id: Date.now() + index + offset,
                                         sender: 'ai',
                                         senderName: parsed.senderName,
@@ -4773,12 +5130,13 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                             return;
                         }
                         
-                        pushMessageToActiveChat({
+                        pushToTarget({
                             id: Date.now() + index,
                             sender: 'ai',
                             senderName: parsed.senderName,
                             senderAvatar: senderAvatar,
                             text: parsed.content,
+                            osContent: osContent || undefined,
                             timestamp: Date.now()
                         });
                     } else {
@@ -4786,7 +5144,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                         if (transferSegments) {
                             transferSegments.forEach((segment, offset) => {
                                 if (segment.type === 'transfer') {
-                                    pushMessageToActiveChat({
+                                    pushToTarget({
                                         id: Date.now() + index + offset,
                                         sender: 'ai',
                                         messageType: 'transfer',
@@ -4797,7 +5155,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                                         timestamp: Date.now()
                                     });
                                 } else {
-                                    pushMessageToActiveChat({
+                                    pushToTarget({
                                         id: Date.now() + index + offset,
                                         sender: 'ai',
                                         text: segment.content,
@@ -4809,7 +5167,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                         }
                         const transfer = extractAiTransfer(trimmedText);
                         if (transfer) {
-                            pushMessageToActiveChat({
+                            pushToTarget({
                                 id: Date.now() + index,
                                 sender: 'ai',
                                 messageType: 'transfer',
@@ -4817,6 +5175,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                                 note: transfer.note,
                                 transferStatus: 'received',
                                 status: 'received',
+                                osContent: osContent || undefined,
                                 timestamp: Date.now()
                             });
                             return;
@@ -4825,7 +5184,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                         if (segments) {
                             segments.forEach((segment, offset) => {
                                 if (segment.type === 'image') {
-                                    pushMessageToActiveChat({
+                                    pushToTarget({
                                         id: Date.now() + index + offset,
                                         sender: 'ai',
                                         messageType: 'image',
@@ -4834,7 +5193,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                                         timestamp: Date.now()
                                     });
                                 } else {
-                                    pushMessageToActiveChat({
+                                    pushToTarget({
                                         id: Date.now() + index + offset,
                                         sender: 'ai',
                                         text: segment.content,
@@ -4846,12 +5205,13 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                         }
                         const imageDesc = extractAiImageDescription(trimmedText);
                         if (imageDesc) {
-                            pushMessageToActiveChat({
+                            pushToTarget({
                                 id: Date.now() + index,
                                 sender: 'ai',
                                 messageType: 'image',
                                 imageUrl: null,
                                 text: formatAiImageText(imageDesc, getActiveChatPronoun()),
+                                osContent: osContent || undefined,
                                 timestamp: Date.now()
                             });
                             return;
@@ -4861,7 +5221,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                         const shoppingCard = extractAiShoppingCard(trimmedText);
                         if (shoppingCard) {
                             if (shoppingCard.type === 'buy') {
-                                pushMessageToActiveChat({
+                                pushToTarget({
                                     id: Date.now() + index,
                                     sender: 'ai',
                                     messageType: 'order',
@@ -4873,7 +5233,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                                     timestamp: Date.now()
                                 });
                             } else if (shoppingCard.type === 'helpBuy') {
-                                pushMessageToActiveChat({
+                                pushToTarget({
                                     id: Date.now() + index,
                                     sender: 'ai',
                                     messageType: 'helpBuy',
@@ -4888,10 +5248,19 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                                 .replace(/\[\s*(?:购买|帮买请求)\s*:\s*[^:\]]+\s*:\s*(?:[¥￥])?\s*[\d.]+\s*\]/g, '')
                                 .trim();
                             if (remainingText) {
-                                pushMessageToActiveChat({
+                                pushToTarget({
                                     id: Date.now() + index + 1,
                                     sender: 'ai',
                                     text: remainingText,
+                                    osContent: osContent || undefined,
+                                    timestamp: Date.now()
+                                });
+                            } else if (osContent) {
+                                pushToTarget({
+                                    id: Date.now() + index + 1,
+                                    sender: 'ai',
+                                    text: '\u200b',
+                                    osContent,
                                     timestamp: Date.now()
                                 });
                             }
@@ -4902,7 +5271,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                         if (stickerSegments) {
                             stickerSegments.forEach((segment, offset) => {
                                 if (segment.type === 'sticker') {
-                                    pushMessageToActiveChat({
+                                    pushToTarget({
                                         id: Date.now() + index + offset,
                                         sender: 'ai',
                                         messageType: 'sticker',
@@ -4912,7 +5281,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                                         timestamp: Date.now()
                                     });
                                 } else {
-                                    pushMessageToActiveChat({
+                                    pushToTarget({
                                         id: Date.now() + index + offset,
                                         sender: 'ai',
                                         text: segment.content,
@@ -4929,7 +5298,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                             voiceSegments.forEach((segment, offset) => {
                                 if (segment.type === 'voice') {
                                     const voiceDuration = Math.max(1, Math.ceil(segment.transcription.length / 4));
-                                    pushMessageToActiveChat({
+                                    pushToTarget({
                                         id: Date.now() + index + offset,
                                         sender: 'ai',
                                         messageType: 'voice',
@@ -4939,7 +5308,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                                         timestamp: Date.now()
                                     });
                                 } else {
-                                    pushMessageToActiveChat({
+                                    pushToTarget({
                                         id: Date.now() + index + offset,
                                         sender: 'ai',
                                         text: segment.content,
@@ -4953,7 +5322,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                         const voice = extractAiVoice(trimmedText);
                         if (voice) {
                             const voiceDuration = Math.max(1, Math.ceil(voice.transcription.length / 4));
-                            pushMessageToActiveChat({
+                            pushToTarget({
                                 id: Date.now() + index,
                                 sender: 'ai',
                                 messageType: 'voice',
@@ -4965,10 +5334,11 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                             return;
                         }
 
-                        pushMessageToActiveChat({
+                        pushToTarget({
                             id: Date.now() + index,
                             sender: 'ai',
                             text: trimmedText,
+                            osContent: osContent || undefined,
                             timestamp: Date.now()
                         });
                     }
@@ -4986,18 +5356,23 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                     appendAiMessage(reply, 0);
                 }
                 if (pendingUserMessages.length > 0) {
-                    markMessagesReplied(history, pendingUserMessages.map(m => m.id));
+                    const targetHistory = currentChatType === 'group'
+                        ? (soulLinkGroups.value.find(g => String(g.id) === String(currentChatId))?.history || [])
+                        : (soulLinkMessages.value[currentChatId] || []);
+                    markMessagesReplied(targetHistory, pendingUserMessages.map(m => m.id));
                 }
                 addConsoleLog('SoulLink 会话：已成功从模型获取回复。', 'success');
             } catch (error) {
                 isAiTyping.value = false;
-                pushMessageToActiveChat({
-                    id: Date.now() + 5,
-                    sender: 'system',
-                    text: `请求模型时出错：${error.message}`,
-                    timestamp: Date.now(),
-                    isSystem: true
-                });
+                if (currentChatId && currentChatType) {
+                    pushMessageToTargetChat(currentChatId, currentChatType, {
+                        id: Date.now() + 5,
+                        sender: 'system',
+                        text: `请求模型时出错：${error.message}`,
+                        timestamp: Date.now(),
+                        isSystem: true
+                    });
+                }
                 addConsoleLog('SoulLink 会话错误：' + error.message, 'error');
             }
         };
@@ -6347,7 +6722,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
             
             pushMessageToActiveChat(msg);
             showVirtualCamera.value = false;
-            autoAiReplyForAttachment(msg);
+            // 不自动触发AI回复：由用户在输入框为空时手动点发送触发
         };
 
         // --- Chat Settings Logic ---
@@ -7371,12 +7746,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
             showSharePanel.value = false;
             scrollToBottom();
             
-            // 触发AI回复
-            console.log('About to trigger AI reply for share card');
-            setTimeout(() => {
-                console.log('Calling autoAiReplyForAttachment');
-                autoAiReplyForAttachment(shareMsg);
-            }, 500);
+            // 不自动触发AI回复：由用户在输入框为空时手动点发送触发
         };
 
         const handleTarot = () => {
@@ -7527,10 +7897,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
             showVoiceInputPanel.value = false;
             scrollToBottom();
             
-            // 触发AI回复
-            setTimeout(() => {
-                autoAiReplyForAttachment(msg);
-            }, 500);
+            // 不自动触发AI回复：由用户在输入框为空时手动点发送触发
         };
 
         const closeVoiceInputPanel = () => {
@@ -7958,6 +8325,10 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
 
         const pushMessageToActiveChat = (msg) => {
             if (!soulLinkActiveChat.value) return;
+            if (msg && msg.sender === 'ai' && msg.isSystem !== true && typeof msg.isReadByUser === 'undefined') {
+                const isViewingThisChatNow = openedApp.value === 'chat' && !!soulLinkActiveChat.value;
+                msg.isReadByUser = !!isViewingThisChatNow;
+            }
             if (soulLinkActiveChatType.value === 'group') {
                 const group = activeGroupChat.value;
                 if (!group) return;
@@ -7973,10 +8344,38 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
             }
             scrollToBottom();
         };
+
+        /** 将消息推送到指定聊天（即使用户已退出，也会保存到对应聊天） */
+        const pushMessageToTargetChat = (chatId, chatType, msg) => {
+            if (!chatId) return;
+            if (msg && msg.sender === 'ai' && msg.isSystem !== true && typeof msg.isReadByUser === 'undefined') {
+                const isViewingThisChat = openedApp.value === 'chat' && String(soulLinkActiveChat.value) === String(chatId) && soulLinkActiveChatType.value === chatType;
+                msg.isReadByUser = !!isViewingThisChat;
+            }
+            if (chatType === 'group') {
+                const group = soulLinkGroups.value.find(g => String(g.id) === String(chatId));
+                if (!group) return;
+                if (!Array.isArray(group.history)) group.history = [];
+                group.history.push(msg);
+                group.lastMessage = msg.text || '';
+                group.lastTime = new Date(msg.timestamp || Date.now()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                saveSoulLinkGroups();
+            } else {
+                if (!soulLinkMessages.value[chatId]) soulLinkMessages.value[chatId] = [];
+                soulLinkMessages.value[chatId].push(msg);
+                saveSoulLinkMessages();
+            }
+            if (openedApp.value === 'chat' && String(soulLinkActiveChat.value) === String(chatId) && soulLinkActiveChatType.value === chatType) {
+                scrollToBottom();
+            }
+        };
         
         watch(openedApp, (newVal) => {
             if (newVal === 'feed') {
                 feed.loadPosts();
+            }
+            if (newVal === 'chat') {
+                markActiveChatAiMessagesRead();
             }
         });
         console.log('setup end');
@@ -8030,6 +8429,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
             soulLinkTab, soulLinkActiveChat, soulLinkActiveChatType, soulLinkInput, soulLinkReplyTarget,
             soulLinkMessages, soulLinkGroups, activeGroupChat, activeChatMessages, currentChatMessages, recentChats,
             formatLastMsgTime, getLastMessage, formatMessageDate, closeAllPanels,
+            getUnrepliedCountForChar, getUnrepliedCountForGroup, totalUnrepliedCount, formatUnreadCount,
             emojiList, previewImage, formatTime, onInputChange, onEnterPress,
             contextMenu, editingMessageId,
             startSoulLinkChat, openSoulLinkGroupChat, exitSoulLinkChat, sendSoulLinkMessage,
@@ -8044,6 +8444,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
             stickerPacks, showStickerImportPanel, stickerImportText, newPackName, parseStickerImport, importStickerPack, sendSticker, deleteStickerPack,
             favoriteStickers, activeStickerTab, isFavorite, toggleFavorite, removeFavorite, onStickerTouchStart, onStickerTouchEnd, counterWithSticker,
             isAiTyping,
+            focusedOsMessageId,
             isOfflineMode,
             novelMode,
             showGreetingSelect,
@@ -8060,6 +8461,10 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
             // Core
             currentTime, currentDate, currentDay, currentMonth, currentMonthEn, currentDayOfMonth, randomHexCode, openedApp, currentScreen, deviceBatteryText, deviceSignalText,
             isHomeScreenVisible,
+            liveWaveBars, liveOnlineCount, liveRooms, activeLiveRoomId, activeLiveRoom, activeLiveHost, activeLiveMessages, liveElapsedText, liveMicMuted, liveInput,
+            activeLiveHostSpeech, activeLiveHostSpeechHistory, liveHostHistoryOpen, liveHostSpeechLoading, liveBgmPlaying, liveBgmAudioRef, LIVE_BGM_URL,
+            switchLiveRoom, toggleLiveMic, sendLiveGift, sendLiveMessage, toggleLiveBgm, onLiveBgmPlay, onLiveBgmPause,
+            toggleLiveHostHistory, closeLiveHostHistory, formatLiveHostHistoryTime,
             // Music Player
             isPlaying, togglePlayPause, playPrevious, playNext,
             // New Features (Chat Menu, Call, Virtual Camera, Panels)
@@ -8094,6 +8499,8 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
             availableModels, fetchingModels, consoleLogs,
             saveProfiles, createNewProfile, deleteActiveProfile, setActiveProfile, deleteProfile,
             onProfileSelect, fetchModels, clearConsole,
+            backupExporting, backupImporting, backupLastSavedHint, soulosBackupFileInput,
+            downloadSoulOsBackup, saveSoulOsBackupSlotOnly, restoreSoulOsFromSlot, triggerSoulOsBackupImport, handleSoulOsBackupImport,
             // Workshop App
             activeWorkshopTab,
             switchWorkshopTab,
@@ -8139,8 +8546,6 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
 
             // feed
             feed,
-            // hub
-            hub,
             // mate
             mate,
             // notice
