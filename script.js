@@ -1,7 +1,7 @@
 // =========================================================================
 // == SOUL OS SCRIPT (FIXED VERSION)
 // =========================================================================
-import { ref, computed, onMounted, watch, reactive } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
+import { ref, computed, onMounted, watch, reactive, nextTick } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
 import { useFeed } from './feed.js';
 import { useMate } from './mate.js';
 import { useNotice } from './notice.js';
@@ -26,7 +26,7 @@ export function setupApp() {
     }
     
     // 页面切换
-    const currentPage = ref(0);
+    const currentPage = ref(1);
     const homePages = ref(null);
   
     
@@ -919,6 +919,15 @@ const saveFont = () => {
         
         // 主屏幕状态 - 必须在openedApp定义之后
         const isHomeScreenVisible = computed(() => !isLockScreenVisible.value && !openedApp.value);
+
+        watch(isHomeScreenVisible, (visible) => {
+            if (visible) {
+                nextTick(() => {
+                    const el = document.querySelector('.home-pages');
+                    if (el) el.style.transform = `translateX(-${currentPage.value * 100}%)`;
+                });
+            }
+        });
         
         const isAiTyping = ref(false);
         const focusedOsMessageId = ref(null);
@@ -2097,46 +2106,6 @@ const saveFont = () => {
             return 'invalid';
         });
 
-        const live = useLive(characters, activeProfile, profiles, availableModels);
-        const {
-            liveWaveBars,
-            liveOnlineCount,
-            activeLiveRoomId,
-            liveMicMuted,
-            liveElapsedSeconds,
-            liveInput,
-            liveMessages,
-            liveHostSpeechByRoom,
-            liveDanmakuByRoom,
-            liveHostSpeechLoading,
-            liveBgmPlaying,
-            liveBgmAudioRef,
-            LIVE_BGM_URL,
-            liveRooms,
-            activeLiveRoom,
-            activeLiveHost,
-            activeLiveMessages,
-            liveElapsedText,
-            activeLiveHostSpeech,
-            activeLiveHostSpeechHistory,
-            liveHostHistoryOpen,
-            switchLiveRoom,
-            toggleLiveMic,
-            sendLiveGift,
-            sendLiveMessage,
-            toggleLiveBgm,
-            onLiveBgmPlay,
-            onLiveBgmPause,
-            startBatchFetch,
-            clearLivePlaybackAndBatch,
-            toggleLiveHostHistory,
-            closeLiveHostHistory,
-            formatLiveHostHistoryTime
-        } = live;
-
-  
-
-
         // Touch event variables for pull-to-refresh
         let startY = 0;
         const pullDistance = ref(0);
@@ -2509,6 +2478,68 @@ const saveFont = () => {
                 fetchingModels.value = false;
             }
         };
+
+        const live = useLive(characters, activeProfile, profiles, availableModels, worldbooks);
+        const {
+            liveWaveBars,
+            liveOnlineCount,
+            activeLiveRoomId,
+            liveMicMuted,
+            liveElapsedSeconds,
+            liveInput,
+            liveMessages,
+            liveHostSpeechByRoom,
+            liveDanmakuByRoom,
+            liveHostSpeechLoading,
+            liveBgmPlaying,
+            liveBgmAudioRef,
+            LIVE_BGM_URL,
+            liveOnMic,
+            liveUserDisguiseNick,
+            liveHallWallpaperUrl,
+            liveSettingsOpen,
+            liveSettingsDraftBgmUrl,
+            liveSettingsDraftUserMask,
+            liveSettingsDraftHallWallpaperUrl,
+            liveBgmSearchTerm,
+            liveBgmSearchResults,
+            liveBgmSearchLoading,
+            liveBgmCurrentSong,
+            liveBgmLyricsLoading,
+            liveBgmCurrentLyricText,
+            liveBgmLyricPrevText,
+            liveBgmLyricNextText,
+            liveRooms,
+            activeLiveRoom,
+            activeLiveHost,
+            activeLiveMessages,
+            liveElapsedText,
+            activeLiveHostSpeech,
+            activeLiveHostSpeechHistory,
+            liveHostHistoryOpen,
+            switchLiveRoom,
+            toggleLiveMic,
+            toggleLiveOnMic,
+            rollDisguiseNick,
+            sendLiveGift,
+            sendLiveMessage,
+            toggleLiveBgm,
+            onLiveBgmPlay,
+            onLiveBgmPause,
+            onLiveBgmEnded,
+            startBatchFetch,
+            clearLivePlaybackAndBatch,
+            toggleLiveHostHistory,
+            closeLiveHostHistory,
+            formatLiveHostHistoryTime,
+            openLiveSettings,
+            closeLiveSettings,
+            saveLiveSettings,
+            searchLiveBgmSongs,
+            playLiveBgmFromSong,
+            playLiveBgmByQuery,
+            onLiveHallWallpaperUpload
+        } = live;
 
         // --- Lifecycle Hook ---
         onMounted(() => {
@@ -2957,6 +2988,13 @@ const saveFont = () => {
         const showLocationPanel = ref(false);
         const showTransferPanel = ref(false);
         const showChatSettings = ref(false);
+        // 外语翻译（reply / OS 下方横线译文）
+        const soulLinkForeignTranslationEnabled = ref(false);
+        const soulLinkForeignTranslationLang = ref('zh-CN');
+        // 时间感知（像微信一样隔一段时间显示相对时间）
+        const timeSenseEnabled = ref(true);
+        const messageTimeNow = ref(Date.now());
+        let messageTimeIntervalId = null;
         const showPhotoSelectPanel = ref(false);
         const showTextImagePanel = ref(false);
         const textImageText = ref('');
@@ -3825,10 +3863,54 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
 
         const parseReplyAndOs = (raw) => {
             if (!raw || typeof raw !== 'string') return { content: '', osContent: null };
-            const replyMatch = raw.match(/\[REPLY\]([\s\S]*?)\[\/REPLY\]/i);
-            const osMatch = raw.match(/\[OS\]([\s\S]*?)\[\/OS\]/i);
-            const content = replyMatch ? replyMatch[1].trim() : raw.replace(/\[OS\][\s\S]*?\[\/OS\]/gi, '').replace(/\[REPLY\][\s\S]*?\[\/REPLY\]/gi, '').trim() || raw.trim();
-            const osContent = osMatch ? osMatch[1].trim() : null;
+
+            const extractTaggedContent = (text, tags) => {
+                for (const tag of tags) {
+                    const pattern = new RegExp(`\\[\\s*${tag}\\s*\\]([\\s\\S]*?)\\[\\s*\\/\\s*${tag}\\s*\\]`, 'i');
+                    const match = text.match(pattern);
+                    if (match && match[1] != null) return match[1].trim();
+                }
+                return null;
+            };
+
+            const removeTaggedBlocks = (text, tags) => {
+                let result = text;
+                tags.forEach(tag => {
+                    const blockPattern = new RegExp(`\\[\\s*${tag}\\s*\\][\\s\\S]*?\\[\\s*\\/\\s*${tag}\\s*\\]`, 'gi');
+                    result = result.replace(blockPattern, ' ');
+                });
+                return result;
+            };
+
+            const removeStandaloneTags = (text, tags) => {
+                let result = text;
+                tags.forEach(tag => {
+                    const openPattern = new RegExp(`\\[\\s*${tag}\\s*\\]`, 'gi');
+                    const closePattern = new RegExp(`\\[\\s*\\/\\s*${tag}\\s*\\]`, 'gi');
+                    result = result.replace(openPattern, ' ').replace(closePattern, ' ');
+                });
+                return result;
+            };
+
+            const replyTags = ['REPLY'];
+            const osTags = ['OS', 'INNER_LOG', 'INNERLOG'];
+
+            const taggedReply = extractTaggedContent(raw, replyTags);
+            const taggedOs = extractTaggedContent(raw, osTags);
+
+            let content = taggedReply ?? raw;
+            content = removeTaggedBlocks(content, osTags);
+            content = removeStandaloneTags(content, [...replyTags, ...osTags]);
+            content = content.replace(/\s+/g, ' ').trim();
+
+            if (!content) {
+                content = raw
+                    .replace(/\[[^\]]+\]/g, ' ')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+            }
+
+            const osContent = taggedOs && taggedOs.trim() ? taggedOs.trim() : null;
             return { content, osContent };
         };
 
@@ -4508,10 +4590,10 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
         };
         
         // 格式化时间
-        const formatTime = (timestamp) => {
+        const formatTime = (timestamp, nowTs = Date.now()) => {
             const date = new Date(timestamp);
-            const now = new Date();
-            const diff = now - date;
+            const now = new Date(typeof nowTs === 'number' ? nowTs : Date.now());
+            const diff = now.getTime() - date.getTime();
             
             const minutes = Math.floor(diff / 60000);
             const hours = Math.floor(diff / 3600000);
@@ -4529,6 +4611,301 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                 return date.toLocaleDateString('zh-CN');
             }
         };
+
+        // 像微信一样：相邻消息间隔过久时，显示一次时间
+        const SOUL_LINK_TIME_DIVIDER_THRESHOLD_MS = 5 * 60 * 1000; // 5分钟
+        const shouldShowTimeDivider = (index) => {
+            const msgs = currentChatMessages.value;
+            if (!Array.isArray(msgs) || index == null) return false;
+            const cur = msgs[index];
+            if (!cur || !cur.timestamp) return false;
+            if (index === 0) return true;
+            const prev = msgs[index - 1];
+            if (!prev || !prev.timestamp) return true;
+
+            const curTs = Number(cur.timestamp) || 0;
+            const prevTs = Number(prev.timestamp) || 0;
+
+            const diff = Math.abs(curTs - prevTs);
+            if (diff >= SOUL_LINK_TIME_DIVIDER_THRESHOLD_MS) return true;
+
+            // 跨天也要显示一次（更像微信）
+            const d1 = new Date(curTs);
+            const d2 = new Date(prevTs);
+            return d1.toDateString() !== d2.toDateString();
+        };
+
+        // ==========================================================
+        // 外语翻译：reply / OS 的自动翻译（带缓存 + 并发控制）
+        // ==========================================================
+        const SOUL_LINK_TRANSLATE_CACHE_PREFIX = 'soulos_translate_cache_v1';
+        const soulLinkAiTranslationInFlight = new Set(); // msg.id
+        const soulLinkAiTranslationQueue = [];
+        let soulLinkAiTranslationRunning = 0;
+        const SOUL_LINK_MAX_TRANSLATE_CONCURRENCY = 2;
+        const SOUL_LINK_TRANSLATE_MAX_LEN = 900;
+
+        const safeLocalStorageGet = (key) => {
+            try {
+                return localStorage.getItem(key);
+            } catch {
+                return null;
+            }
+        };
+
+        const safeLocalStorageSet = (key, value) => {
+            try {
+                localStorage.setItem(key, value);
+            } catch {
+                // ignore
+            }
+        };
+
+        const simpleHash = (str) => {
+            const s = String(str || '');
+            let h = 2166136261; // FNV-ish
+            for (let i = 0; i < s.length; i++) {
+                h ^= s.charCodeAt(i);
+                h = Math.imul(h, 16777619);
+            }
+            // unsigned 32-bit -> hex
+            return (h >>> 0).toString(16);
+        };
+
+        const getTargetLangLabel = (langValue) => {
+            const v = String(langValue || '').trim();
+            const map = {
+                'zh-CN': '简体中文',
+                'en': 'English',
+                'ja': '日本語',
+                'ko': '한국어'
+            };
+            return map[v] || v || '简体中文';
+        };
+
+        const isForeignLikelyText = (text) => {
+            const t = String(text || '').trim();
+            if (!t) return false;
+            if (t.length < 4) return false;
+
+            // 日文假名/汉字混写：优先检测片假/平假
+            const hasKana = /[\u3040-\u30ff]/.test(t);
+            // 韩文
+            const hasHangul = /[\uac00-\ud7af]/.test(t);
+            if (hasKana || hasHangul) return true;
+
+            // 英文/拉丁字母：用“至少一个单词长度>=2”作为信号，并结合整体长度避免把 OK/AI 这种短词误翻
+            const latinWords = t.match(/\b[a-zA-Z]{2,}\b/g) || [];
+            if (latinWords.length >= 2) return true;
+            if (latinWords.length >= 1 && t.length >= 20) return true;
+
+            return false;
+        };
+
+        const getTranslateCacheKey = (partType, rawText, targetLangValue) => {
+            const t = String(rawText || '').trim().slice(0, SOUL_LINK_TRANSLATE_MAX_LEN);
+            const lang = String(targetLangValue || '').trim();
+            return `${SOUL_LINK_TRANSLATE_CACHE_PREFIX}::${lang}::${partType}::${simpleHash(t)}`;
+        };
+
+        const extractJsonBlock = (raw) => {
+            if (!raw) return null;
+            const m = String(raw).match(/```(?:json)?\s*([\s\S]*?)```/i);
+            const tryParse = (s) => {
+                try {
+                    return JSON.parse(String(s || '').trim());
+                } catch {
+                    return null;
+                }
+            };
+            if (m && m[1]) {
+                const parsed = tryParse(m[1]);
+                if (parsed) return parsed;
+            }
+            // 兜底：直接抓第一段 {...}
+            const m2 = String(raw).match(/\{[\s\S]*\}/);
+            if (m2 && m2[0]) return tryParse(m2[0]);
+            return null;
+        };
+
+        const translateSoulLinkAiMessageParts = async (replyTextOrNull, osTextOrNull, targetLangValue) => {
+            const profile = activeProfile.value;
+            if (!profile || !profile.endpoint || !profile.key) return { replyTranslation: null, osTranslation: null };
+
+            const endpoint = String(profile.endpoint).replace(/\/+$/, '');
+            const key = profile.key;
+            const modelId = profile.model || (availableModels.value && availableModels.value.length ? availableModels.value[0].id : '') || '';
+
+            const replyText = replyTextOrNull != null ? String(replyTextOrNull) : '';
+            const osText = osTextOrNull != null ? String(osTextOrNull) : '';
+
+            const replyForPrompt = replyText ? replyText.slice(0, SOUL_LINK_TRANSLATE_MAX_LEN) : '';
+            const osForPrompt = osText ? osText.slice(0, SOUL_LINK_TRANSLATE_MAX_LEN) : '';
+
+            const targetLabel = getTargetLangLabel(targetLangValue);
+
+            const sys = `你是专业翻译器。只做翻译，不要解释，不要添加额外文本。`;
+            const user = `请把下面两段文本分别翻译成：${targetLabel}。
+输出严格 JSON（不要 markdown），格式必须是：
+{"replyTranslation": string|null, "osTranslation": string|null}
+
+规则：
+- 若“回复文本”为空字符串，请把 replyTranslation 设为 null
+- 若“内心文本”为空字符串，请把 osTranslation 设为 null
+- 保留原意与语气，尽量自然，不要附带原文。
+
+回复文本：
+${replyForPrompt || ''}
+
+内心文本：
+${osForPrompt || ''}`;
+
+            try {
+                const resp = await fetch(`${endpoint}/chat/completions`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${key}`
+                    },
+                    body: JSON.stringify({
+                        model: modelId,
+                        messages: [
+                            { role: 'system', content: sys },
+                            { role: 'user', content: user }
+                        ],
+                        temperature: 0.2,
+                        stream: false
+                    })
+                });
+                if (!resp.ok) throw new Error(`translate http ${resp.status}`);
+                const data = await resp.json();
+                const rawText =
+                    data?.choices?.[0]?.message?.content ||
+                    data?.choices?.[0]?.delta?.content ||
+                    data?.message?.content ||
+                    data?.output_text ||
+                    data?.text ||
+                    '';
+
+                const json = extractJsonBlock(rawText);
+                const replyTranslationRaw =
+                    json?.replyTranslation ?? json?.reply ?? null;
+                const osTranslationRaw =
+                    json?.osTranslation ?? json?.os ?? null;
+
+                const replyTranslation =
+                    typeof replyTranslationRaw === 'string' ? replyTranslationRaw.trim() : null;
+                const osTranslation =
+                    typeof osTranslationRaw === 'string' ? osTranslationRaw.trim() : null;
+
+                return { replyTranslation, osTranslation };
+            } catch {
+                return { replyTranslation: null, osTranslation: null };
+            }
+        };
+
+        const soulLinkAiTranslationPump = () => {
+            while (soulLinkAiTranslationRunning < SOUL_LINK_MAX_TRANSLATE_CONCURRENCY && soulLinkAiTranslationQueue.length > 0) {
+                const task = soulLinkAiTranslationQueue.shift();
+                if (!task) continue;
+                soulLinkAiTranslationRunning++;
+                void (async () => {
+                    try {
+                        const { msg, needReply, needOs, replyText, osText, targetLangValue } = task;
+
+                        const replyCacheKey = needReply ? getTranslateCacheKey('reply', replyText, targetLangValue) : null;
+                        const osCacheKey = needOs ? getTranslateCacheKey('os', osText, targetLangValue) : null;
+
+                        if (needReply && replyCacheKey) {
+                            const cached = safeLocalStorageGet(replyCacheKey);
+                            if (cached) msg.replyTranslation = cached;
+                        }
+                        if (needOs && osCacheKey) {
+                            const cached = safeLocalStorageGet(osCacheKey);
+                            if (cached) msg.osTranslation = cached;
+                        }
+
+                        const stillNeedReply = needReply && !msg.replyTranslation;
+                        const stillNeedOs = needOs && !msg.osTranslation;
+
+                        if (stillNeedReply || stillNeedOs) {
+                            const { replyTranslation, osTranslation } = await translateSoulLinkAiMessageParts(
+                                stillNeedReply ? replyText : null,
+                                stillNeedOs ? osText : null,
+                                targetLangValue
+                            );
+
+                            if (replyTranslation && stillNeedReply) {
+                                msg.replyTranslation = replyTranslation;
+                                if (replyCacheKey) safeLocalStorageSet(replyCacheKey, replyTranslation);
+                            }
+                            if (osTranslation && stillNeedOs) {
+                                msg.osTranslation = osTranslation;
+                                if (osCacheKey) safeLocalStorageSet(osCacheKey, osTranslation);
+                            }
+                        }
+                    } finally {
+                        soulLinkAiTranslationRunning--;
+                        if (task?.msg?.id != null) soulLinkAiTranslationInFlight.delete(task.msg.id);
+                        soulLinkAiTranslationPump();
+                    }
+                })();
+            }
+        };
+
+        const maybeAutoTranslateSoulLinkAiMessage = (msg, chatType, chatId, force = false) => {
+            if (!soulLinkForeignTranslationEnabled.value) return;
+            if (!msg || msg.sender !== 'ai' || msg.isSystem) return;
+            if (!msg.id) return;
+
+            const isViewingThisChat = openedApp.value === 'chat' &&
+                String(soulLinkActiveChat.value) === String(chatId) &&
+                soulLinkActiveChatType.value === chatType;
+            if (!force && !isViewingThisChat) return;
+
+            const replyText = typeof msg.text === 'string' ? msg.text.trim() : '';
+            const osText = typeof msg.osContent === 'string' ? msg.osContent.trim() : '';
+
+            const targetLangValue = soulLinkForeignTranslationLang.value;
+
+            const needReply = !msg.replyTranslation && replyText && isForeignLikelyText(replyText);
+            const needOs = !msg.osTranslation && osText && isForeignLikelyText(osText);
+            if (!needReply && !needOs) return;
+
+            // 幂等：同一条消息只入队一次
+            if (soulLinkAiTranslationInFlight.has(msg.id)) return;
+            soulLinkAiTranslationInFlight.add(msg.id);
+
+            soulLinkAiTranslationQueue.push({
+                msg,
+                needReply,
+                needOs,
+                replyText,
+                osText,
+                targetLangValue
+            });
+
+            soulLinkAiTranslationPump();
+        };
+
+        const ensureRecentForeignTranslations = () => {
+            if (!soulLinkForeignTranslationEnabled.value) return;
+            const msgs = currentChatMessages.value || [];
+            const start = Math.max(0, msgs.length - 15);
+            for (let i = start; i < msgs.length; i++) {
+                const m = msgs[i];
+                if (!m) continue;
+                // force=true：补齐打开聊天后的历史翻译（用缓存优先，不会太慢）
+                maybeAutoTranslateSoulLinkAiMessage(m, soulLinkActiveChatType.value, soulLinkActiveChat.value, true);
+            }
+        };
+
+        // 当用户开启外语翻译时，补齐当前聊天最近几条（从缓存读取优先）
+        watch(soulLinkForeignTranslationEnabled, (val) => {
+            if (val && openedApp.value === 'chat') {
+                ensureRecentForeignTranslations();
+            }
+        });
 
         const emojiList = computed(() => pixelEmojis.value);
 
@@ -4885,13 +5262,25 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                 }
                 const data = await response.json();
                 let reply = '';
-                if (data && Array.isArray(data.choices) && data.choices.length > 0) {
-                    const msg = data.choices[0].message || data.choices[0].delta;
-                    if (msg && msg.content) reply = msg.content;
-                }
-                if (!reply && data && data.message && data.message.content) {
-                    reply = data.message.content;
-                }
+                const extractContent = (obj) => {
+                    if (!obj) return '';
+                    const raw = obj.choices?.[0]?.message || obj.choices?.[0]?.delta;
+                    if (raw?.content != null) {
+                        if (typeof raw.content === 'string') return raw.content;
+                        if (Array.isArray(raw.content)) {
+                            return raw.content.map((c) => (typeof c === 'string' ? c : (c?.text ?? c?.content ?? '')) || '').join('');
+                        }
+                    }
+                    if (obj.message?.content != null) return typeof obj.message.content === 'string' ? obj.message.content : '';
+                    const parts = obj.candidates?.[0]?.content?.parts;
+                    if (Array.isArray(parts) && parts.length) return parts.map((p) => p?.text ?? '').join('');
+                    if (typeof obj.output_text === 'string') return obj.output_text;
+                    if (typeof obj.result === 'string') return obj.result;
+                    if (typeof obj.text === 'string') return obj.text;
+                    return '';
+                };
+                reply = extractContent(data) || extractContent(data?.data || data?.result) || '';
+                reply = String(reply || '').trim();
                 if (!reply) {
                     reply = '模型已响应，但未返回可显示的内容。';
                 }
@@ -6224,7 +6613,10 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                 userIdentity: userIdentity.value,
                 userRelation: userRelation.value,
                 bubbleStyle: bubbleStyle.value,
-                customBubbleCSS: customBubbleCSS.value
+                customBubbleCSS: customBubbleCSS.value,
+                soulLinkForeignTranslationEnabled: soulLinkForeignTranslationEnabled.value,
+                soulLinkForeignTranslationLang: soulLinkForeignTranslationLang.value,
+                timeSenseEnabled: timeSenseEnabled.value
             });
             
             showChatSettings.value = false;
@@ -6240,12 +6632,18 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                 userRelation.value = saved.userRelation || '';
                 bubbleStyle.value = saved.bubbleStyle || 'default';
                 customBubbleCSS.value = saved.customBubbleCSS || '';
+                soulLinkForeignTranslationEnabled.value = !!saved.soulLinkForeignTranslationEnabled;
+                soulLinkForeignTranslationLang.value = saved.soulLinkForeignTranslationLang || 'zh-CN';
+                timeSenseEnabled.value = saved.timeSenseEnabled !== false;
             } else {
                 // 如果没有保存的设置，使用默认值
                 userIdentity.value = '';
                 userRelation.value = '';
                 bubbleStyle.value = 'default';
                 customBubbleCSS.value = '';
+                soulLinkForeignTranslationEnabled.value = false;
+                soulLinkForeignTranslationLang.value = 'zh-CN';
+                timeSenseEnabled.value = true;
             }
             applyBubbleStyle();
         };
@@ -8342,6 +8740,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                 }
                 soulLinkMessages.value[soulLinkActiveChat.value].push(msg);
             }
+            maybeAutoTranslateSoulLinkAiMessage(msg, soulLinkActiveChatType.value, soulLinkActiveChat.value);
             scrollToBottom();
         };
 
@@ -8365,6 +8764,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                 soulLinkMessages.value[chatId].push(msg);
                 saveSoulLinkMessages();
             }
+            maybeAutoTranslateSoulLinkAiMessage(msg, chatType, chatId);
             if (openedApp.value === 'chat' && String(soulLinkActiveChat.value) === String(chatId) && soulLinkActiveChatType.value === chatType) {
                 scrollToBottom();
             }
@@ -8376,6 +8776,19 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
             }
             if (newVal === 'chat') {
                 markActiveChatAiMessagesRead();
+                if (timeSenseEnabled.value && !messageTimeIntervalId) {
+                    messageTimeIntervalId = setInterval(() => {
+                        messageTimeNow.value = Date.now();
+                    }, 30000);
+                }
+                if (soulLinkForeignTranslationEnabled.value) {
+                    ensureRecentForeignTranslations();
+                }
+            } else {
+                if (messageTimeIntervalId) {
+                    clearInterval(messageTimeIntervalId);
+                    messageTimeIntervalId = null;
+                }
             }
         });
         console.log('setup end');
@@ -8462,9 +8875,18 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
             currentTime, currentDate, currentDay, currentMonth, currentMonthEn, currentDayOfMonth, randomHexCode, openedApp, currentScreen, deviceBatteryText, deviceSignalText,
             isHomeScreenVisible,
             liveWaveBars, liveOnlineCount, liveRooms, activeLiveRoomId, activeLiveRoom, activeLiveHost, activeLiveMessages, liveElapsedText, liveMicMuted, liveInput,
+            liveOnMic, liveUserDisguiseNick, liveHallWallpaperUrl,
+            liveSettingsOpen,
+            liveSettingsDraftBgmUrl, liveSettingsDraftUserMask, liveSettingsDraftHallWallpaperUrl,
+            liveBgmSearchTerm, liveBgmSearchResults, liveBgmSearchLoading, liveBgmCurrentSong,
+            liveBgmLyricsLoading, liveBgmCurrentLyricText,
+            liveBgmLyricPrevText, liveBgmLyricNextText,
             activeLiveHostSpeech, activeLiveHostSpeechHistory, liveHostHistoryOpen, liveHostSpeechLoading, liveBgmPlaying, liveBgmAudioRef, LIVE_BGM_URL,
-            switchLiveRoom, toggleLiveMic, sendLiveGift, sendLiveMessage, toggleLiveBgm, onLiveBgmPlay, onLiveBgmPause,
+            switchLiveRoom, toggleLiveMic, toggleLiveOnMic, rollDisguiseNick, sendLiveGift, sendLiveMessage, toggleLiveBgm, onLiveBgmPlay, onLiveBgmPause,
             toggleLiveHostHistory, closeLiveHostHistory, formatLiveHostHistoryTime,
+            openLiveSettings, closeLiveSettings, saveLiveSettings,
+            onLiveHallWallpaperUpload,
+            searchLiveBgmSongs, playLiveBgmFromSong, playLiveBgmByQuery, onLiveBgmEnded,
             // Music Player
             isPlaying, togglePlayPause, playPrevious, playNext,
             // New Features (Chat Menu, Call, Virtual Camera, Panels)
@@ -8478,6 +8900,9 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
             openTransferPanel, closeTransferPanel, sendTransfer, transferAmount, transferNote,
             // Chat Settings
             showChatSettings, toggleChatSettings,
+            // Foreign translation / time sense
+            soulLinkForeignTranslationEnabled, soulLinkForeignTranslationLang,
+            timeSenseEnabled, messageTimeNow, shouldShowTimeDivider,
             chatBackgroundStyle, gradientStartColor, gradientEndColor, solidBackgroundColor, chatBackgroundImage,
             updateChatBackground, selectBackgroundImage, handleBackgroundImageSelect,
             // Profile & Navigation
@@ -8711,10 +9136,12 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
 
     } catch (error) {
         console.error('setup 同步错误:', error);
+        const noop = () => {};
         return {
             isLockScreenVisible: ref(true),
             currentTime: ref(''),
             currentDate: ref(''),
+            fullDate: ref(''),
             weekdays: ref(['日', '一', '二', '三', '四', '五', '六']),
             currentWeekday: ref(0),
             isHomeScreenVisible: ref(false),
@@ -8722,6 +9149,33 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
             showGreetingSelect: ref(false),
             showTransferPanel: ref(false),
             showChatSettings: ref(false),
+            showPhotoWidgetEditDialog: ref(false),
+            showCapsuleEditDialog: ref(false),
+            showDashboardEditDialog: ref(false),
+            showCharacterSelector: ref(false),
+            showCallWidgetEdit: ref(false),
+            closePhotoWidgetEditDialog: noop,
+            closeCapsuleEditDialog: noop,
+            closeDashboardEditDialog: noop,
+            closeCallWidgetEdit: noop,
+            // 锁屏相关（避免模板访问 undefined 导致渲染崩溃）
+            password: ref(''),
+            lockSignature: ref('每一天都是新的开始'),
+            lockWallpaper: ref(''),
+            lockDateTimeColor: ref('#ffffff'),
+            enableNotchAdaptation: ref(true),
+            lockTouchStart: noop,
+            lockTouchMove: noop,
+            lockTouchEnd: noop,
+            lockMouseDown: noop,
+            lockMouseMove: noop,
+            lockMouseUp: noop,
+            addPassword: noop,
+            removePassword: noop,
+            // 聊天/上下文菜单相关
+            showRenameGroupDialog: ref(false),
+            contextMenu: ref({ visible: false, x: 0, y: 0, msg: null }),
+            closeContextMenu: noop,
         };
     }
 }

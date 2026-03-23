@@ -850,13 +850,21 @@
                                     <button v-if="msg.sender === 'ai'" class="sticker-counter-btn" @click="counterWithSticker(msg)" title="斗图">怼</button>
                                 </div>
                                 <template v-else>
-                                    {{ msg.text }}
+                                    <div class="message-text">{{ msg.text }}</div>
+                                    <div v-if="soulLinkForeignTranslationEnabled && msg.replyTranslation" class="reply-translation">
+                                        <div class="translation-divider"></div>
+                                        <div class="translation-text">{{ msg.replyTranslation }}</div>
+                                    </div>
                                 </template>
                             </div>
                             <div v-else class="novel-text">
                                 <span v-if="msg.sender === 'ai'" class="novel-char-name">{{ currentChatName }}：</span>
                                 <span v-else class="novel-char-name">我：</span>
-                                {{ msg.text }}
+                                <div class="message-text">{{ msg.text }}</div>
+                                <div v-if="soulLinkForeignTranslationEnabled && msg.replyTranslation" class="reply-translation">
+                                    <div class="translation-divider"></div>
+                                    <div class="translation-text">{{ msg.replyTranslation }}</div>
+                                </div>
                             </div>
                             <div v-if="!isOfflineMode && !msg.isCallMessage && !msg.isSystem" class="message-status">
                                 <template v-if="msg.sender === 'user'">
@@ -864,13 +872,20 @@
                                     <span v-if="msg.isReplied" class="status-check double">✓</span>
                                 </template>
                             </div>
+                            <div v-if="!isOfflineMode && timeSenseEnabled && !msg.isSystem && shouldShowTimeDivider(index) && msg.timestamp" class="message-time">
+                                {{ formatTime(msg.timestamp, messageTimeNow) }}
+                            </div>
                             </div>
                             <div v-if="msg.sender === 'ai' && msg.osContent && !msg.isSystem" 
                                  class="ai-os-container" 
                                  :class="{ focused: focusedOsMessageId === msg.id }"
                                  @click.stop="focusedOsMessageId = focusedOsMessageId === msg.id ? null : msg.id">
-                                <div class="os-index">INNER_LOG:</div>
+                                <div class="os-index">内心：</div>
                                 <div class="os-content">{{ msg.osContent }}</div>
+                                <div v-if="soulLinkForeignTranslationEnabled && msg.osTranslation" class="os-translation">
+                                    <div class="translation-divider"></div>
+                                    <div class="translation-text">{{ msg.osTranslation }}</div>
+                                </div>
                             </div>
                             <div v-if="!msg.isSystem && msg.isLiked" :class="['message-like', msg.sender]">
                                 <svg viewBox="0 0 24 24" fill="#000000" stroke="none">
@@ -1154,6 +1169,48 @@
                             <i class="fas fa-plus"></i>
                             添加成员
                         </button>
+                    </div>
+                </div>
+
+                <div class="art-settings-section">
+                    <h2 class="art-section-title">外语翻译</h2>
+                    <div class="art-settings-input-item">
+                        <div class="art-settings-icon-wrapper">
+                            <div class="art-settings-blob blob-color-4"></div>
+                            <svg class="art-settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M4 5h16"></path>
+                                <path d="M4 19h16"></path>
+                                <path d="M7 5v14"></path>
+                                <path d="M17 5v14"></path>
+                            </svg>
+                        </div>
+                        <div class="art-input-wrapper">
+                            <label class="art-input-label">外语功能</label>
+                            <div style="display: flex; align-items: center; gap: 10px; padding-top: 6px;">
+                                <input id="soulLinkForeignTranslationEnabled" type="checkbox" v-model="soulLinkForeignTranslationEnabled">
+                                <label for="soulLinkForeignTranslationEnabled" style="font-family: 'Inter', sans-serif; font-size: 14px; color: #000000;">开启外语翻译</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="art-settings-input-item">
+                        <div class="art-settings-icon-wrapper">
+                            <div class="art-settings-blob blob-color-5"></div>
+                            <svg class="art-settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M3 5h18"></path>
+                                <path d="M7 9h10"></path>
+                                <path d="M8 19h8"></path>
+                                <path d="M12 5v14"></path>
+                            </svg>
+                        </div>
+                        <div class="art-input-wrapper">
+                            <label class="art-input-label">翻译语言</label>
+                            <select v-model="soulLinkForeignTranslationLang" class="art-settings-input">
+                                <option value="zh-CN">中文(简体)</option>
+                                <option value="en">English</option>
+                                <option value="ja">日本語</option>
+                                <option value="ko">한국어</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
                 
@@ -2022,9 +2079,10 @@
         </div>
         
         <!-- LIVE App -->
-        <div v-else-if="openedApp === 'live'" class="app-view live-app">
-            <audio ref="liveBgmAudioRef" :src="LIVE_BGM_URL" loop preload="metadata" class="live-bgm-audio"
-                @play="onLiveBgmPlay" @pause="onLiveBgmPause"></audio>
+        <div v-else-if="openedApp === 'live'" class="app-view live-app"
+            :style="liveHallWallpaperUrl ? { '--live-app-bg': 'url(' + liveHallWallpaperUrl + ')' } : {}">
+            <audio ref="liveBgmAudioRef" :src="LIVE_BGM_URL" preload="metadata" class="live-bgm-audio"
+                @play="onLiveBgmPlay" @pause="onLiveBgmPause" @ended="onLiveBgmEnded"></audio>
             <div class="live-bg-overlay"></div>
             <div class="live-bg-caption">ISLAND MEETS SEA</div>
             <div class="live-header-bar">
@@ -2035,7 +2093,94 @@
                     </div>
                 </div>
                 <h1 class="live-title">SENSE LUXURY</h1>
-                <div class="live-greet">Day6~ Hello User</div>
+                <button type="button" class="live-greet live-settings-btn" @click="openLiveSettings">设置</button>
+            </div>
+
+            <!-- LIVE 设置面板 -->
+            <div v-if="liveSettingsOpen" class="live-settings-overlay" @click.self="closeLiveSettings">
+                <div class="live-settings-panel" @click.stop>
+                    <div class="live-settings-head">
+                        <span class="live-settings-title">语音厅设置</span>
+                        <button type="button" class="live-settings-close" @click="closeLiveSettings" aria-label="关闭">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+
+                    <div class="live-settings-body">
+                        <div class="live-bgm-picker">
+                            <div class="live-bgm-picker-head">
+                                <label class="live-settings-label" style="margin:0;">厅内音乐（搜索/播放）</label>
+                                <button type="button" class="live-bgm-mini-play"
+                                    @click="toggleLiveBgm" :title="liveBgmPlaying ? '暂停' : '播放'">
+                                    <i class="fas" :class="liveBgmPlaying ? 'fa-pause' : 'fa-play'"></i>
+                                </button>
+                            </div>
+
+                            <div class="live-bgm-current">
+                                <img class="live-bgm-current-cover"
+                                    :src="liveBgmCurrentSong?.cover || 'https://i.postimg.cc/pT2xKzP-album-cover-placeholder.png'"
+                                    alt="">
+                                <div class="live-bgm-current-info">
+                                    <div class="live-bgm-current-title">
+                                        {{ liveBgmCurrentSong?.name || '自定义/默认 BGM' }}
+                                    </div>
+                                    <div class="live-bgm-current-artist">
+                                        {{ liveBgmCurrentSong?.artist || '' }}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="live-bgm-search-row">
+                                <input class="live-settings-input live-bgm-search-input" type="text"
+                                    v-model="liveBgmSearchTerm" placeholder="输入歌名/歌手后回车"
+                                    @keyup.enter="searchLiveBgmSongs(liveBgmSearchTerm)">
+                                <button type="button" class="live-bgm-search-btn"
+                                    @click="searchLiveBgmSongs(liveBgmSearchTerm)">搜索</button>
+                            </div>
+
+                            <div v-if="liveBgmSearchLoading" class="live-bgm-status">搜索中...</div>
+                            <div v-else class="live-bgm-results">
+                                <div v-if="!liveBgmSearchResults || liveBgmSearchResults.length === 0"
+                                    class="live-bgm-empty">暂无结果</div>
+                                <div v-for="song in liveBgmSearchResults" :key="song.source + '_' + song.id"
+                                    class="live-bgm-result"
+                                    :class="{ active: liveBgmCurrentSong?.id === song.id && liveBgmCurrentSong?.source === song.source }"
+                                    @click="playLiveBgmFromSong(song)">
+                                    <img class="live-bgm-result-cover" :src="song.cover" alt="">
+                                    <div class="live-bgm-result-info">
+                                        <div class="live-bgm-result-title">{{ song.name }}</div>
+                                        <div class="live-bgm-result-artist">{{ song.artist }}</div>
+                                    </div>
+                                    <div class="live-bgm-result-play">
+                                        <i class="fas"
+                                            :class="liveBgmPlaying && liveBgmCurrentSong?.id === song.id && liveBgmCurrentSong?.source === song.source ? 'fa-volume-up' : 'fa-music'"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <label class="live-settings-label">用户马甲</label>
+                        <input class="live-settings-input" type="text" v-model="liveSettingsDraftUserMask"
+                            placeholder="例如：夜航船_123">
+
+                        <label class="live-settings-label">语音厅壁纸（上传图片/链接）</label>
+                        <div class="live-wallpaper-upload-row">
+                            <input class="live-wallpaper-upload-input" type="file" accept="image/*"
+                                @change="onLiveHallWallpaperUpload">
+                        </div>
+                        <input class="live-settings-input" type="text" v-model="liveSettingsDraftHallWallpaperUrl"
+                            placeholder="https://.../wallpaper.jpg（或上传图片后会自动生成 dataURL）">
+                        <div class="live-wallpaper-preview"
+                            v-if="liveSettingsDraftHallWallpaperUrl && String(liveSettingsDraftHallWallpaperUrl).length > 10">
+                            <img :src="liveSettingsDraftHallWallpaperUrl" alt="壁纸预览">
+                        </div>
+                    </div>
+
+                    <div class="live-settings-actions">
+                        <button type="button" class="live-settings-cancel" @click="closeLiveSettings">取消</button>
+                        <button type="button" class="live-settings-save" @click="saveLiveSettings">保存</button>
+                    </div>
+                </div>
             </div>
 
             <div class="live-room-tabs">
@@ -2055,7 +2200,10 @@
                             @click.stop="toggleLiveHostHistory" title="查看主播历史发言">
                         <span>{{ activeLiveHost?.nickname || activeLiveHost?.name || '主持位' }}</span>
                     </div>
-                    <div class="seat waiting"><span>空麦位</span></div>
+                    <div class="seat" :class="{ active: liveOnMic, waiting: !liveOnMic }">
+                        <span v-if="liveOnMic">我</span>
+                        <span v-else>空麦位</span>
+                    </div>
                 </div>
             </div>
 
@@ -2074,8 +2222,17 @@
                         </div>
                         <div class="live-feed-now-copy">
                             <span class="live-feed-now-label">主播说</span>
-                            <p class="live-feed-now-text" v-if="!liveHostSpeechLoading">{{ activeLiveHostSpeech || '欢迎来到语音厅，欢迎留言～' }}</p>
+                            <p class="live-feed-now-text" v-if="!liveHostSpeechLoading">
+                                {{ activeLiveHostSpeech || '欢迎来到语音厅，欢迎留言～' }}
+                            </p>
                             <p class="live-feed-now-text is-loading" v-else>正在组织语言…</p>
+                            <div class="live-bgm-lyrics-window">
+                                <p class="live-bgm-lyrics-loading" v-if="liveBgmLyricsLoading">歌词加载中…</p>
+                                <p class="live-bgm-lyrics-empty" v-else-if="!liveBgmCurrentLyricText">（暂无歌词）</p>
+                                <p class="live-bgm-lyrics-prev" v-else-if="liveBgmLyricPrevText">{{ liveBgmLyricPrevText }}</p>
+                                <p class="live-bgm-lyrics-current">{{ liveBgmCurrentLyricText }}</p>
+                                <p class="live-bgm-lyrics-next" v-if="liveBgmLyricNextText">{{ liveBgmLyricNextText }}</p>
+                            </div>
                         </div>
                     </div>
                     <div class="live-feed-stream">
@@ -2115,8 +2272,14 @@
                         </div>
                     </div>
                     <div class="live-feed-compose-wrap">
+                        <div class="live-feed-compose-row live-disguise-row" v-if="!liveOnMic">
+                            <span class="live-disguise-hint live-disguise-hint-edit" role="button" tabindex="0"
+                                @click="openLiveSettings" @keyup.enter.prevent="openLiveSettings">
+                                马甲：{{ liveUserDisguiseNick || '（未设置）' }}
+                            </span>
+                        </div>
                         <div class="live-feed-compose-row">
-                            <input class="live-feed-input" v-model="liveInput" @keyup.enter="sendLiveMessage" placeholder="说点什么…" autocomplete="off">
+                            <input class="live-feed-input" v-model="liveInput" @keyup.enter="sendLiveMessage" :placeholder="liveOnMic ? '说点什么…（角色知道是你）' : '说点什么…（马甲发言，角色以为是网友）'" autocomplete="off">
                             <button type="button" class="live-quick-btn" @click="sendLiveGift" title="送礼" aria-label="送礼"><i class="fas fa-gift"></i></button>
                             <button type="button" class="live-feed-send" @click="sendLiveMessage">发送</button>
                         </div>
@@ -2129,18 +2292,26 @@
                     <i class="fas" :class="liveMicMuted ? 'fa-microphone-slash' : 'fa-microphone'"></i>
                     <span>{{ liveMicMuted ? '已静音' : '麦克风' }}</span>
                 </button>
-                <button type="button" class="voice-btn primary"><i class="fas fa-hand-paper"></i><span>申请上麦</span></button>
+                <button type="button" class="voice-btn primary" :class="{ active: liveOnMic }" @click="toggleLiveOnMic"
+                    :title="liveOnMic ? '下麦（角色会以为你是普通网友）' : '上麦（掉马，角色知道是你）'">
+                    <i class="fas" :class="liveOnMic ? 'fa-hand-paper' : 'fa-microphone'"></i>
+                    <span>{{ liveOnMic ? '下麦' : '申请上麦' }}</span>
+                </button>
                 <button type="button" class="voice-btn" @click="goBack"><i class="fas fa-door-open"></i><span>离开房间</span></button>
             </div>
 
             <div class="live-player" :class="{ 'is-bgm-playing': liveBgmPlaying }">
                 <div class="live-player-inner">
                     <div class="live-player-icon-wrap" aria-hidden="true">
-                        <i class="fas fa-compact-disc"></i>
+                        <img class="live-player-cover-img"
+                            :src="liveBgmCurrentSong?.cover || 'https://i.postimg.cc/pT2xKzP-album-cover-placeholder.png'"
+                            alt="BGM">
                     </div>
                     <div class="live-player-text">
-                        <span class="live-player-title">厅内 BGM</span>
-                        <span class="live-player-sub">岛屿遇见海 · 已播 {{ liveElapsedText }}</span>
+                        <span class="live-player-title">{{ liveBgmCurrentSong?.name || '厅内 BGM' }}</span>
+                        <span class="live-player-sub">
+                            {{ liveBgmCurrentSong?.artist || '' }} · 已播 {{ liveElapsedText }}
+                        </span>
                     </div>
                     <button type="button" class="live-player-play" @click="toggleLiveBgm"
                         :title="liveBgmPlaying ? '暂停' : '播放'">
@@ -2174,490 +2345,148 @@
         </div>
 
         <!-- Mate App - AI Companion -->
-        <div v-else-if="openedApp === 'mate'" class="app-view mate-app">
-            <!-- Header -->
-            <div class="mate-header">
-                <button class="mate-back" @click="goBack">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M19 12H5M12 19l-7-7 7-7"/>
-                    </svg>
-                </button>
-                <h1 class="mate-title">COMPANION</h1>
-                <div class="mate-decoration">
-                    <svg class="hand-drawn-wave" viewBox="0 0 200 20" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path d="M0 10 Q25 20 50 10 T100 10 T150 10 T200 10" stroke-linecap="round"/>
-                    </svg>
+        <div v-else-if="openedApp === 'mate'" class="app-view mate-app mate-v2">
+            <div class="mate-v2-topbar">
+                <button class="mate-v2-icon-btn" @click="goBack"><i class="fas fa-chevron-left"></i></button>
+                <div class="mate-v2-title-wrap">
+                    <h1 class="mate-v2-title">MATE</h1>
+                    <p class="mate-v2-sub">陪伴场景</p>
                 </div>
-                <div class="mate-actions">
-                    <button class="mate-btn" @click="mate.showAddEventModal = true">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                            <line x1="16" y1="2" x2="16" y2="6"/>
-                            <line x1="8" y1="2" x2="8" y2="6"/>
-                            <line x1="3" y1="10" x2="21" y2="10"/>
-                        </svg>
-                    </button>
-                </div>
+                <button class="mate-v2-icon-btn" @click="mate.showAddEventModal = true"><i class="fas fa-plus"></i></button>
             </div>
-            
-            <div class="app-content mate-content" @scroll="mate.handleScroll">
-                <!-- Grid Layout -->
-                <div class="mate-grid">
-                    <!-- Focus Module -->
-                    <!-- Focus Module -->
-                    <div class="mate-card focus-card">
-                        <h3 class="module-title">学习陪伴</h3>
-                        <div class="focus-content">
-                            <!-- 角色陪伴区域 -->
-                            <div class="study-companion">
-                                <div class="companion-avatar" @click="mate.generateCharacterReply('study')">
-                                    <img v-if="mate.selectedCharacter && mate.selectedCharacter.avatarUrl" :src="mate.selectedCharacter.avatarUrl" alt="角色头像">
-                                    <div v-else class="companion-avatar-placeholder">
-                                        <i class="fas fa-user"></i>
-                                    </div>
-                                </div>
-                                <div class="companion-message">
-                                    <div v-if="mate.studyEncouragement" class="message-bubble">
-                                        {{ mate.studyEncouragement }}
-                                    </div>
-                                    <div v-else class="message-placeholder">
-                                        开始学习吧，我会陪着你！
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- 学习状态显示 -->
-                            <div class="study-status">
-                                <div class="status-display">
-                                    <div class="time-display">
-                                        <div class="time-value">{{ mate.focusTimeFormatted }}</div>
-                                        <div class="time-label">{{ mate.isFocusing ? (mate.isPaused ? '已暂停' : '学习中') : '准备开始' }}</div>
-                                    </div>
-                                    <div class="session-count">
-                                        <i class="fas fa-book"></i>
-                                        <span>今日 {{ mate.focusHistory.filter(h => new Date(h.date).toDateString() === new Date().toDateString()).length }} 次专注</span>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- 学习时长设置 -->
-                            <div class="study-duration">
-                                <div class="duration-label">学习时长</div>
-                                <div class="duration-options">
-                                    <button v-for="duration in [15, 25, 45, 60]" :key="duration"
-                                            class="duration-btn"
-                                            :class="{ 'active': Math.floor(mate.focusTime / 60) === duration }"
-                                            @click="mate.setStudyDuration(duration)">
-                                        {{ duration }}分钟
-                                    </button>
-                                </div>
-                            </div>
-                            
-                            <!-- 控制按钮 -->
-                            <div class="study-controls">
-                                <button v-if="!mate.isFocusing" class="study-btn primary" @click="mate.startFocus">
-                                    <i class="fas fa-play"></i>
-                                    开始学习
-                                </button>
-                                <button v-else-if="mate.isPaused" class="study-btn primary" @click="mate.pauseFocus">
-                                    <i class="fas fa-play"></i>
-                                    继续
-                                </button>
-                                <button v-else class="study-btn warning" @click="mate.pauseFocus">
-                                    <i class="fas fa-pause"></i>
-                                    暂停
-                                </button>
-                                <button v-if="mate.isFocusing" class="study-btn secondary" @click="mate.cancelFocus">
-                                    <i class="fas fa-stop"></i>
-                                    结束
-                                </button>
-                                <button class="study-btn accent" @click="mate.generateStudyEncouragement" :disabled="mate.isGeneratingStudyEncouragement">
-                                    <i v-if="mate.isGeneratingStudyEncouragement" class="fas fa-spinner fa-spin"></i>
-                                    <i v-else class="fas fa-lightbulb"></i>
-                                    {{ mate.isGeneratingStudyEncouragement ? '生成中...' : '获取鼓励' }}
-                                </button>
-                            </div>
+
+            <div class="mate-v2-stage">
+                <section v-show="mate.currentMode === 'focus'" class="mate-v2-scene focus">
+                    <div class="scene-watermark">FOCUS</div>
+                    <div class="scene-editorial-top"><span>Edition 06</span><span>Monochrome Companion</span></div>
+                    <div class="scene-badge">专注 · 时光</div>
+                    <div class="scene-ring">
+                        <div class="scene-ring-time">{{ mate.focusTimeFormatted }}</div>
+                        <div class="scene-ring-sub">{{ mate.isFocusing ? (mate.isPaused ? '已暂停' : '专注中') : '准备开始' }}</div>
+                    </div>
+                    <div class="scene-chip-row">
+                        <button v-for="duration in [25, 45, 60]" :key="'f'+duration" class="scene-chip"
+                            :class="{ active: Math.floor(mate.focusTime / 60) === duration }"
+                            @click="mate.setStudyDuration(duration)">{{ duration }}m</button>
+                    </div>
+                    <div class="scene-inline-stats">
+                        <span>今日专注 {{ mate.focusHistory.length }} 次</span>
+                        <span>累计 {{ mate.focusHistory.reduce((s, h) => s + (h.duration || 0), 0) }} 分钟</span>
+                    </div>
+                    <div class="scene-action-row">
+                        <button v-if="!mate.isFocusing" class="scene-btn primary" @click="mate.startFocus">开始</button>
+                        <button v-else-if="mate.isPaused" class="scene-btn primary" @click="mate.pauseFocus">继续</button>
+                        <button v-else class="scene-btn primary" @click="mate.pauseFocus">暂停</button>
+                        <button v-if="mate.isFocusing" class="scene-btn ghost" @click="mate.cancelFocus">结束</button>
+                    </div>
+                </section>
+
+                <section v-show="mate.currentMode === 'exercise'" class="mate-v2-scene exercise">
+                    <div class="scene-watermark">MOVE</div>
+                    <div class="scene-editorial-top"><span>Edition 06</span><span>Body Motion</span></div>
+                    <div class="scene-badge">跃动 · 身体</div>
+                    <div class="scene-chip-row scrollable">
+                        <button v-for="type in mate.exerciseTypes" :key="type.id" class="scene-chip"
+                            :class="{ active: mate.exerciseType === type.id }"
+                            @click="mate.setExerciseType(type.id)">
+                            <i :class="`fas ${type.icon}`"></i> {{ type.label }}
+                        </button>
+                    </div>
+                    <div class="scene-metrics">
+                        <div class="metric"><span>步数</span><strong>{{ mate.steps }}</strong></div>
+                        <div class="metric"><span>心率</span><strong>{{ mate.heartRate }}</strong></div>
+                        <div class="metric"><span>进度</span><strong>{{ mate.exerciseProgress }}%</strong></div>
+                    </div>
+                    <div class="scene-progress"><span :style="{ width: mate.exerciseProgress + '%' }"></span></div>
+                    <div class="scene-action-row">
+                        <button class="scene-btn primary" @click="mate.generateExerciseEncouragement" :disabled="mate.isGeneratingEncouragement">
+                            {{ mate.isGeneratingEncouragement ? '生成中...' : '给我鼓励' }}
+                        </button>
+                        <button class="scene-btn ghost" @click="mate.resetExerciseData">重置</button>
+                    </div>
+                </section>
+
+                <section v-show="mate.currentMode === 'sleep'" class="mate-v2-scene sleep">
+                    <div class="scene-watermark">NIGHT</div>
+                    <div class="scene-editorial-top"><span>Edition 06</span><span>Dream Archive</span></div>
+                    <div class="scene-badge">安眠 · 梦境</div>
+                    <div class="scene-sleep-core">
+                        <button v-if="!mate.isSleeping" class="scene-sleep-btn" @click="mate.startSleeping">开始入睡</button>
+                        <button v-else class="scene-sleep-btn active" @click="mate.wakeUp">深睡中… 点击醒来</button>
+                    </div>
+                    <div class="scene-chip-row">
+                        <button v-for="duration in [6, 7, 8, 9]" :key="'s'+duration" class="scene-chip"
+                            :class="{ active: mate.targetSleepDuration === duration }"
+                            @click="mate.setTargetSleepDuration(duration)">{{ duration }}h</button>
+                    </div>
+                    <div class="scene-inline-stats">
+                        <span>目标睡眠 {{ mate.targetSleepDuration }} 小时</span>
+                        <span>日记 {{ mate.sleepDiaries.length }} 条</span>
+                    </div>
+                </section>
+
+                <section v-show="mate.currentMode === 'life'" class="mate-v2-scene life">
+                    <div class="scene-watermark">LIFE</div>
+                    <div class="scene-editorial-top"><span>Edition 06</span><span>Ledger Notes</span></div>
+                    <div class="scene-badge">生活 · 拾光</div>
+                    <div class="life-finance-mini">
+                        <div><span>预算剩余</span><strong>¥{{ Math.max(0, mate.monthlyBudget - mate.monthlyExpenses) }}</strong></div>
+                        <div><span>本月支出</span><strong>¥{{ mate.monthlyExpenses }}</strong></div>
+                    </div>
+                    <div class="life-todo-list">
+                        <div class="life-section-head">
+                            <span>待办</span>
+                            <button class="scene-mini-btn" @click="mate.showAddTodoModal = true">+</button>
+                        </div>
+                        <div v-if="mate.pendingTodos.length === 0" class="life-empty">暂无待办</div>
+                        <div v-for="todo in mate.pendingTodos.slice(0,3)" :key="todo.id" class="life-item">
+                            <span>{{ todo.text }}</span>
+                            <button @click="mate.toggleTodo(todo.id)"><i class="fas fa-check"></i></button>
                         </div>
                     </div>
-                    
-                    <!-- Exercise Module -->
-                    <!-- Exercise Module -->
-                    <div class="mate-card exercise-card">
-                        <h3 class="module-title">运动陪伴</h3>
-                        <div class="exercise-content">
-                            <!-- 角色陪伴区域 -->
-                            <div class="exercise-companion">
-                                <div class="companion-avatar" @click="mate.generateCharacterReply('exercise')">
-                                    <img v-if="mate.selectedCharacter && mate.selectedCharacter.avatarUrl" :src="mate.selectedCharacter.avatarUrl" alt="角色头像">
-                                    <div v-else class="companion-avatar-placeholder">
-                                        <i class="fas fa-user"></i>
-                                    </div>
-                                </div>
-                                <div class="companion-message">
-                                    <div v-if="mate.exerciseEncouragement" class="message-bubble">
-                                        {{ mate.exerciseEncouragement }}
-                                    </div>
-                                    <div v-else class="message-placeholder">
-                                        点击"获取鼓励"开始运动吧！
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- 运动类型选择 -->
-                            <div class="exercise-types">
-                                <button v-for="type in mate.exerciseTypes" :key="type.id" 
-                                        class="exercise-type-btn" 
-                                        :class="{ 'active': mate.exerciseType === type.id }"
-                                        @click="mate.setExerciseType(type.id)">
-                                    <i :class="`fas ${type.icon}`"></i>
-                                    <span>{{ type.label }}</span>
-                                </button>
-                            </div>
-                            
-                            <!-- 运动数据展示 -->
-                            <div class="exercise-stats">
-                                <div class="stat-item">
-                                    <div class="stat-icon">
-                                        <i class="fas fa-shoe-prints"></i>
-                                    </div>
-                                    <div class="stat-info">
-                                        <div class="stat-value">{{ mate.steps }}</div>
-                                        <div class="stat-label">步数</div>
-                                    </div>
-                                </div>
-                                <div class="stat-item">
-                                    <div class="stat-icon">
-                                        <i class="fas fa-heartbeat"></i>
-                                    </div>
-                                    <div class="stat-info">
-                                        <div class="stat-value">{{ mate.heartRate }}</div>
-                                        <div class="stat-label">心率</div>
-                                    </div>
-                                </div>
-                                <div class="stat-item">
-                                    <div class="stat-icon">
-                                        <i class="fas fa-bullseye"></i>
-                                    </div>
-                                    <div class="stat-info">
-                                        <div class="stat-value">{{ mate.targetSteps }}</div>
-                                        <div class="stat-label">目标</div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- 控制按钮 -->
-                            <div class="exercise-controls">
-                                <button class="exercise-btn primary" @click="mate.generateExerciseEncouragement" :disabled="mate.isGeneratingEncouragement">
-                                    <i v-if="mate.isGeneratingEncouragement" class="fas fa-spinner fa-spin"></i>
-                                    <i v-else class="fas fa-heart"></i>
-                                    {{ mate.isGeneratingEncouragement ? '生成中...' : '获取鼓励' }}
-                                </button>
-                                <button class="exercise-btn secondary" @click="mate.resetExerciseData">
-                                    <i class="fas fa-redo"></i>
-                                    重置
-                                </button>
-                            </div>
+                    <div class="life-events-mini">
+                        <div class="life-section-head"><span>今日事件</span></div>
+                        <div v-if="mate.recentEvents.length === 0" class="life-empty">暂无事件</div>
+                        <div v-for="event in mate.recentEvents" :key="event.id" class="life-item">
+                            <span>{{ event.title }}</span>
+                            <small>{{ new Date(event.startTime).toLocaleString() }}</small>
                         </div>
                     </div>
-                    
-                    <!-- Sleep Module -->
-                    <div class="mate-card sleep-card">
-                        <h3 class="module-title">睡眠陪伴</h3>
-                        <div class="sleep-content">
-                            <!-- 角色陪伴区域 -->
-                            <div class="sleep-companion">
-                                <div class="companion-avatar" @click="mate.generateCharacterReply('sleep')">
-                                    <img v-if="mate.selectedCharacter && mate.selectedCharacter.avatarUrl" :src="mate.selectedCharacter.avatarUrl" alt="角色头像">
-                                    <div v-else class="companion-avatar-placeholder">
-                                        <i class="fas fa-user"></i>
-                                    </div>
-                                </div>
-                                <div class="companion-message">
-                                    <div v-if="mate.sleepEncouragement" class="message-bubble">
-                                        {{ mate.sleepEncouragement }}
-                                    </div>
-                                    <div v-else class="message-placeholder">
-                                        晚安，我会守护你的梦境
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- 睡眠状态显示 -->
-                            <div class="sleep-status">
-                                <div class="status-display">
-                                    <div class="time-display">
-                                        <div class="time-value" v-if="!mate.isSleeping">
-                                            <i class="fas fa-moon"></i>
-                                            准备入睡
-                                        </div>
-                                        <div class="time-value" v-else>
-                                            {{ Math.floor(mate.sleepDuration / 60) }}h {{ mate.sleepDuration % 60 }}m
-                                        </div>
-                                        <div class="time-label">{{ mate.isSleeping ? '睡眠中' : '准备开始' }}</div>
-                                    </div>
-                                    <div class="sleep-quality">
-                                        <i class="fas fa-star"></i>
-                                        <span>今日 {{ mate.sleepDiaries.filter(d => new Date(d.date).toDateString() === new Date().toDateString()).length }} 次记录</span>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- 睡眠时长设置 -->
-                            <div class="sleep-duration-setting">
-                                <div class="duration-label">目标睡眠时长</div>
-                                <div class="duration-options">
-                                    <button v-for="duration in [6, 7, 8, 9]" :key="duration"
-                                            class="duration-btn"
-                                            :class="{ 'active': mate.targetSleepDuration === duration }"
-                                            @click="mate.setTargetSleepDuration(duration)">
-                                        {{ duration }}小时
-                                    </button>
-                                </div>
-                            </div>
-                            
-                            <!-- 控制按钮 -->
-                            <div class="sleep-controls">
-                                <button v-if="!mate.isSleeping" class="sleep-btn primary" @click="mate.startSleeping">
-                                    <i class="fas fa-bed"></i>
-                                    开始睡眠
-                                </button>
-                                <button v-else class="sleep-btn warning" @click="mate.wakeUp" :disabled="mate.isGeneratingSleepDiary">
-                                    <i v-if="mate.isGeneratingSleepDiary" class="fas fa-spinner fa-spin"></i>
-                                    <i v-else class="fas fa-sun"></i>
-                                    {{ mate.isGeneratingSleepDiary ? '生成中...' : '醒来' }}
-                                </button>
-                                <button class="sleep-btn accent" @click="mate.generateSleepEncouragement" :disabled="mate.isGeneratingSleepEncouragement">
-                                    <i v-if="mate.isGeneratingSleepEncouragement" class="fas fa-spinner fa-spin"></i>
-                                    <i v-else class="fas fa-heart"></i>
-                                    {{ mate.isGeneratingSleepEncouragement ? '生成中...' : '晚安祝福' }}
-                                </button>
-                            </div>
-                            
-                            <!-- 睡眠日记 -->
-                            <div class="sleep-diaries" v-if="mate.sleepDiaries.length > 0">
-                                <h4>睡眠日记</h4>
-                                <div v-for="diary in mate.sleepDiaries.slice(0, 2)" :key="diary.id" class="diary-item" @click="mate.currentSleepDiary = diary; mate.showSleepDiaryModal = true">
-                                    <span class="diary-date">{{ new Date(diary.date).toLocaleDateString() }}</span>
-                                    <span class="diary-score">{{ diary.score }}分</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Finance Module -->
-                    <div class="mate-card finance-card">
-                        <h3 class="module-title">记账</h3>
-                        <div class="finance-content">
-                            <div class="finance-overview">
-                                <div class="finance-item">
-                                    <span class="finance-label">初始金额</span>
-                                    <span class="finance-value" @click="mate.promptUpdateInitialBalance()">¥{{ mate.initialBalance }}</span>
-                                </div>
-                                <div class="finance-item">
-                                    <span class="finance-label">本月收入</span>
-                                    <span class="finance-value income">¥{{ mate.monthlyIncome }}</span>
-                                </div>
-                                <div class="finance-item">
-                                    <span class="finance-label">本月支出</span>
-                                    <span class="finance-value expense">¥{{ mate.monthlyExpenses }}</span>
-                                </div>
-                                <div class="finance-item">
-                                    <span class="finance-label">本月余额</span>
-                                    <span class="finance-value balance">¥{{ mate.monthlyBalance }}</span>
-                                </div>
-                            </div>
-                            
-                            <!-- 存款目标 -->
-                            <div class="saving-goal">
-                                <div class="goal-header">
-                                    <span class="goal-label">存款目标</span>
-                                    <span class="goal-value" @click="mate.promptUpdateSavingGoal()">¥{{ mate.monthlySavingGoal }}</span>
-                                </div>
-                                <div class="progress-bar">
-                                    <div class="progress-fill" :style="{ width: mate.savingProgress + '%' }"></div>
-                                </div>
-                                <span class="progress-text">{{ mate.savingProgress }}%</span>
-                            </div>
-                            
-                            <!-- 消费对比 -->
-                            <div class="expense-comparison">
-                                <div class="comparison-header">
-                                    <span class="comparison-label">消费对比</span>
-                                    <span class="comparison-change" :class="mate.expenseChangePercent >= 0 ? 'increase' : 'decrease'">
-                                        {{ mate.expenseChangePercent >= 0 ? '+' : '' }}{{ mate.expenseChangePercent }}%
-                                    </span>
-                                </div>
-                                <div class="comparison-bars">
-                                    <div class="bar-item">
-                                        <span class="bar-label">上月</span>
-                                        <div class="bar-container">
-                                            <div class="bar" :style="{ width: '70%' }"></div>
-                                        </div>
-                                        <span class="bar-value">¥{{ mate.lastMonthExpenses }}</span>
-                                    </div>
-                                    <div class="bar-item">
-                                        <span class="bar-label">本月</span>
-                                        <div class="bar-container">
-                                            <div class="bar current" :style="{ width: '100%' }"></div>
-                                        </div>
-                                        <span class="bar-value">¥{{ mate.monthlyExpenses }}</span>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- 支出分类 -->
-                            <div class="expense-categories" v-if="mate.groupedExpenses.length > 0">
-                                <h4 class="category-section-title">支出明细</h4>
-                                <div v-for="group in mate.groupedExpenses.slice(0, 5)" :key="group.category" class="expense-category" @click="mate.viewCategoryDetail(group.category)">
-                                    <div class="category-icon">
-                                        <i v-if="group.category === '餐饮'" class="fas fa-utensils"></i>
-                                        <i v-else-if="group.category === '交通'" class="fas fa-car"></i>
-                                        <i v-else-if="group.category === '购物'" class="fas fa-shopping-bag"></i>
-                                        <i v-else-if="group.category === '娱乐'" class="fas fa-film"></i>
-                                        <i v-else-if="group.category === '生活'" class="fas fa-home"></i>
-                                        <i v-else class="fas fa-ellipsis-h"></i>
-                                    </div>
-                                    <span class="category-name">{{ group.category }}</span>
-                                    <span class="category-amount">¥{{ group.amount }}</span>
-                                    <i class="fas fa-chevron-right"></i>
-                                </div>
-                            </div>
-                            
-                            <!-- 收入分类 -->
-                            <div class="income-categories" v-if="mate.groupedIncomes.length > 0">
-                                <h4 class="category-section-title">收入明细</h4>
-                                <div v-for="group in mate.groupedIncomes.slice(0, 5)" :key="group.category" class="income-category" @click="mate.viewIncomeCategoryDetail(group.category)">
-                                    <div class="category-icon income-icon">
-                                        <i v-if="group.category === '工资'" class="fas fa-money-bill-wave"></i>
-                                        <i v-else-if="group.category === '奖金'" class="fas fa-trophy"></i>
-                                        <i v-else-if="group.category === '投资'" class="fas fa-chart-line"></i>
-                                        <i v-else class="fas fa-coins"></i>
-                                    </div>
-                                    <span class="category-name">{{ group.category }}</span>
-                                    <span class="category-amount income-amount">¥{{ group.amount }}</span>
-                                    <i class="fas fa-chevron-right"></i>
-                                </div>
-                            </div>
-                            
-                            <div class="finance-actions">
-                                <button class="mate-card-btn" @click="mate.showAddExpenseModal = true"><i class="fas fa-minus"></i> 支出</button>
-                                <button class="mate-card-btn primary" @click="mate.showAddIncomeModal = true"><i class="fas fa-plus"></i> 收入</button>
-                                <button class="mate-card-btn" @click="mate.promptAiBookkeep(activeProfile)"><i class="fas fa-bolt"></i> AI 记账</button>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Period Module -->
-                    <div class="mate-card period-card" v-if="mate.lastPeriodDate">
-                        <h3 class="module-title">月经</h3>
-                        <div class="period-content">
-                            <!-- 角色关心 -->
-                            <div class="character-care">
-                                <div class="care-header">
-                                    <div class="character-selector">
-                                        <button class="character-btn" @click="mate.cycleCharacter">
-                                            <i class="fas fa-user-circle"></i>
-                                            <span>{{ mate.selectedCharacter ? mate.selectedCharacter.name : '选择角色' }}</span>
-                                        </button>
-                                    </div>
-                                    <button class="generate-care-btn" @click="mate.generatePeriodCare" :disabled="mate.isGeneratingCare">
-                                        <i class="fas fa-heart"></i>
-                                        <span>{{ mate.isGeneratingCare ? '生成中...' : '生成关心' }}</span>
-                                    </button>
-                                </div>
-                                <div class="care-content" v-if="mate.periodCareMessage">
-                                    <div class="care-avatar">
-                                        <img v-if="mate.selectedCharacter && mate.selectedCharacter.avatarUrl" :src="mate.selectedCharacter.avatarUrl" alt="角色头像">
-                                        <div v-else class="care-avatar-placeholder">
-                                            <i class="fas fa-user"></i>
-                                        </div>
-                                    </div>
-                                    <div class="care-message">
-                                        {{ mate.periodCareMessage }}
-                                    </div>
-                                </div>
-                                <div class="care-placeholder" v-else>
-                                    <i class="fas fa-heart"></i>
-                                    <span>点击"生成关心"获取角色的贴心话</span>
-                                </div>
-                            </div>
-                            
-                            <!-- 历史预测 -->
-                            <div class="history-prediction">
-                                <div class="history-header" @click="mate.showHistoryPrediction = !mate.showHistoryPrediction">
-                                    <span>历史预测</span>
-                                    <i class="fas fa-chevron-down" :class="{ 'rotate': mate.showHistoryPrediction }"></i>
-                                </div>
-                                <div v-if="mate.showHistoryPrediction" class="history-list">
-                                    <div v-for="(prediction, index) in mate.historyPrediction" :key="index" class="history-item">
-                                        <span class="history-month">{{ prediction.month }}月</span>
-                                        <span class="history-dates">
-                                            {{ new Date(prediction.startDate).toLocaleDateString() }} - {{ new Date(prediction.endDate).toLocaleDateString() }}
-                                        </span>
-                                        <span class="history-ovulation">排卵: {{ new Date(prediction.ovulationDate).toLocaleDateString() }}</span>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- 历史记录 -->
-                            <div class="period-logs">
-                                <div class="history-header" @click="mate.showPeriodLogs = !mate.showPeriodLogs">
-                                    <span>历史记录</span>
-                                    <i class="fas fa-chevron-down" :class="{ 'rotate': mate.showPeriodLogs }"></i>
-                                </div>
-                                <div v-if="mate.showPeriodLogs" class="logs-list">
-                                    <div v-for="(log, index) in mate.periodLogs.slice(-5)" :key="log.id" class="log-item">
-                                        <span class="log-date">{{ new Date(log.date).toLocaleDateString() }}</span>
-                                        <span class="log-flow">{{ log.flow === 'light' ? '轻' : log.flow === 'medium' ? '中' : '重' }}</span>
-                                        <span class="log-mood">{{ log.mood === 'happy' ? '开心' : log.mood === 'normal' ? '正常' : log.mood === 'sad' ? '难过' : '烦躁' }}</span>
-                                        <span class="log-symptoms" v-if="log.symptoms.length > 0">{{ log.symptoms.join(', ') }}</span>
-                                        <button class="delete-mini-btn" @click="mate.deletePeriodLog(log.id)"><i class="fas fa-trash"></i></button>
-                                    </div>
-                                    <div v-if="mate.periodLogs.length === 0" class="empty-logs">
-                                        暂无记录
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <button class="mate-card-btn" @click="mate.showPeriodSettings = true"><i class="fas fa-cog"></i> 设置</button>
-                        </div>
-                    </div>
-                    
-                    <!-- Schedule Module -->
-                    <div class="mate-card schedule-card">
-                        <h3 class="module-title">行程 & 待办</h3>
-                        <div class="schedule-content">
-                            <!-- Timeline -->
-                            <div class="timeline">
-                                <div v-for="event in mate.events.slice(0, 3)" :key="event.id" class="timeline-item">
-                                    <div class="timeline-time">{{ new Date(event.startTime).getHours() }}:{{ String(new Date(event.startTime).getMinutes()).padStart(2, '0') }}</div>
-                                    <div class="timeline-line"></div>
-                                    <div class="timeline-content">
-                                        <span class="timeline-title">{{ event.title }}</span>
-                                        <span class="timeline-category">{{ event.category }}</span>
-                                    </div>
-                                    <button class="delete-btn" @click="mate.deleteEvent(event.id)"><i class="fas fa-times"></i></button>
-                                </div>
-                            </div>
-                            
-                            <!-- Todo List -->
-                            <div class="todo-list">
-                                <div v-for="todo in mate.todos.slice(0, 4)" :key="todo.id" class="todo-item">
-                                    <div class="todo-checkbox">
-                                        <div class="checkbox-custom" :class="{ 'checked': todo.completed }" @click="mate.toggleTodo(todo.id)">
-                                            <svg v-if="todo.completed" viewBox="0 0 20 20" fill="none" stroke="#000000" stroke-width="2">
-                                                <path d="M5 10 L8 13 L15 6" stroke-linecap="round" stroke-linejoin="round"/>
-                                            </svg>
-                                        </div>
-                                    </div>
-                                    <span class="todo-text" :class="{ 'completed': todo.completed }">{{ todo.text }}</span>
-                                    <button class="delete-btn" @click="mate.deleteTodo(todo.id)"><i class="fas fa-trash-alt"></i></button>
-                                </div>
-                            </div>
-                            
-                            <button class="mate-card-btn" @click="mate.showAddTodoModal = true"><i class="fas fa-plus-circle"></i> 添加待办</button>
-                        </div>
-                    </div>
+                    <button class="scene-float-action" @click="mate.showAddExpenseModal = true">记账</button>
+                    <button class="scene-moon-action" @click="mate.showPeriodSettings = true"><i class="fas fa-moon"></i></button>
+                </section>
+            </div>
+
+            <div class="mate-v2-dots">
+                <button v-for="mode in mate.sceneModes" :key="mode" class="mate-dot"
+                    :class="{ active: mate.currentMode === mode }"
+                    @click="mate.jumpToScene(mode)"></button>
+            </div>
+
+            <div class="mate-floating-companion"
+                @click="mate.triggerSceneEncouragement"
+                @dblclick="mate.showMateChatPanel = !mate.showMateChatPanel"
+                @contextmenu.prevent="mate.showQuickSceneMenu = !mate.showQuickSceneMenu">
+                <img v-if="mate.selectedCharacter && mate.selectedCharacter.avatarUrl" :src="mate.selectedCharacter.avatarUrl" alt="伙伴">
+                <i v-else class="fas fa-user-astronaut"></i>
+                <div v-if="mate.mateAIVoice" class="mate-floating-bubble">{{ mate.mateAIVoice }}</div>
+            </div>
+
+            <div v-if="mate.showQuickSceneMenu" class="mate-quick-scene-menu">
+                <button @click="mate.jumpToScene('focus')">专注</button>
+                <button @click="mate.jumpToScene('exercise')">运动</button>
+                <button @click="mate.jumpToScene('sleep')">睡眠</button>
+                <button @click="mate.jumpToScene('life')">生活</button>
+            </div>
+
+            <div v-if="mate.showMateChatPanel" class="mate-chat-pop">
+                <div class="mate-chat-pop-head">
+                    <span>伙伴快捷对话</span>
+                    <button @click="mate.showMateChatPanel = false"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="mate-chat-pop-actions">
+                    <button @click="mate.triggerSceneEncouragement">来一句</button>
+                    <button @click="mate.cycleCharacter">换角色</button>
                 </div>
             </div>
             
@@ -3392,7 +3221,7 @@
                         <option :value="null">不绑定预设</option>
                         <option v-for="p in presets" :key="p.id" :value="p.id">{{ p.name }}</option>
                     </select>
-                    
+
                     <label class="mt-2">用户人设</label>
                     <textarea v-model="editingCharacter.userPersona" rows="2" placeholder="用户在此角色面前的人设..."></textarea>
                     

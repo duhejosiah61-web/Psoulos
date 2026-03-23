@@ -193,6 +193,8 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
     const showIncomeCategoryDetailModal = ref(false);
     const showAddTodoModal = ref(false);
     const showAddEventModal = ref(false);
+    const showQuickSceneMenu = ref(false);
+    const showMateChatPanel = ref(false);
     const newExpense = ref({ 
         amount: '', 
         category: '餐饮', 
@@ -534,6 +536,23 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
         return events.value.find(event => {
             return new Date(event.startTime) <= now && new Date(event.endTime) >= now;
         });
+    });
+    const sceneModes = ['focus', 'exercise', 'sleep', 'life'];
+    const currentSceneIndex = computed(() => {
+        const idx = sceneModes.indexOf(currentMode.value);
+        return idx >= 0 ? idx : 0;
+    });
+    const pendingTodos = computed(() => todos.value.filter(t => !t.completed));
+    const recentEvents = computed(() => {
+        const now = Date.now();
+        return [...events.value]
+            .filter(e => new Date(e.endTime).getTime() >= now - 24 * 60 * 60 * 1000)
+            .sort((a, b) => new Date(a.startTime) - new Date(b.startTime))
+            .slice(0, 3);
+    });
+    const exerciseProgress = computed(() => {
+        if (!targetSteps.value) return 0;
+        return Math.max(0, Math.min(100, Math.round((steps.value / targetSteps.value) * 100)));
     });
 
     const selectedCharacter = computed(() => {
@@ -1419,6 +1438,16 @@ ${recentMessages || '最近没有聊天。'}
         currentMode.value = mode;
         saveToLocal();
     };
+    const jumpToScene = async (mode) => {
+        showQuickSceneMenu.value = false;
+        await setMode(mode);
+    };
+    const triggerSceneEncouragement = async () => {
+        if (currentMode.value === 'focus') return generateCharacterReply('study');
+        if (currentMode.value === 'exercise') return generateCharacterReply('exercise');
+        if (currentMode.value === 'sleep') return generateCharacterReply('sleep');
+        return generatePeriodCare();
+    };
 
     const startSleeping = () => {
         isSleeping.value = true;
@@ -1502,11 +1531,18 @@ ${recentMessages || '最近没有聊天。'}
         showSleepDiaryModal,
         currentSleepDiary,
         currentEvent,
+        recentEvents,
+        pendingTodos,
+        sceneModes,
+        currentSceneIndex,
+        exerciseProgress,
         containerClass,
         showAddExpenseModal,
         showAddIncomeModal,
         showAddTodoModal,
         showAddEventModal,
+        showQuickSceneMenu,
+        showMateChatPanel,
         showPeriodSettings,
         lastPeriodDate,
         cycleLength,
@@ -1574,6 +1610,8 @@ ${recentMessages || '最近没有聊天。'}
         getCurrentStatus,
         getGreeting,
         setMode,
+        jumpToScene,
+        triggerSceneEncouragement,
         startSleeping,
         wakeUp,
         aiBookkeep,
