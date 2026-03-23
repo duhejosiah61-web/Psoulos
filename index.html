@@ -128,12 +128,144 @@
             <div class="homescreen-inner">
                 <!-- 页面容器 -->
                 <div class="home-pages" ref="homePages" style="cursor: grab;">
-                    <!-- 新增最左页（第三页） -->
-                    <div class="home-page" :class="{ 'active': currentPage === 0 }">
+                    <!-- 最左页：角色手机模拟 -->
+                    <div class="home-page home-page-left-peek" :class="{ 'active': currentPage === 0 }">
                         <div class="grid-6x4">
-                            <div class="grid-cell grid-row-1-6">
-                                <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;opacity:.55;font-family:'Inter',sans-serif;letter-spacing:1px;">
-                                    <span>LEFT PAGE</span>
+                            <div class="grid-cell grid-row-1-6 left-peek-cell">
+                                <div class="left-peek-container" :class="{ dark: peek.peekDark }">
+                                    <div class="left-peek-toolbar">
+                                        <select class="left-peek-select" :value="peek.peekSelectedCharacterId" @change="peek.selectPeekCharacter($event.target.value)">
+                                            <option value="">选择角色手机</option>
+                                            <option v-for="char in characters" :key="char.id" :value="char.id">
+                                                {{ char.nickname || char.name || '未命名' }}
+                                            </option>
+                                        </select>
+                                        <button class="left-peek-theme-btn" @click="peek.peekDark = !peek.peekDark" :title="peek.peekDark ? '浅色' : '深色'">
+                                            <i class="fas" :class="peek.peekDark ? 'fa-sun' : 'fa-moon'"></i>
+                                        </button>
+                                        <button class="left-peek-ai-btn" @click="peek.generatePeekLinkedData()" :disabled="peek.peekAiGenerating" title="联动生成">
+                                            <i class="fas" :class="peek.peekAiGenerating ? 'fa-spinner fa-spin' : 'fa-wand-magic-sparkles'"></i>
+                                        </button>
+                                    </div>
+                                    <div v-if="!peek.peekSelectedCharacter" class="left-peek-empty">
+                                        选择角色查看其手机
+                                    </div>
+                                    <div v-else class="left-peek-phone-wrap">
+                                        <div class="left-peek-phone-frame">
+                                            <div class="left-peek-notch"></div>
+                                            <div class="left-peek-screen peek-phone-screen" :class="{ dark: peek.peekDark }">
+                                                <div v-if="peek.peekLocked" class="peek-lockscreen" :style="{ backgroundImage: 'url(' + (peek.peekSelectedCharacter?.avatarUrl || 'https://placehold.co/400x800?text=Wallpaper') + ')' }" @click="peek.unlockPeek">
+                                                    <div class="peek-lockscreen-widget">
+                                                        <span class="peek-lockscreen-weather"><i class="fas fa-sun"></i> {{ peek.peekWidgetWeather }}</span>
+                                                        <span class="peek-lockscreen-location"><i class="fas fa-location-dot"></i> 当前定位</span>
+                                                    </div>
+                                                    <div class="peek-lockscreen-time">{{ peek.peekStatusTime }}</div>
+                                                    <div class="peek-lockscreen-date">{{ peek.peekWidgetDate }}</div>
+                                                    <div class="peek-lockscreen-hint"><i class="fas fa-lock-open"></i> 点击解锁</div>
+                                                    <div class="peek-lockscreen-quick">
+                                                        <div class="peek-lockscreen-quick-item"><i class="fas fa-flashlight"></i></div>
+                                                        <div class="peek-lockscreen-quick-item"><i class="fas fa-camera"></i></div>
+                                                    </div>
+                                                </div>
+                                                <template v-else>
+                                                    <div class="peek-statusbar">
+                                                        <span class="peek-status-time">{{ peek.peekStatusTime }}</span>
+                                                        <div class="peek-status-right"><i class="fas fa-signal"></i><i class="fas fa-wifi"></i><i class="fas fa-battery-full"></i></div>
+                                                    </div>
+                                                    <template v-if="peek.peekInnerApp === 'home'">
+                                                        <div class="peek-home-content">
+                                                            <div class="peek-widget-row peek-widget-top">
+                                                                <div class="peek-widget-greeting">{{ peek.peekWidgetGreeting }}，{{ peek.peekSelectedCharacter?.nickname || peek.peekSelectedCharacter?.name || '你' }}</div>
+                                                                <div class="peek-widget-meta">
+                                                                    <span class="peek-widget-date">{{ peek.peekWidgetDate }}</span>
+                                                                    <span class="peek-widget-weather"><i class="fas fa-sun"></i> {{ peek.peekWidgetWeather }}</span>
+                                                                </div>
+                                                            </div>
+                                                            <div class="peek-widget-row peek-widget-photos" @click="peek.openPeekInnerApp('album')">
+                                                                <div class="peek-widget-photo" v-for="(p, i) in peek.peekWidgetPhotos" :key="i">
+                                                                    <img :src="p" alt="">
+                                                                </div>
+                                                            </div>
+                                                            <div class="peek-widget-row peek-widget-note" v-if="peek.peekWidgetFirstNote" @click="peek.openPeekInnerApp('notes')">
+                                                                <i class="fas fa-note-sticky"></i>
+                                                                <div class="peek-widget-note-content">
+                                                                    <span class="peek-widget-note-title">{{ peek.peekWidgetFirstNote.title }}</span>
+                                                                    <span class="peek-widget-note-preview">{{ peek.peekWidgetFirstNote.content.split('\n')[0] }}</span>
+                                                                </div>
+                                                            </div>
+                                                            <div class="peek-home-search"><i class="fas fa-search"></i><span>搜索</span></div>
+                                                            <div class="peek-generate-tip" v-if="peek.peekAiLastGeneratedAt">
+                                                                联动更新：{{ peek.peekAiLastGeneratedAt }}
+                                                            </div>
+                                                            <div class="peek-home-grid">
+                                                                <button class="peek-app-icon" v-for="app in peek.filteredPeekApps" :key="app.id" @click="peek.openPeekInnerApp(app.id)">
+                                                                    <i class="fas" :class="app.icon"></i>
+                                                                    <span>{{ app.name }}</span>
+                                                                    <span v-if="app.id === 'messages' && peek.peekWidgetUnreadCount > 0" class="peek-app-badge">{{ peek.peekWidgetUnreadCount }}</span>
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                        <div class="peek-dock">
+                                                            <button class="peek-dock-item" v-for="d in peek.DOCK_APPS" :key="d.id" @click="peek.openPeekInnerApp(d.id)">
+                                                                <i class="fas" :class="d.icon"></i><span>{{ d.name }}</span>
+                                                            </button>
+                                                        </div>
+                                                        <div class="peek-home-indicator"></div>
+                                                    </template>
+                                                    <template v-else>
+                                                        <div class="peek-app-nav">
+                                                            <button class="peek-app-back" @click="peek.closePeekInnerApp"><i class="fas fa-chevron-left"></i></button>
+                                                            <span class="peek-app-title">{{ peek.getPeekAppName(peek.peekInnerApp) }}</span>
+                                                            <button class="peek-app-back peek-app-lock" @click="peek.lockPeek"><i class="fas fa-lock"></i></button>
+                                                        </div>
+                                                        <div class="peek-app-body">
+                                                            <div v-if="peek.peekInnerApp === 'messages'" class="peek-list">
+                                                                <div class="peek-list-item" v-for="m in peek.peekMessages" :key="m.id"><div><b>{{ m.app }}</b> · {{ m.text }}</div><span>{{ m.at }}</span></div>
+                                                            </div>
+                                                            <div v-else-if="peek.peekInnerApp === 'calls'" class="peek-list">
+                                                                <div class="peek-list-item" v-for="c in peek.peekCalls" :key="c.id"><div><b>{{ c.who }}</b> · {{ c.type === 'missed' ? '未接来电' : '已拨出' }}</div><span>{{ c.at }}</span></div>
+                                                            </div>
+                                                            <div v-else-if="peek.peekInnerApp === 'album'" class="peek-photo-grid">
+                                                                <img v-for="(p, i) in peek.peekPhotos" :key="i" :src="p" alt="photo">
+                                                            </div>
+                                                            <div v-else-if="peek.peekInnerApp === 'notes'" class="peek-list">
+                                                                <div class="peek-note" v-for="n in peek.peekNotes" :key="n.id"><h4>{{ n.title }}</h4><p>{{ n.content }}</p></div>
+                                                            </div>
+                                                            <div v-else-if="peek.peekInnerApp === 'browser'" class="peek-list">
+                                                                <div class="peek-list-item" v-for="b in peek.peekBrowserHistory" :key="b.id"><div><b>{{ b.title }}</b><br><small>{{ b.url }}</small></div></div>
+                                                            </div>
+                                                            <div v-else-if="peek.peekInnerApp === 'files'" class="peek-list">
+                                                                <div class="peek-list-item" v-for="f in peek.peekFiles" :key="f.id"><div><b>{{ f.name }}</b></div><span>{{ f.size }}</span></div>
+                                                            </div>
+                                                            <div v-else-if="peek.peekInnerApp === 'diary'" class="peek-list">
+                                                                <div class="peek-note" v-for="d in peek.peekDiaryEntries" :key="d.id">
+                                                                    <h4>{{ d.title }} · {{ d.mood }}</h4>
+                                                                    <p>{{ d.content }}</p>
+                                                                </div>
+                                                            </div>
+                                                            <div v-else-if="peek.peekInnerApp === 'bank'" class="peek-list">
+                                                                <div class="peek-list-item">
+                                                                    <div><b>余额</b></div><span>¥ {{ peek.peekBankAccount.balance }}</span>
+                                                                </div>
+                                                                <div class="peek-list-item">
+                                                                    <div><b>本月支出</b></div><span>¥ {{ peek.peekBankAccount.monthlySpend }}</span>
+                                                                </div>
+                                                                <div class="peek-list-item" v-for="r in (peek.peekBankAccount.records || [])" :key="r.id">
+                                                                    <div><b>{{ r.item }}</b></div><span>{{ peek.peekFormatAmount(r.amount) }} · {{ r.at }}</span>
+                                                                </div>
+                                                            </div>
+                                                            <div v-else-if="peek.peekInnerApp === 'map'" class="peek-list">
+                                                                <div class="peek-list-item" v-for="m in peek.peekMapTracks" :key="m.id">
+                                                                    <div><b>{{ m.place }}</b> · {{ m.note }}</div><span>{{ m.at }}</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="peek-home-indicator"></div>
+                                                    </template>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -312,11 +444,11 @@
                                     </div>
                                     <div class="app-label">Mate</div>
                                 </div>
-                                <div class="app-icon" @click="openApp('peek')">
+                                <div class="app-icon" @click="openApp('read')">
                                     <div class="app-icon-wrapper">
-                                        <i class="fa fa-eye app-icon-font"></i>
+                                        <i class="fa fa-book-open app-icon-font"></i>
                                     </div>
-                                    <div class="app-label">Peek</div>
+                                    <div class="app-label">Read</div>
                                 </div>
                                 <div class="app-icon" @click="openApp('feed')">
                                     <div class="app-icon-wrapper">
@@ -691,9 +823,10 @@
                                             <div class="reply-quote-text">{{ msg.replyTo.text }}</div>
                                         </div>
                                     </div>
-                                <div v-if="msg.isCallMessage" class="call-content">
+                                <div v-if="msg.isCallMessage" class="call-content" :class="{ 'clickable': !!msg.callDiaryId }" @click.stop="openCallDiary(msg)">
                                     <span class="call-icon" :class="msg.callType === 'video' ? 'video' : 'voice'"></span>
                                     {{ msg.text }}
+                                    <small v-if="msg.callDiaryHint" class="call-diary-hint">{{ msg.callDiaryHint }}</small>
                                 </div>
                                 <div v-else-if="msg.messageType === 'image'" class="special-card polaroid-card">
                                     <div class="polaroid-frame">
@@ -843,6 +976,10 @@
                                     <div v-if="msg.showTranslation" class="voice-translation">
                                         <div class="translation-label">转文字</div>
                                         <div class="translation-text">{{ msg.transcription || msg.voiceText || msg.text }}</div>
+                                        <div v-if="soulLinkForeignTranslationEnabled && msg.voiceTranslation" class="reply-translation">
+                                            <div class="translation-divider"></div>
+                                            <div class="translation-text">{{ msg.voiceTranslation }}</div>
+                                        </div>
                                     </div>
                                 </div>
                                 <div v-else-if="msg.messageType === 'sticker'" class="sticker-message-wrapper">
@@ -1136,6 +1273,27 @@
                             <input type="text" v-model="userIdentity" class="art-settings-input" placeholder="例如：朋友、恋人、同事...">
                         </div>
                     </div>
+
+                    <div class="art-settings-input-item">
+                        <div class="art-settings-icon-wrapper">
+                            <div class="art-settings-blob blob-color-2"></div>
+                            <svg class="art-settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M8 7a3 3 0 1 1 0 6 3 3 0 0 1 0-6z"></path>
+                                <path d="M16 7a3 3 0 1 1 0 6 3 3 0 0 1 0-6z"></path>
+                                <path d="M4 19c0-2.2 1.8-4 4-4"></path>
+                                <path d="M20 19c0-2.2-1.8-4-4-4"></path>
+                            </svg>
+                        </div>
+                        <div class="art-input-wrapper">
+                            <label class="art-input-label">我的人称代词</label>
+                            <select v-model="userPronoun" class="art-settings-input">
+                                <option value="unknown">保密/中性（TA）</option>
+                                <option value="female">女性（她）</option>
+                                <option value="male">男性（他）</option>
+                                <option value="nonbinary">非二元/中性</option>
+                            </select>
+                        </div>
+                    </div>
                     
                     <div v-if="soulLinkActiveChatType !== 'group'" class="art-settings-input-item">
                         <div class="art-settings-icon-wrapper">
@@ -1203,13 +1361,16 @@
                             </svg>
                         </div>
                         <div class="art-input-wrapper">
-                            <label class="art-input-label">翻译语言</label>
+                            <label class="art-input-label">翻译方向</label>
                             <select v-model="soulLinkForeignTranslationLang" class="art-settings-input">
                                 <option value="zh-CN">中文(简体)</option>
                                 <option value="en">English</option>
                                 <option value="ja">日本語</option>
                                 <option value="ko">한국어</option>
                             </select>
+                            <div style="font-size: 12px; color: rgba(0, 0, 0, 0.55); margin-top: 6px;">
+                                {{ soulLinkForeignTranslationDirectionText }}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -3026,6 +3187,19 @@
             </div>
         </div>
 
+        <!-- Read App（暂定占位） -->
+        <div v-else-if="openedApp === 'read'" class="app-view read-app">
+            <div class="app-header">
+                <button class="back-btn" @click="closeApp"><i class="fas fa-chevron-left"></i></button>
+                <span class="app-title">Read</span>
+                <div style="width: 40px;"></div>
+            </div>
+            <div class="read-placeholder">
+                <i class="fas fa-book-open"></i>
+                <p>阅读功能即将上线</p>
+            </div>
+        </div>
+
         <!-- Workshop App -->
         <div v-else-if="openedApp === 'workshop'" class="app-view workshop-view">
             <div class="app-header">
@@ -3427,6 +3601,10 @@
                                 :disabled="backupExporting || backupImporting">
                                 <i class="fas fa-download"></i> {{ backupExporting ? '打包中…' : '下载完整备份' }}
                             </button>
+                            <button type="button" class="console-btn console-btn-secondary console-btn-full" @click="downloadSegmentedBackup"
+                                :disabled="backupExporting || backupImporting">
+                                <i class="fas fa-layer-group"></i> 下载分片备份（按软件/角色）
+                            </button>
                             <button type="button" class="console-btn console-btn-secondary console-btn-full" @click="saveSoulOsBackupSlotOnly"
                                 :disabled="backupExporting || backupImporting">
                                 <i class="fas fa-archive"></i> 仅写入本地备份槽
@@ -3440,6 +3618,35 @@
                                 <i class="fas fa-file-import"></i> 从备份文件恢复
                             </button>
                             <input type="file" accept=".json,application/json" ref="soulosBackupFileInput" style="display:none" @change="handleSoulOsBackupImport">
+                        </div>
+                    </div>
+                </div>
+
+                <div v-if="showSegmentedImportPanel && segmentedImportPackage" class="art-savearchive-overlay" @click.self="closeSegmentedImportPanel">
+                    <div class="art-savearchive-panel" style="max-height: 80vh; overflow-y: auto;">
+                        <div class="card-title" style="margin-bottom: 10px;">分片恢复选择</div>
+                        <p class="console-backup-desc">勾选要恢复的软件模块和角色。未勾选项不会被影响。</p>
+                        <div class="console-card" style="margin: 10px 0;">
+                            <div class="console-card-header"><span>软件分片</span></div>
+                            <div class="console-card-body">
+                                <label v-for="(seg, appKey) in segmentedImportPackage.segments.apps" :key="appKey" style="display:flex; gap:8px; align-items:center; margin:6px 0;">
+                                    <input type="checkbox" v-model="segmentedImportAppSelections[appKey]">
+                                    <span>{{ appKey }}</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="console-card" style="margin: 10px 0;">
+                            <div class="console-card-header"><span>角色分片</span></div>
+                            <div class="console-card-body">
+                                <label v-for="(seg, roleId) in segmentedImportPackage.segments.roles" :key="roleId" style="display:flex; gap:8px; align-items:center; margin:6px 0;">
+                                    <input type="checkbox" v-model="segmentedImportRoleSelections[roleId]">
+                                    <span>{{ seg.name || roleId }}</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="art-savearchive-buttons">
+                            <button class="art-savearchive-btn art-savearchive-btn-cancel" @click="closeSegmentedImportPanel">取消</button>
+                            <button class="art-savearchive-btn art-savearchive-btn-save" @click="confirmSegmentedImport">按勾选恢复</button>
                         </div>
                     </div>
                 </div>
@@ -3810,6 +4017,25 @@
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <div v-if="showCallDiaryModal && selectedCallDiary" class="call-diary-modal" @click.self="closeCallDiaryModal">
+            <div class="call-diary-panel">
+                <div class="call-diary-header">
+                    <div class="call-diary-kicker">CALL DOSSIER</div>
+                    <strong>{{ callDiaryTitle }}</strong>
+                    <span class="call-diary-issue">VOL.{{ selectedCallDiary.volNo || '--' }}</span>
+                    <span class="call-diary-file">FILE-{{ selectedCallDiary.fileNo || '----' }}</span>
+                    <button class="call-diary-close" @click="closeCallDiaryModal"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="call-diary-meta">
+                    <span>{{ selectedCallDiary.name }}</span>
+                    <span>{{ selectedCallDiary.callType === 'video' ? '视频通话' : '语音通话' }}</span>
+                    <span>{{ selectedCallDiary.duration }}</span>
+                    <span>{{ new Date(selectedCallDiary.createdAt).toLocaleDateString('zh-CN') }}</span>
+                </div>
+                <div class="call-diary-body" :class="{ 'long-form': (selectedCallDiary.body || '').length > 260 }">{{ selectedCallDiary.body }}</div>
             </div>
         </div>
 

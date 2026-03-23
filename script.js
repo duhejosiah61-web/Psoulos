@@ -1,4 +1,4 @@
-// =========================================================================
+//=========================================================================
 // == SOUL OS SCRIPT (FIXED VERSION)
 // =========================================================================
 import { ref, computed, onMounted, watch, reactive, nextTick } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
@@ -7,6 +7,7 @@ import { useMate } from './mate.js';
 import { useNotice } from './notice.js';
 import { useGames } from './games.js';
 import { useLive } from './live.js';
+import { usePeek } from './peek.js';
 
 
 export function setupApp() {
@@ -25,8 +26,8 @@ export function setupApp() {
         // ignore
     }
     
-    // 页面切换
-    const currentPage = ref(1);
+    // 页面切换（0=角色手机 1=主页 2=第二页）
+    const currentPage = ref(0);
     const homePages = ref(null);
   
     
@@ -1078,7 +1079,7 @@ const saveFont = () => {
                 nickname: `新角色 ${characters.value.length + 1}`,
                 name: `新角色 ${characters.value.length + 1}`,
                 summary: '点击卡片进行编辑...', 
-                avatarUrl: `./assets/avatar-placeholder.png`, 
+                avatarUrl: `https://placehold.co/100x100?text=Avatar`, 
                 tags: ['新角色'],
                 persona: '',
                 kvData: [],
@@ -1331,7 +1332,7 @@ const saveFont = () => {
                 nickname: characterName,
                 name: characterName,
                 summary,
-                avatarUrl: avatarBase64 || `./assets/avatar-placeholder.png`,
+                avatarUrl: avatarBase64 || `https://placehold.co/100x100?text=Avatar`,
                 tags: tags.length > 0 ? tags : ['导入'],
                 persona,
                 kvData: [],
@@ -1360,7 +1361,7 @@ const saveFont = () => {
                     avatarBase64 = result.avatarBase64;
                 } else if (name.endsWith('.json')) {
                     characterData = await parseCharJson(file);
-                    avatarBase64 = characterData && characterData.avatar ? characterData.avatar : `./assets/avatar-placeholder.png`;
+                    avatarBase64 = characterData && characterData.avatar ? characterData.avatar : `https://placehold.co/100x100?text=Avatar`;
                 } else {
                     alert('不支持的文件格式，请选择 .png 或 .json 文件。');
                     return;
@@ -2750,6 +2751,7 @@ const saveFont = () => {
         const mate = reactive(useMate(soulLinkMessages, characters, activeProfile));
         const feed = reactive(useFeed(profiles, activeProfile));
         const notice = reactive(useNotice());
+        const peek = reactive(usePeek(characters, activeProfile));
         const games = reactive(useGames());
 
         // --- Console：全量备份（localStorage + SoulOS_DB / FeedDB，思路类似 kmain 里 JSON 导出） ---
@@ -2758,6 +2760,10 @@ const saveFont = () => {
         const backupImporting = ref(false);
         const backupLastSavedHint = ref('');
         const soulosBackupFileInput = ref(null);
+        const showSegmentedImportPanel = ref(false);
+        const segmentedImportPackage = ref(null);
+        const segmentedImportAppSelections = ref({});
+        const segmentedImportRoleSelections = ref({});
 
         const collectAllLocalStorageEntries = () => {
             const entries = {};
@@ -2856,6 +2862,263 @@ const saveFont = () => {
             };
         };
 
+        const buildSlimBackupPackage = (pkg) => {
+            const clone = JSON.parse(JSON.stringify(pkg || {}));
+            const ls = clone.localStorage && typeof clone.localStorage === 'object' ? clone.localStorage : {};
+            const keys = Object.keys(ls);
+            for (const k of keys) {
+                const v = String(ls[k] ?? '');
+                const looksLikeBase64Image = v.startsWith('data:image/');
+                const tooLarge = v.length > 60000;
+                const avatarLikeKey = /avatar|wallpaper|bg|background|image|photo/i.test(k);
+                if (looksLikeBase64Image || tooLarge || avatarLikeKey) {
+                    delete ls[k];
+                }
+            }
+            clone.localStorage = ls;
+            // 降级时仅保留核心对话库，减少槽位体积；完整内容仍在导出的 JSON 文件里
+            if (clone.indexedDB && clone.indexedDB.FeedDB) {
+                delete clone.indexedDB.FeedDB;
+            }
+            return clone;
+        };
+
+        const writeBackupSlotWithFallback = (pkg) => {
+            const fullJson = JSON.stringify(pkg);
+            try {
+                localStorage.setItem(SOULOS_BACKUP_SLOT_KEY, fullJson);
+                return { ok: true, mode: 'full', bytes: fullJson.length };
+            } catch (e1) {
+                const slim = buildSlimBackupPackage(pkg);
+                const slimJson = JSON.stringify(slim);
+                try {
+                    localStorage.setItem(SOULOS_BACKUP_SLOT_KEY, slimJson);
+                    return { ok: true, mode: 'slim', bytes: slimJson.length, error: e1 };
+                } catch (e2) {
+                    return { ok: false, mode: 'failed', error: e2 };
+                }
+            }
+        };
+
+        const mergeById = (currentList, incomingList) => {
+            const base = Array.isArray(currentList) ? [...currentList] : [];
+            const map = new Map(base.map((x) => [String(x.id), x]));
+            (Array.isArray(incomingList) ? incomingList : []).forEach((item) => {
+                if (!item || item.id === undefined || item.id === null) return;
+                map.set(String(item.id), item);
+            });
+            return Array.from(map.values());
+        };
+
+        const pickLocalStorageByPrefixes = (prefixes = []) => {
+            const out = {};
+            try {
+                for (let i = 0; i < localStorage.length; i++) {
+                    const k = localStorage.key(i);
+                    if (!k) continue;
+                    if (prefixes.some((p) => k.startsWith(p))) out[k] = localStorage.getItem(k);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+            return out;
+        };
+
+        const buildSegmentedBackupPackage = () => {
+            const appSegments = {
+                chat: {
+                    localStorage: pickLocalStorageByPrefixes([
+                        'soulos_chat_menu_',
+                        'soulos_chat_offline_modes',
+                        'soulos_novel_mode',
+                        'callWidgetSubtitle'
+                    ]),
+                    data: {
+                        soulLinkMessages: JSON.parse(JSON.stringify(soulLinkMessages.value || {})),
+                        soulLinkGroups: JSON.parse(JSON.stringify(soulLinkGroups.value || [])),
+                        soulLinkPet: JSON.parse(JSON.stringify(soulLinkPet.value || {}))
+                    }
+                },
+                workshop: {
+                    localStorage: pickLocalStorageByPrefixes([
+                        'soulos_workshop_'
+                    ]),
+                    data: {
+                        characters: JSON.parse(JSON.stringify(characters.value || [])),
+                        worldbooks: JSON.parse(JSON.stringify(worldbooks.value || [])),
+                        presets: JSON.parse(JSON.stringify(presets.value || []))
+                    }
+                },
+                feed: {
+                    localStorage: pickLocalStorageByPrefixes([
+                        'feed_'
+                    ]),
+                    data: {}
+                },
+                mate: {
+                    localStorage: pickLocalStorageByPrefixes([
+                        'mate_'
+                    ]),
+                    data: {}
+                },
+                theme: {
+                    localStorage: pickLocalStorageByPrefixes([
+                        'theme',
+                        'homeWallpaper',
+                        'homeTextColor',
+                        'enableHomeGlass',
+                        'enableHideStatusBar',
+                        'enableNotchAdaptation'
+                    ]),
+                    data: {}
+                }
+            };
+
+            const roleSegments = {};
+            const chars = Array.isArray(characters.value) ? characters.value : [];
+            chars.forEach((c) => {
+                const rid = String(c.id);
+                roleSegments[rid] = {
+                    id: rid,
+                    name: c.nickname || c.name || `角色-${rid}`,
+                    character: JSON.parse(JSON.stringify(c)),
+                    soulLinkMessages: JSON.parse(JSON.stringify(soulLinkMessages.value?.[rid] || [])),
+                    localStorage: {
+                        [`soulos_chat_menu_${rid}`]: localStorage.getItem(`soulos_chat_menu_${rid}`)
+                    }
+                };
+            });
+
+            return {
+                v: 3,
+                app: 'SoulOS-phone',
+                mode: 'segmented',
+                exportedAt: new Date().toISOString(),
+                segments: {
+                    apps: appSegments,
+                    roles: roleSegments
+                }
+            };
+        };
+
+        const applySegmentedBackupPayload = async (pkg, pickers = null) => {
+            if (!pkg?.segments || typeof pkg.segments !== 'object') {
+                addConsoleLog('分片备份数据无效。', 'error');
+                return;
+            }
+            backupImporting.value = true;
+            try {
+                const apps = pkg.segments.apps || {};
+                const roles = pkg.segments.roles || {};
+                const allowedApps = pickers?.apps || null;
+                const allowedRoles = pickers?.roles || null;
+
+                // 1) 合并软件分片
+                Object.entries(apps).forEach(([appKey, seg]) => {
+                    if (allowedApps && !allowedApps.has(appKey)) return;
+                    const ls = seg?.localStorage || {};
+                    Object.entries(ls).forEach(([k, v]) => {
+                        if (v !== null && v !== undefined) localStorage.setItem(k, String(v));
+                    });
+                });
+
+                if ((!allowedApps || allowedApps.has('chat')) && apps.chat?.data?.soulLinkMessages && typeof apps.chat.data.soulLinkMessages === 'object') {
+                    soulLinkMessages.value = {
+                        ...(soulLinkMessages.value || {}),
+                        ...apps.chat.data.soulLinkMessages
+                    };
+                    await saveSoulLinkMessages();
+                }
+                if ((!allowedApps || allowedApps.has('chat')) && Array.isArray(apps.chat?.data?.soulLinkGroups)) {
+                    soulLinkGroups.value = mergeById(soulLinkGroups.value, apps.chat.data.soulLinkGroups);
+                    saveSoulLinkGroups();
+                }
+                if ((!allowedApps || allowedApps.has('chat')) && apps.chat?.data?.soulLinkPet && typeof apps.chat.data.soulLinkPet === 'object') {
+                    soulLinkPet.value = { ...(soulLinkPet.value || {}), ...apps.chat.data.soulLinkPet };
+                }
+                if ((!allowedApps || allowedApps.has('workshop')) && Array.isArray(apps.workshop?.data?.characters)) {
+                    characters.value = mergeById(characters.value, apps.workshop.data.characters);
+                }
+                if ((!allowedApps || allowedApps.has('workshop')) && Array.isArray(apps.workshop?.data?.worldbooks)) {
+                    worldbooks.value = mergeById(worldbooks.value, apps.workshop.data.worldbooks);
+                }
+                if ((!allowedApps || allowedApps.has('workshop')) && Array.isArray(apps.workshop?.data?.presets)) {
+                    presets.value = mergeById(presets.value, apps.workshop.data.presets);
+                }
+
+                // 2) 合并角色分片（只影响对应角色）
+                Object.values(roles).forEach((seg) => {
+                    const roleId = String(seg?.id || '');
+                    if (!roleId) return;
+                    if (allowedRoles && !allowedRoles.has(roleId)) return;
+                    if (seg.character) {
+                        characters.value = mergeById(characters.value, [seg.character]);
+                    }
+                    if (Array.isArray(seg.soulLinkMessages)) {
+                        soulLinkMessages.value = { ...(soulLinkMessages.value || {}), [roleId]: seg.soulLinkMessages };
+                    }
+                    const ls = seg.localStorage || {};
+                    Object.entries(ls).forEach(([k, v]) => {
+                        if (v !== null && v !== undefined) localStorage.setItem(k, String(v));
+                    });
+                });
+
+                await saveSoulLinkMessages();
+                saveSoulLinkGroups();
+                saveCharacters();
+                saveWorldbooks();
+                savePresets();
+                addConsoleLog('分片恢复完成：已按软件/角色合并，不影响其它数据。', 'success');
+            } catch (e) {
+                addConsoleLog('分片恢复失败：' + (e.message || e), 'error');
+            } finally {
+                backupImporting.value = false;
+            }
+        };
+
+        const openSegmentedImportPanel = (pkg) => {
+            segmentedImportPackage.value = pkg;
+            const apps = pkg?.segments?.apps || {};
+            const roles = pkg?.segments?.roles || {};
+            const appSel = {};
+            Object.keys(apps).forEach((k) => { appSel[k] = true; });
+            const roleSel = {};
+            Object.keys(roles).forEach((k) => { roleSel[k] = true; });
+            segmentedImportAppSelections.value = appSel;
+            segmentedImportRoleSelections.value = roleSel;
+            showSegmentedImportPanel.value = true;
+        };
+
+        const closeSegmentedImportPanel = () => {
+            showSegmentedImportPanel.value = false;
+            segmentedImportPackage.value = null;
+            segmentedImportAppSelections.value = {};
+            segmentedImportRoleSelections.value = {};
+        };
+
+        const confirmSegmentedImport = async () => {
+            const pkg = segmentedImportPackage.value;
+            if (!pkg?.segments) return;
+            const appsPicked = new Set(
+                Object.entries(segmentedImportAppSelections.value || {})
+                    .filter(([, v]) => !!v)
+                    .map(([k]) => k)
+            );
+            const rolesPicked = new Set(
+                Object.entries(segmentedImportRoleSelections.value || {})
+                    .filter(([, v]) => !!v)
+                    .map(([k]) => k)
+            );
+            if (appsPicked.size === 0 && rolesPicked.size === 0) {
+                addConsoleLog('请至少选择一个软件或角色分片。', 'warn');
+                return;
+            }
+            const ok = window.confirm('将按勾选项进行“分片合并恢复”，未勾选项不会受影响。确认继续？');
+            if (!ok) return;
+            await applySegmentedBackupPayload(pkg, { apps: appsPicked, roles: rolesPicked });
+            closeSegmentedImportPanel();
+        };
+
         const applySoulOsBackupPayload = async (pkg) => {
             if (!pkg || typeof pkg !== 'object') {
                 addConsoleLog('备份数据无效。', 'error');
@@ -2892,12 +3155,15 @@ const saveFont = () => {
                 addConsoleLog('正在打包完整备份（含 IndexedDB）…', 'info');
                 const pkg = await buildSoulOsBackupPackage();
                 const json = JSON.stringify(pkg);
-                try {
-                    localStorage.setItem(SOULOS_BACKUP_SLOT_KEY, json);
+                const slotResult = writeBackupSlotWithFallback(pkg);
+                if (slotResult.ok) {
                     backupLastSavedHint.value = `本地备份槽已更新 · ${new Date().toLocaleString()}`;
-                } catch (e) {
+                    if (slotResult.mode === 'slim') {
+                        addConsoleLog('备份槽容量不足，已自动写入“精简槽备份”（完整备份仍已下载）。', 'warn');
+                    }
+                } else {
                     backupLastSavedHint.value = '';
-                    addConsoleLog('备份槽写入失败（可能超出容量）：' + e.message, 'warn');
+                    addConsoleLog('备份槽写入失败（可能超出容量）：' + (slotResult.error?.message || slotResult.error), 'warn');
                 }
                 const blob = new Blob([json], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
@@ -2917,17 +3183,48 @@ const saveFont = () => {
             }
         };
 
+        const downloadSegmentedBackup = async () => {
+            if (backupExporting.value || backupImporting.value) return;
+            backupExporting.value = true;
+            try {
+                addConsoleLog('正在打包分片备份（按软件/角色）…', 'info');
+                const pkg = buildSegmentedBackupPackage();
+                const json = JSON.stringify(pkg);
+                const blob = new Blob([json], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+                a.href = url;
+                a.download = `SoulOS-分片备份-${stamp}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                addConsoleLog('分片备份已下载：可按软件/角色合并恢复。', 'success');
+            } catch (e) {
+                addConsoleLog('分片导出失败：' + (e.message || e), 'error');
+            } finally {
+                backupExporting.value = false;
+            }
+        };
+
         const saveSoulOsBackupSlotOnly = async () => {
             if (backupExporting.value || backupImporting.value) return;
             backupExporting.value = true;
             try {
                 addConsoleLog('正在写入本地备份槽…', 'info');
                 const pkg = await buildSoulOsBackupPackage();
-                localStorage.setItem(SOULOS_BACKUP_SLOT_KEY, JSON.stringify(pkg));
-                backupLastSavedHint.value = `本地备份槽已更新 · ${new Date().toLocaleString()}`;
-                addConsoleLog('已写入本地备份槽（仅存本浏览器）。', 'success');
-            } catch (e) {
-                addConsoleLog('写入失败：' + (e.message || e), 'error');
+                const slotResult = writeBackupSlotWithFallback(pkg);
+                if (slotResult.ok) {
+                    backupLastSavedHint.value = `本地备份槽已更新 · ${new Date().toLocaleString()}`;
+                    if (slotResult.mode === 'slim') {
+                        addConsoleLog('容量不足：已写入精简槽备份（剔除了大图/部分库数据）。', 'warn');
+                    } else {
+                        addConsoleLog('已写入本地备份槽（仅存本浏览器）。', 'success');
+                    }
+                } else {
+                    addConsoleLog('写入失败：' + (slotResult.error?.message || slotResult.error), 'error');
+                }
             } finally {
                 backupExporting.value = false;
             }
@@ -2961,7 +3258,11 @@ const saveFont = () => {
             if (backupExporting.value || backupImporting.value) return;
             try {
                 const pkg = JSON.parse(await file.text());
-                await applySoulOsBackupPayload(pkg);
+                if (pkg?.mode === 'segmented') {
+                    openSegmentedImportPanel(pkg);
+                } else {
+                    await applySoulOsBackupPayload(pkg);
+                }
             } catch (e) {
                 addConsoleLog('读取或解析备份文件失败：' + (e.message || e), 'error');
             }
@@ -3680,7 +3981,8 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
             
             if (availableStickers.length === 0) return null;
             
-            const stickerPattern = /\[(?:表情[:：])?([^\]]+)\]/g;
+            // 支持半角/全角方括号：[...] / ［...］
+            const stickerPattern = /[\[\uFF3B](?:表情[:：])?([^\]\uFF3D]+)[\]\uFF3D]/g;
             const matches = [...text.matchAll(stickerPattern)];
             
             const validMatches = matches.filter(match => {
@@ -3803,11 +4105,11 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
         };
 
         const extractAiVoice = (rawText) => {
-            const text = (rawText || '').trim();
+            const text = String(rawText || '').replace(/\u200b/g, '').replace(/\r\n/g, '\n').trim();
             if (!text) return null;
             const patterns = [
-                /^\[语音\]\s*(.+)$/i,
-                /^语音[:：]?\s*(.+)$/i
+                /^(?:(?:\[\s*[语語]音\s*[:：]?\s*\])|(?:［\s*[语語]音\s*[:：]?\s*］)|(?:【\s*[语語]音\s*[:：]?\s*】))\s*[:：]?\s*(.+)$/i,
+                /^[语語]音[:：]?\s*(.+)$/i
             ];
             for (const pattern of patterns) {
                 const match = text.match(pattern);
@@ -3821,21 +4123,22 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
         };
 
         const splitAiVoiceSegments = (rawText) => {
-            const text = (rawText || '').trim();
+            const text = String(rawText || '').replace(/\u200b/g, '').replace(/\r\n/g, '\n').trim();
             if (!text) return null;
-            const tagPattern = /(\[语音\]|语音[:：])/i;
+            const tagPattern = /(?:\[\s*[语語]音\s*[:：]?\s*\]|［\s*[语語]音\s*[:：]?\s*］|【\s*[语語]音\s*[:：]?\s*】|[语語]音[:：]?)/i;
             const match = text.match(tagPattern);
             if (!match || match.index == null) return null;
             const before = text.slice(0, match.index).trim();
             const after = text.slice(match.index + match[0].length).trim();
-            let voiceRaw = after;
+            // 兼容：\[语音\]：xxx / [语音]： xxx
+            const normalizedAfter = after.replace(/^[：:]\s*/,'').trim();
+            let voiceRaw = normalizedAfter;
             let tail = '';
             const lineBreakIndex = after.indexOf('\n');
             if (lineBreakIndex >= 0) {
-                voiceRaw = after.slice(0, lineBreakIndex).trim();
-                tail = after.slice(lineBreakIndex + 1).trim();
+                voiceRaw = normalizedAfter.slice(0, lineBreakIndex).trim();
+                tail = normalizedAfter.slice(lineBreakIndex + 1).trim();
             }
-            if (!voiceRaw) return null;
             const segments = [];
             if (before) segments.push({ type: 'text', content: before });
             segments.push({ type: 'voice', transcription: voiceRaw });
@@ -3896,10 +4199,30 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
             const osTags = ['OS', 'INNER_LOG', 'INNERLOG'];
 
             const taggedReply = extractTaggedContent(raw, replyTags);
-            const taggedOs = extractTaggedContent(raw, osTags);
+            let taggedOs = extractTaggedContent(raw, osTags);
+
+            // 兼容模型漏写结尾标签：例如只给了 [OS] 但没有 [/OS]
+            // 通过“遇到下一个 REPLY/OS 开始处或到结尾”来截断。
+            if (!taggedOs) {
+                const osAlt = '(?:OS|INNER_LOG|INNERLOG)';
+                const stopLookahead = `(?=\\[\\s*REPLY\\s*\\]|\\[\\s*${osAlt}\\s*\\]|\\[\\s*\\/\\s*${osAlt}\\s*\\]|$)`;
+                const looseOsRe = new RegExp(`\\[\\s*${osAlt}\\s*\\]([\\s\\S]*?)${stopLookahead}`, 'i');
+                const looseOsMatch = raw.match(looseOsRe);
+                if (looseOsMatch && looseOsMatch[1] != null) {
+                    taggedOs = looseOsMatch[1].trim();
+                }
+            }
 
             let content = taggedReply ?? raw;
             content = removeTaggedBlocks(content, osTags);
+
+            // 同样兼容“OS 未闭合”的情况：把 [OS]... 这一段从内容里清掉，避免跑进 REPLY 气泡
+            {
+                const osAlt = '(?:OS|INNER_LOG|INNERLOG)';
+                const stopLookahead = `(?=\\[\\s*REPLY\\s*\\]|\\[\\s*${osAlt}\\s*\\]|\\[\\s*\\/\\s*${osAlt}\\s*\\]|$)`;
+                const looseOsBlockRe = new RegExp(`\\[\\s*${osAlt}\\s*\\][\\s\\S]*?${stopLookahead}`, 'gi');
+                content = content.replace(looseOsBlockRe, ' ');
+            }
             content = removeStandaloneTags(content, [...replyTags, ...osTags]);
             content = content.replace(/\s+/g, ' ').trim();
 
@@ -4683,6 +5006,10 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
             return map[v] || v || '简体中文';
         };
 
+        // 外语翻译 UI 文案：xx翻译成xx（前置为“原文/自动识别语言”）
+        const soulLinkForeignTranslationTargetLabel = computed(() => getTargetLangLabel(soulLinkForeignTranslationLang.value));
+        const soulLinkForeignTranslationDirectionText = computed(() => `${soulLinkForeignTranslationTargetLabel.value}翻译成（自动识别原语言）`);
+
         const isForeignLikelyText = (text) => {
             const t = String(text || '').trim();
             if (!t) return false;
@@ -4744,20 +5071,27 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
 
             const targetLabel = getTargetLangLabel(targetLangValue);
 
-            const sys = `你是专业翻译器。只做翻译，不要解释，不要添加额外文本。`;
-            const user = `请把下面两段文本分别翻译成：${targetLabel}。
+            // 这里的“使用者思维”按用户需求：以“原文语言使用者”的角度理解原意，再输出为目标语言。
+            const sys = `你是专业翻译器：以原文语言使用者的思维理解含义，然后输出为目标语言（${targetLabel}）。请只输出翻译结果，不要解释，不要附带原文。`;
+            const user = `请把下面两段文本从原文语言A翻译到目标语言B：${targetLabel}。
+要求“句句对应/逐句翻译”：
+- 按句号/问号/感叹号/换行切分为句子，保持句子顺序一致。
+- replyTranslation 与输入的句子边界一一对应；不要把多句合并成一整段。
+- 每句译文之间用换行符分隔（同一段文本内部也用换行保持对应关系）。
+
 输出严格 JSON（不要 markdown），格式必须是：
 {"replyTranslation": string|null, "osTranslation": string|null}
 
 规则：
 - 若“回复文本”为空字符串，请把 replyTranslation 设为 null
 - 若“内心文本”为空字符串，请把 osTranslation 设为 null
-- 保留原意与语气，尽量自然，不要附带原文。
+- 仅输出译文内容，不要输出原文、不要输出任何解释。
+- 保持所有方括号标签“[...]”原样输出，不要翻译或改写方括号内部的内容（尤其是表情包标签，如[笑] / [表情:笑]）。
 
-回复文本：
+回复文本（A）：
 ${replyForPrompt || ''}
 
-内心文本：
+内心文本（A）：
 ${osForPrompt || ''}`;
 
             try {
@@ -4857,19 +5191,23 @@ ${osForPrompt || ''}`;
             if (!soulLinkForeignTranslationEnabled.value) return;
             if (!msg || msg.sender !== 'ai' || msg.isSystem) return;
             if (!msg.id) return;
+            // 仅对“普通文字气泡”(reply / os 展示那类)做翻译，避免影响图片/语音/转账等卡片
+            if (msg.messageType) return;
 
             const isViewingThisChat = openedApp.value === 'chat' &&
                 String(soulLinkActiveChat.value) === String(chatId) &&
                 soulLinkActiveChatType.value === chatType;
             if (!force && !isViewingThisChat) return;
 
-            const replyText = typeof msg.text === 'string' ? msg.text.trim() : '';
-            const osText = typeof msg.osContent === 'string' ? msg.osContent.trim() : '';
+            const normalizeForTranslate = (s) => String(s || '').replace(/\u200b/g, '').trim();
+            const replyText = typeof msg.text === 'string' ? normalizeForTranslate(msg.text) : '';
+            const osText = typeof msg.osContent === 'string' ? normalizeForTranslate(msg.osContent) : '';
 
             const targetLangValue = soulLinkForeignTranslationLang.value;
 
-            const needReply = !msg.replyTranslation && replyText && isForeignLikelyText(replyText);
-            const needOs = !msg.osTranslation && osText && isForeignLikelyText(osText);
+            // 只翻译“新生成出来的”：有回复/内心文本且尚未翻译时才入队
+            const needReply = !msg.replyTranslation && replyText;
+            const needOs = !msg.osTranslation && osText;
             if (!needReply && !needOs) return;
 
             // 幂等：同一条消息只入队一次
@@ -4887,25 +5225,6 @@ ${osForPrompt || ''}`;
 
             soulLinkAiTranslationPump();
         };
-
-        const ensureRecentForeignTranslations = () => {
-            if (!soulLinkForeignTranslationEnabled.value) return;
-            const msgs = currentChatMessages.value || [];
-            const start = Math.max(0, msgs.length - 15);
-            for (let i = start; i < msgs.length; i++) {
-                const m = msgs[i];
-                if (!m) continue;
-                // force=true：补齐打开聊天后的历史翻译（用缓存优先，不会太慢）
-                maybeAutoTranslateSoulLinkAiMessage(m, soulLinkActiveChatType.value, soulLinkActiveChat.value, true);
-            }
-        };
-
-        // 当用户开启外语翻译时，补齐当前聊天最近几条（从缓存读取优先）
-        watch(soulLinkForeignTranslationEnabled, (val) => {
-            if (val && openedApp.value === 'chat') {
-                ensureRecentForeignTranslations();
-            }
-        });
 
         const emojiList = computed(() => pixelEmojis.value);
 
@@ -5134,7 +5453,7 @@ ${osForPrompt || ''}`;
                 } else {
                     systemPrompt += `成员A、成员B、成员C\n`;
                 }
-                systemPrompt += `\n# 行为规则\n1. 回复要简短自然，像真实群聊一样。\n2. 每次回复只扮演其中一名群成员。\n3. 回复格式为「成员名: 内容」。\n4. 可以用emoji和口语表达。\n5. 根据每个成员的人设来扮演他们的说话风格和性格特点。\n6. 回复格式：[REPLY]正式内容[/REPLY] [OS]内心独白（可选，需有反差感）[/OS]\n\n`;
+                systemPrompt += `\n# 行为规则\n1. 回复要简短自然，像真实群聊一样。\n2. 每次回复只扮演其中一名群成员。\n3. 回复格式为「成员名: 内容」。\n4. 可以用emoji和口语表达。\n5. 根据每个成员的人设来扮演他们的说话风格和性格特点。\n6. 回复格式：[REPLY]正式内容[/REPLY] [OS]内心独白（必须输出，且与REPLY有反差感）[/OS]\n7. 需要更强语气/情绪表达时，主动发送语音消息（文字假装语音）。把 [语音] 语音文字内容（至少 5 个字）放在 [REPLY] 里，严禁只输出[语音]标签。\n不要说没有该功能。\n\n`;
                 if (availableStickers.length > 0) {
                     systemPrompt += `你可以发送表情包来表达情感！使用格式：[表情名] 或 [表情:表情名]。可用的表情包有：${availableStickers.map(s => s.name).join('、')}。当情绪适合时自然地发送表情包。\n\n`;
                 }
@@ -5142,6 +5461,7 @@ ${osForPrompt || ''}`;
             } else if (char && char.persona) {
                 const charName = char.name || '角色';
                 systemPrompt = `你正在通过 SoulLink 和朋友聊天。\n\n`;
+                systemPrompt += `# 用户人称与称呼规则\n${getUserPronounInstruction()}\n\n`;
                 systemPrompt += `# 你是谁\n`;
                 systemPrompt += `你的名字是【${charName}】。\n`;
                 systemPrompt += `${replaceUserPlaceholder(char.persona)}\n\n`;
@@ -5202,7 +5522,7 @@ ${osForPrompt || ''}`;
                     systemPrompt += `# 开场\n这是你们的第一次对话。你可以从以下开场白中选择一个打招呼：\n${replacedOpeningLines.join('\n')}\n\n`;
                 }
                 systemPrompt += `现在，请以${charName}的身份，自然地回复对方。记住：简短、真实、有人情味。`;
-                systemPrompt += `\n\n# 回复格式（重要）\n每次回复请使用以下格式：\n[REPLY]你展示给对方看的正式回复内容[/REPLY] [OS]此时此刻你内心真实的独白，语气要与表面回复有反差感[/OS]\n例如：[REPLY]好的呀，没问题～[/REPLY] [OS]其实我有点烦但不好意思说...[/OS]\n如果暂时没有内心独白，可省略 [OS]...[/OS] 部分。`;
+                systemPrompt += `\n\n# 回复格式（重要）\n每次回复请使用以下格式（务必逐字照做，不要输出额外内容）：\n[REPLY]你展示给对方看的正式回复内容[/REPLY] [OS]此时此刻你内心真实的独白，语气要与表面回复有反差感[/OS]\n例如：[REPLY]好的呀，没问题～[/REPLY] [OS]其实我有点烦但不好意思说...[/OS]\n要求：[OS]必须总是输出，且不要把OS内容写进REPLY里。\n需要更强语气/更有情绪时：在 [REPLY] 内追加语音标签 [语音] 语音文字内容（至少 5 个字），严禁只输出[语音]标签。\n不要说“没有这个功能”。`;
                 const myPosts = (feed.posts?.value ?? feed.posts ?? []).filter(p => p && (p.author === '我' || p.author === 'Me')).slice(0, 2);
                 if (myPosts.length) {
                     systemPrompt += `\n\n用户最近发的朋友圈：\n${myPosts.map((p, i) => `${i+1}. ${(p.content || '').slice(0, 80)}${(p.content||'').length>80?'...':''}`).join('\n')}\n你可以用 [评论我的动态] 评论内容 来评论上述某条动态。`;
@@ -5214,7 +5534,8 @@ ${osForPrompt || ''}`;
                 systemPrompt += `\n\n# 购物卡片功能（重要）\n\n## 发送购物卡片\n你可以发送购物卡片给用户，格式如下：\n- 购买卡片：[购买:商品名:价格] - 表示你买了东西送给用户\n- 帮买卡片：[帮买请求:商品名:价格] - 表示你想让用户帮你买东西\n\n例如：\n- [购买:小熊饼干:15] - 你买了小熊饼干送给用户\n- [帮买请求:笔记本:25] - 你想让用户帮你买笔记本\n\n## 接收帮买请求\n当用户发送帮买请求卡片时，如果你愿意帮Ta买，直接回复"好的，我帮你买！"即可。`;
             } else {
                 systemPrompt = '你是一个友好的朋友，正在通过SoulLink聊天。请像真人一样自然、简短地对话，每次1-3句话即可。可以用emoji和口语化表达。';
-                systemPrompt += '\n回复格式：[REPLY]正式内容[/REPLY] [OS]内心独白（可选）[/OS]';
+                systemPrompt += '\n回复格式：[REPLY]正式内容[/REPLY] [OS]内心独白（必须输出且与REPLY反差感）[/OS]。';
+                systemPrompt += '\n需要更强语气/情绪时：在 [REPLY] 内追加语音标签 [语音] 语音文字内容（至少 5 个字），严禁只输出[语音]标签。不要说没有这个功能。';
                 systemPrompt += '\n如果要发照片，请用"[图片] 照片内容描述"的格式。';
                 if (availableStickers.length > 0) {
                     systemPrompt += `\n你可以发送表情包来表达情感！使用格式：[表情名] 或 [表情:表情名]。可用的表情包有：${availableStickers.map(s => s.name).join('、')}。当情绪适合时自然地发送表情包，有时可以连续发多个表情包来表达强烈情感。`;
@@ -5381,13 +5702,123 @@ ${osForPrompt || ''}`;
                 isAiTyping.value = false;
                 const separator = '---';
                 const targetGroup = currentChatType === 'group' ? soulLinkGroups.value.find(g => String(g.id) === String(currentChatId)) : null;
-                const pushToTarget = (m) => pushMessageToTargetChat(currentChatId, currentChatType, m);
+                // 为了“翻译与生成同屏出现”且“句句对应/顺序不乱”，push 前先等待补齐 reply / OS 的翻译（优先缓存，失败不影响正文展示）
+                // 同时对同一条回复里的多段（---）进行串行化：避免后到的翻译先 push 造成错位。
+                let soulLinkPushSerialChain = Promise.resolve();
+                const pushToTarget = (m) => {
+                    soulLinkPushSerialChain = soulLinkPushSerialChain
+                        .then(async () => {
+                            try {
+                                // 只对“普通文字气泡”(messageType 为空)做 reply/os 翻译，避免图片/语音/转账等带 text 字段时触发无意义翻译
+                                if (soulLinkForeignTranslationEnabled.value && m && m.sender === 'ai' && !m.isSystem) {
+                                    const normalizeForTranslate = (s) => String(s || '').replace(/\u200b/g, '').trim();
+                                    const targetLangValue = soulLinkForeignTranslationLang.value;
+
+                                    // reply / os：普通文字气泡
+                                    if (!m.messageType) {
+                                        const replyText = typeof m.text === 'string' ? normalizeForTranslate(m.text) : '';
+                                        const osText = typeof m.osContent === 'string' ? normalizeForTranslate(m.osContent) : '';
+
+                                        // 只翻译“新生成出来的文本”：有内容且未翻译时才翻译
+                                        const needReply = !m.replyTranslation && replyText;
+                                        const needOs = !m.osTranslation && osText;
+
+                                        if (needReply || needOs) {
+                                            const replyCacheKey = needReply ? getTranslateCacheKey('reply', replyText, targetLangValue) : null;
+                                            const osCacheKey = needOs ? getTranslateCacheKey('os', osText, targetLangValue) : null;
+
+                                            let stillNeedReply = needReply;
+                                            let stillNeedOs = needOs;
+
+                                            if (needReply && replyCacheKey) {
+                                                const cached = safeLocalStorageGet(replyCacheKey);
+                                                if (cached) {
+                                                    m.replyTranslation = cached;
+                                                    stillNeedReply = false;
+                                                }
+                                            }
+                                            if (needOs && osCacheKey) {
+                                                const cached = safeLocalStorageGet(osCacheKey);
+                                                if (cached) {
+                                                    m.osTranslation = cached;
+                                                    stillNeedOs = false;
+                                                }
+                                            }
+
+                                            if (stillNeedReply || stillNeedOs) {
+                                                const { replyTranslation, osTranslation } = await translateSoulLinkAiMessageParts(
+                                                    stillNeedReply ? replyText : null,
+                                                    stillNeedOs ? osText : null,
+                                                    targetLangValue
+                                                );
+                                                if (replyTranslation && stillNeedReply) {
+                                                    m.replyTranslation = replyTranslation;
+                                                    if (replyCacheKey) safeLocalStorageSet(replyCacheKey, replyTranslation);
+                                                }
+                                                if (osTranslation && stillNeedOs) {
+                                                    m.osTranslation = osTranslation;
+                                                    if (osCacheKey) safeLocalStorageSet(osCacheKey, osTranslation);
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // voice：语音消息的“转文字”转写内容也要翻译
+                                    if (m.messageType === 'voice') {
+                                        const voiceTextRaw =
+                                            (typeof m.transcription === 'string' ? m.transcription : '') ||
+                                            (typeof m.voiceText === 'string' ? m.voiceText : '') ||
+                                            (typeof m.text === 'string' ? m.text : '');
+                                        const voiceText = normalizeForTranslate(voiceTextRaw);
+
+                                        // 确保展示“转文字”区域，这样用户能在同一块看到原文转写 + 译文
+                                        if (soulLinkForeignTranslationEnabled.value && !m.showTranslation) {
+                                            m.showTranslation = true;
+                                        }
+
+                                        const needVoice = !m.voiceTranslation && voiceText;
+                                        if (needVoice) {
+                                            const voiceCacheKey = getTranslateCacheKey('voice', voiceText, targetLangValue);
+                                            let stillNeedVoice = needVoice;
+
+                                            const cached = safeLocalStorageGet(voiceCacheKey);
+                                            if (cached) {
+                                                m.voiceTranslation = cached;
+                                                stillNeedVoice = false;
+                                            }
+
+                                            if (stillNeedVoice) {
+                                                const { replyTranslation } = await translateSoulLinkAiMessageParts(
+                                                    voiceText,
+                                                    null,
+                                                    targetLangValue
+                                                );
+                                                if (replyTranslation) {
+                                                    m.voiceTranslation = replyTranslation;
+                                                    safeLocalStorageSet(voiceCacheKey, replyTranslation);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            } catch {
+                                // ignore translation failures
+                            }
+
+                            pushMessageToTargetChat(currentChatId, currentChatType, m);
+                        })
+                        .catch(() => {
+                            // don't break the chain
+                        });
+
+                    return soulLinkPushSerialChain;
+                };
                 const appendAiMessage = (rawText, index = 0) => {
                     const { content: parsedContent, osContent } = parseReplyAndOs(rawText);
                     const trimmedText = parsedContent.trim();
                     if (!trimmedText && !osContent) return;
                     if (!trimmedText && osContent) {
-                        pushToTarget({ id: Date.now() + index, sender: 'ai', text: '\u200b', osContent, osRevealed: true, timestamp: Date.now() });
+                        void pushToTarget({ id: Date.now() + index, sender: 'ai', text: '\u200b', osContent, osRevealed: true, timestamp: Date.now() });
                         return;
                     }
                     if (isGroupChat) {
@@ -5797,6 +6228,7 @@ ${osForPrompt || ''}`;
             if (!isGroupChat && char && char.persona) {
                 const charName = char.name || '角色';
                 systemPrompt = `你正在通过 SoulLink 和朋友聊天。\n\n`;
+                systemPrompt += `# 用户人称与称呼规则\n${getUserPronounInstruction()}\n\n`;
                 systemPrompt += `你的名字是【${charName}】。\n`;
                 systemPrompt += `${char.persona}\n\n`;
                 if (char.worldbookId) {
@@ -6157,7 +6589,7 @@ ${osForPrompt || ''}`;
                             voiceSegments.forEach((segment, offset) => {
                                 if (segment.type === 'voice') {
                                     const voiceDuration = Math.max(1, Math.ceil(segment.transcription.length / 4));
-                                    pushMessageToActiveChat({
+                                    pushToTarget({
                                         id: Date.now() + index + offset,
                                         sender: 'ai',
                                         senderName: parsed.senderName,
@@ -6168,7 +6600,7 @@ ${osForPrompt || ''}`;
                                         timestamp: Date.now()
                                     });
                                 } else {
-                                    pushMessageToActiveChat({
+                                    pushToTarget({
                                         id: Date.now() + index + offset,
                                         sender: 'ai',
                                         senderName: parsed.senderName,
@@ -6183,7 +6615,7 @@ ${osForPrompt || ''}`;
                         const voice = extractAiVoice(parsed.content);
                         if (voice) {
                             const voiceDuration = Math.max(1, Math.ceil(voice.transcription.length / 4));
-                            pushMessageToActiveChat({
+                            pushToTarget({
                                 id: Date.now() + index,
                                 sender: 'ai',
                                 senderName: parsed.senderName,
@@ -6520,6 +6952,7 @@ ${osForPrompt || ''}`;
         // --- Chat Menu Logic ---        
         const userIdentity = ref('');
         const userRelation = ref('');
+        const userPronoun = ref('unknown');
         const userAvatar = ref('');
         const bubbleStyle = ref('default');
         const customBubbleCSS = ref('');
@@ -6604,6 +7037,18 @@ ${osForPrompt || ''}`;
                 if (styleTag) styleTag.textContent = '';
             }
         };
+        const getUserPronounInstruction = () => {
+            const pronounMap = {
+                female: '用户是女性，请优先使用“她/小姐姐/女生”相关称呼。',
+                male: '用户是男性，请优先使用“他/小哥哥/男生”相关称呼。',
+                nonbinary: '用户偏中性表达，请尽量使用“TA/对方/你”而非强性别称呼。',
+                unknown: '用户性别未指定，默认使用“你/对方/TA”等中性称呼。'
+            };
+            const base = pronounMap[userPronoun.value] || pronounMap.unknown;
+            const identityText = userIdentity.value ? `用户自我身份：${userIdentity.value}。` : '';
+            const relationText = userRelation.value ? `你和用户关系：${userRelation.value}。` : '';
+            return `${base}${identityText}${relationText}`;
+        };
         const saveChatMenuSettings = () => {
             if (!soulLinkActiveChat.value) return;
             
@@ -6612,6 +7057,7 @@ ${osForPrompt || ''}`;
             saveToStorage(settingsKey, {
                 userIdentity: userIdentity.value,
                 userRelation: userRelation.value,
+                userPronoun: userPronoun.value,
                 bubbleStyle: bubbleStyle.value,
                 customBubbleCSS: customBubbleCSS.value,
                 soulLinkForeignTranslationEnabled: soulLinkForeignTranslationEnabled.value,
@@ -6630,6 +7076,7 @@ ${osForPrompt || ''}`;
             if (saved && typeof saved === 'object' && !Array.isArray(saved)) {
                 userIdentity.value = saved.userIdentity || '';
                 userRelation.value = saved.userRelation || '';
+                userPronoun.value = saved.userPronoun || 'unknown';
                 bubbleStyle.value = saved.bubbleStyle || 'default';
                 customBubbleCSS.value = saved.customBubbleCSS || '';
                 soulLinkForeignTranslationEnabled.value = !!saved.soulLinkForeignTranslationEnabled;
@@ -6639,6 +7086,7 @@ ${osForPrompt || ''}`;
                 // 如果没有保存的设置，使用默认值
                 userIdentity.value = '';
                 userRelation.value = '';
+                userPronoun.value = 'unknown';
                 bubbleStyle.value = 'default';
                 customBubbleCSS.value = '';
                 soulLinkForeignTranslationEnabled.value = false;
@@ -6661,6 +7109,8 @@ ${osForPrompt || ''}`;
 
 
         // --- Call Logic ---
+        const CALL_DIARY_STORAGE_KEY = 'soulos_call_diary_records_v1';
+        const CALL_DIARY_COUNTER_KEY = 'soulos_call_diary_counter_v1';
         const callActive = ref(false);
         const callType = ref('voice');
         const callTimer = ref('00:00');
@@ -6672,6 +7122,226 @@ ${osForPrompt || ''}`;
         const isMuted = ref(false);
         const isSpeakerOn = ref(true);
         const isCameraOn = ref(true);
+        const callDiaryRecords = ref({});
+        const callDiaryCounters = ref({});
+        const showCallDiaryModal = ref(false);
+        const selectedCallDiary = ref(null);
+        const callDiaryTitle = ref('');
+
+        const loadCallDiaryRecords = () => {
+            try {
+                callDiaryRecords.value = JSON.parse(localStorage.getItem(CALL_DIARY_STORAGE_KEY) || '{}') || {};
+            } catch {
+                callDiaryRecords.value = {};
+            }
+        };
+        const loadCallDiaryCounters = () => {
+            try {
+                callDiaryCounters.value = JSON.parse(localStorage.getItem(CALL_DIARY_COUNTER_KEY) || '{}') || {};
+            } catch {
+                callDiaryCounters.value = {};
+            }
+        };
+        const saveCallDiaryRecords = () => {
+            try {
+                localStorage.setItem(CALL_DIARY_STORAGE_KEY, JSON.stringify(callDiaryRecords.value || {}));
+            } catch {
+                // ignore
+            }
+        };
+        const saveCallDiaryCounters = () => {
+            try {
+                localStorage.setItem(CALL_DIARY_COUNTER_KEY, JSON.stringify(callDiaryCounters.value || {}));
+            } catch {
+                // ignore
+            }
+        };
+        loadCallDiaryRecords();
+        loadCallDiaryCounters();
+
+        const getCallDiaryKey = () => {
+            if (!soulLinkActiveChat.value) return '';
+            return soulLinkActiveChatType.value === 'group'
+                ? `group:${String(soulLinkActiveChat.value)}`
+                : `char:${String(soulLinkActiveChat.value)}`;
+        };
+        const generateCallDiaryByModel = async ({ charName, duration, type, charPersona, recentChatMessages, sessionMessages }) => {
+            if (!activeProfile.value) {
+                alert('未检测到 API 配置，无法生成通话日记。');
+                return null;
+            }
+            const profile = activeProfile.value;
+            const endpoint = (profile.endpoint || '').trim();
+            const key = (profile.key || '').trim();
+            if (!endpoint || !key) {
+                alert('当前 API 配置缺少 endpoint 或 key，无法生成通话日记。');
+                return null;
+            }
+
+            const pronounWord = (() => {
+                if (userPronoun.value === 'female') return '她';
+                if (userPronoun.value === 'male') return '他';
+                if (userPronoun.value === 'nonbinary') return 'TA';
+                return '你';
+            })();
+            const [mm, ss] = String(duration || '00:00').split(':').map((x) => Number(x) || 0);
+            const totalSeconds = mm * 60 + ss;
+            const targetParagraphs = totalSeconds >= 8 * 60 ? '5-8 段' : totalSeconds >= 3 * 60 ? '4-6 段' : '2-4 段';
+            const model = profile.model || profile.openai_model || profile.claude_model || profile.openrouter_model || 'gpt-4o-mini';
+            const talkType = type === 'video' ? '视频' : '语音';
+            const recentChat = (recentChatMessages || []).slice(-18).map((m) => ({
+                sender: m.sender,
+                text: (m.text || '').slice(0, 120),
+                time: m.timestamp || m.time || ''
+            }));
+            const callChat = (sessionMessages || []).slice(-16).map((m) => ({
+                sender: m.sender,
+                text: (m.text || '').slice(0, 120),
+                time: m.time || ''
+            }));
+            const userMeta = {
+                pronoun: userPronoun.value,
+                pronounWord,
+                identity: userIdentity.value || '',
+                relation: userRelation.value || ''
+            };
+
+            const styleGuide = `
+你要以“白描、温润、克制”的中文散文风格写作：
+- 角色第一人称（必须用“我”）
+- 不要照抄聊天原句，不要逐条复述
+- 通过细节、动作、感官去呈现情绪
+- 不要写成报告/总结/提纲
+- 篇幅按通话时长自适应，目标约 ${targetParagraphs}
+- 用户代词严格使用：${pronounWord}
+`;
+
+            const prompt = `
+请写一篇“通话后角色日记”。
+
+【角色】
+姓名：${charName}
+人设：${(charPersona || '').slice(0, 600)}
+
+【通话信息】
+类型：${talkType}
+时长：${duration}
+
+【用户设定】
+${JSON.stringify(userMeta)}
+
+【当前聊天上下文（通话前后）】
+${JSON.stringify(recentChat)}
+
+【本次通话内容摘要素材】
+${JSON.stringify(callChat)}
+
+【写作要求】
+${styleGuide}
+
+只输出正文，不要标题、不要解释、不要代码块。
+`;
+
+            const base = endpoint.replace(/\/+$/, '');
+            const candidateUrls = /\/chat\/completions$/i.test(base)
+                ? [base]
+                : /\/v1$/i.test(base)
+                    ? [`${base}/chat/completions`]
+                    : [`${base}/v1/chat/completions`, `${base}/chat/completions`];
+
+            for (const url of candidateUrls) {
+                try {
+                    const resp = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            Authorization: `Bearer ${key}`
+                        },
+                        body: JSON.stringify({
+                            model,
+                            temperature: 0.9,
+                            messages: [
+                                { role: 'system', content: '你是擅长中文叙事散文的作家。输出必须是纯正文。' },
+                                { role: 'user', content: prompt }
+                            ]
+                        })
+                    });
+                    if (!resp.ok) continue;
+                    const data = await resp.json();
+                    const text = (
+                        data?.choices?.[0]?.message?.content ||
+                        data?.choices?.[0]?.delta?.content ||
+                        data?.message?.content ||
+                        ''
+                    ).trim();
+                    if (text) return text.replace(/```[\s\S]*?```/g, '').trim();
+                } catch {
+                    // try next candidate url
+                }
+            }
+
+            alert('通话日记生成失败：API 调用异常或返回为空。');
+            return null;
+        };
+
+        const createCallDiaryEntry = async () => {
+            const key = getCallDiaryKey();
+            if (!key) return null;
+            const char = soulLinkActiveChatType.value === 'group'
+                ? null
+                : characters.value.find(c => String(c.id) === String(soulLinkActiveChat.value));
+            const charName = char?.nickname || char?.name || currentChatName.value || 'TA';
+            const chatHistory = (Array.isArray(currentChatMessages?.value) ? currentChatMessages.value : []).slice(-20);
+            const now = new Date();
+            const counterKey = `${key}:${callType.value}`;
+            const nextNo = (Number(callDiaryCounters.value[counterKey]) || 0) + 1;
+            callDiaryCounters.value[counterKey] = nextNo;
+            saveCallDiaryCounters();
+            const vol = String(nextNo).padStart(2, '0');
+            const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+            const fileNo = `${datePart}-${String(nextNo).padStart(4, '0')}`;
+            const diaryText = await generateCallDiaryByModel({
+                charName,
+                duration: callTimer.value || '00:00',
+                type: callType.value,
+                charPersona: char?.persona || '',
+                recentChatMessages: chatHistory,
+                sessionMessages: callMessages.value || []
+            });
+            if (!diaryText) return null;
+            const closing = `\n\n—— ${now.toLocaleDateString('zh-CN')} · ${charName}`;
+            const entry = {
+                id: `call_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`,
+                chatId: String(soulLinkActiveChat.value || ''),
+                chatType: soulLinkActiveChatType.value,
+                name: charName,
+                callType: callType.value,
+                duration: callTimer.value || '00:00',
+                createdAt: now.toISOString(),
+                volNo: vol,
+                fileNo,
+                title: `${charName} · ${callType.value === 'video' ? '视频' : '语音'}通话档案`,
+                body: `${diaryText}${closing}`
+            };
+            if (!Array.isArray(callDiaryRecords.value[key])) callDiaryRecords.value[key] = [];
+            callDiaryRecords.value[key].unshift(entry);
+            saveCallDiaryRecords();
+            return entry;
+        };
+        const openCallDiary = (msg) => {
+            if (!msg?.callDiaryId) return;
+            const key = getCallDiaryKey();
+            const list = Array.isArray(callDiaryRecords.value[key]) ? callDiaryRecords.value[key] : [];
+            const found = list.find((x) => String(x.id) === String(msg.callDiaryId));
+            if (!found) return;
+            selectedCallDiary.value = found;
+            callDiaryTitle.value = found.title || '通话档案';
+            showCallDiaryModal.value = true;
+        };
+        const closeCallDiaryModal = () => {
+            showCallDiaryModal.value = false;
+            selectedCallDiary.value = null;
+        };
         
         const toggleMute = () => {
             isMuted.value = !isMuted.value;
@@ -6799,6 +7469,7 @@ ${osForPrompt || ''}`;
             if (char && char.persona) {
                 const charName = char.name || '角色';
                 systemPrompt = `你正在通过语音通话与对方交流。\n\n`;
+                systemPrompt += `# 用户人称与称呼规则\n${getUserPronounInstruction()}\n\n`;
                 systemPrompt += `你的名字是【${charName}】。\n`;
                 systemPrompt += `${char.persona}\n\n`;
                 systemPrompt += `1. 像真实的人类那样自然通话。\n`;
@@ -6947,11 +7618,12 @@ ${osForPrompt || ''}`;
             startCallTimer();
         };
 
-        const endCall = () => {
+        const endCall = async () => {
             callActive.value = false;
             stopCallTimer();
             if (!soulLinkActiveChat.value) return;
             const isVideo = callType.value === 'video';
+            const diaryEntry = await createCallDiaryEntry();
             pushMessageToActiveChat({
                 id: Date.now(),
                 sender: 'ai',
@@ -6960,6 +7632,8 @@ ${osForPrompt || ''}`;
                 isCallMessage: true,
                 callIcon: isVideo ? '🎥' : '📞',
                 text: `${isVideo ? '视频通话' : '语音通话'}结束 ${callTimer.value || ''}`.trim(),
+                callDiaryId: diaryEntry?.id || null,
+                callDiaryHint: diaryEntry ? '点击查看通话档案' : '',
                 timestamp: Date.now()
             });
             syncActiveChatState();
@@ -8781,9 +9455,6 @@ ${osForPrompt || ''}`;
                         messageTimeNow.value = Date.now();
                     }, 30000);
                 }
-                if (soulLinkForeignTranslationEnabled.value) {
-                    ensureRecentForeignTranslations();
-                }
             } else {
                 if (messageTimeIntervalId) {
                     clearInterval(messageTimeIntervalId);
@@ -8890,9 +9561,9 @@ ${osForPrompt || ''}`;
             // Music Player
             isPlaying, togglePlayPause, playPrevious, playNext,
             // New Features (Chat Menu, Call, Virtual Camera, Panels)
-            userIdentity, userRelation, userAvatar, uploadUserAvatar, resetUserAvatar, bubbleStyle, customBubbleCSS, setBubbleStyle, applyCustomCSS, saveAndCloseSettings, confirmChatMenu, showArchiveDialog, showArchivedChats, archiveName, archiveDescription, archivedChats, filteredArchivedChats, sortedArchivedChats, archiveCurrentChat, restoreArchivedChat, deleteArchivedChat, saveChatMenuSettings, loadChatMenuSettings, clearChatHistory, exportChatHistory, showCreateGroupDialog, newGroupName, newGroupMembers, createNewGroup, newGroupAvatar, selectedGroupMembers, groupAvatarInput, triggerGroupAvatarUpload, handleGroupAvatarUpload, toggleGroupMember, showAddMemberDialog, selectedAddMembers, getAvailableCharactersForAdd, toggleAddMember, addMembersToGroup, removeGroupMember, addMemberMode, customMemberAvatar, customMemberName, customMemberPersona, customMemberAvatarInput, triggerCustomMemberAvatarUpload, handleCustomMemberAvatarUpload, addCustomMember, showRenameGroupDialog, newGroupNameInput, tempGroupAvatar, renameGroupAvatarInput, triggerRenameGroupAvatarUpload, handleRenameGroupAvatarUpload, renameGroup, shakeCharacter, shakeGroupMember,
+            userIdentity, userRelation, userPronoun, userAvatar, uploadUserAvatar, resetUserAvatar, bubbleStyle, customBubbleCSS, setBubbleStyle, applyCustomCSS, saveAndCloseSettings, confirmChatMenu, showArchiveDialog, showArchivedChats, archiveName, archiveDescription, archivedChats, filteredArchivedChats, sortedArchivedChats, archiveCurrentChat, restoreArchivedChat, deleteArchivedChat, saveChatMenuSettings, loadChatMenuSettings, clearChatHistory, exportChatHistory, showCreateGroupDialog, newGroupName, newGroupMembers, createNewGroup, newGroupAvatar, selectedGroupMembers, groupAvatarInput, triggerGroupAvatarUpload, handleGroupAvatarUpload, toggleGroupMember, showAddMemberDialog, selectedAddMembers, getAvailableCharactersForAdd, toggleAddMember, addMembersToGroup, removeGroupMember, addMemberMode, customMemberAvatar, customMemberName, customMemberPersona, customMemberAvatarInput, triggerCustomMemberAvatarUpload, handleCustomMemberAvatarUpload, addCustomMember, showRenameGroupDialog, newGroupNameInput, tempGroupAvatar, renameGroupAvatarInput, triggerRenameGroupAvatarUpload, handleRenameGroupAvatarUpload, renameGroup, shakeCharacter, shakeGroupMember,
             callActive, callType, callTimer, callInput, callMessages, isCallAiTyping, isMuted, toggleMute, isSpeakerOn, toggleSpeaker, isCameraOn, toggleCamera, currentChatName, currentChatAvatar,
-            showCallInput, callInputText, toggleCallInput, sendCallText,
+            showCallInput, callInputText, toggleCallInput, sendCallText, openCallDiary, closeCallDiaryModal, showCallDiaryModal, selectedCallDiary, callDiaryTitle,
             videoSelfPosition, isVideoAvatarSwapped, startDragVideoSelf, swapVideoAvatars,
             startVoiceCall, startVideoCall, endCall, sendCallMessage,
             showVirtualCamera, virtualImageDesc, openVirtualCamera, sendVirtualImage,
@@ -8902,6 +9573,7 @@ ${osForPrompt || ''}`;
             showChatSettings, toggleChatSettings,
             // Foreign translation / time sense
             soulLinkForeignTranslationEnabled, soulLinkForeignTranslationLang,
+            soulLinkForeignTranslationTargetLabel, soulLinkForeignTranslationDirectionText,
             timeSenseEnabled, messageTimeNow, shouldShowTimeDivider,
             chatBackgroundStyle, gradientStartColor, gradientEndColor, solidBackgroundColor, chatBackgroundImage,
             updateChatBackground, selectBackgroundImage, handleBackgroundImageSelect,
@@ -8925,7 +9597,8 @@ ${osForPrompt || ''}`;
             saveProfiles, createNewProfile, deleteActiveProfile, setActiveProfile, deleteProfile,
             onProfileSelect, fetchModels, clearConsole,
             backupExporting, backupImporting, backupLastSavedHint, soulosBackupFileInput,
-            downloadSoulOsBackup, saveSoulOsBackupSlotOnly, restoreSoulOsFromSlot, triggerSoulOsBackupImport, handleSoulOsBackupImport,
+            downloadSoulOsBackup, downloadSegmentedBackup, saveSoulOsBackupSlotOnly, restoreSoulOsFromSlot, triggerSoulOsBackupImport, handleSoulOsBackupImport,
+            showSegmentedImportPanel, segmentedImportPackage, segmentedImportAppSelections, segmentedImportRoleSelections, closeSegmentedImportPanel, confirmSegmentedImport,
             // Workshop App
             activeWorkshopTab,
             switchWorkshopTab,
@@ -8973,6 +9646,8 @@ ${osForPrompt || ''}`;
             feed,
             // mate
             mate,
+            // peek
+            peek,
             // notice
             notice,
             // games

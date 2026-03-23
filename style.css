@@ -7941,6 +7941,165 @@ label {
     display: flex;
     gap: 8px;
 }
+.message.call-message .call-content.clickable {
+    cursor: pointer;
+}
+.message.call-message .call-content .call-diary-hint {
+    margin-left: 8px;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    opacity: 0.75;
+    border-left: 1px solid rgba(0, 0, 0, 0.2);
+    padding-left: 8px;
+}
+
+.call-diary-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    background:
+        radial-gradient(circle at 20% 20%, rgba(255,255,255,0.12), transparent 40%),
+        radial-gradient(circle at 80% 80%, rgba(255,255,255,0.08), transparent 35%),
+        rgba(0, 0, 0, 0.66);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+}
+.call-diary-panel {
+    width: min(620px, 95vw);
+    max-height: 82vh;
+    background: #f8f8f8;
+    border: 1px solid rgba(17, 17, 17, 0.75);
+    border-radius: 18px;
+    box-shadow:
+        0 28px 80px rgba(0, 0, 0, 0.42),
+        0 1px 0 rgba(255, 255, 255, 0.6) inset;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+}
+.call-diary-panel::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+        linear-gradient(180deg, rgba(255,255,255,0.45), rgba(255,255,255,0.05)),
+        repeating-linear-gradient(0deg, rgba(0,0,0,0.018) 0, rgba(0,0,0,0.018) 1px, transparent 1px, transparent 3px);
+}
+.call-diary-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    justify-content: space-between;
+    padding: 18px 22px 12px;
+    border-bottom: 1px solid rgba(17, 17, 17, 0.75);
+    background: #fff;
+    font-family: "Inter", sans-serif;
+    letter-spacing: 0.08em;
+    position: relative;
+    z-index: 1;
+}
+.call-diary-kicker {
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    border: 1px solid rgba(17, 17, 17, 0.8);
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: #1d1d1d;
+    color: #fff;
+    margin-right: 6px;
+}
+.call-diary-header strong {
+    flex: 1;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+.call-diary-issue,
+.call-diary-file {
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: #2a2a2a;
+    border: 1px solid rgba(17, 17, 17, 0.42);
+    border-radius: 999px;
+    padding: 4px 8px;
+    background: rgba(255, 255, 255, 0.72);
+}
+.call-diary-close {
+    border: 1px solid rgba(17, 17, 17, 0.75);
+    background: #fff;
+    width: 30px;
+    height: 30px;
+    border-radius: 999px;
+    cursor: pointer;
+}
+.call-diary-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 10px 22px;
+    border-bottom: 1px dashed rgba(17, 17, 17, 0.6);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #222;
+    font-family: 'Inter', sans-serif;
+    position: relative;
+    z-index: 1;
+}
+.call-diary-meta span {
+    border: 1px solid rgba(26, 26, 26, 0.45);
+    padding: 3px 7px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.75);
+}
+.call-diary-body {
+    padding: 22px 24px 28px;
+    overflow: auto;
+    white-space: pre-wrap;
+    line-height: 1.95;
+    color: #111;
+    font-size: 15px;
+    font-family: "Noto Serif SC", "Songti SC", "STSong", serif;
+    text-shadow: 0 0 0.01px rgba(0,0,0,0.01);
+    background:
+        linear-gradient(180deg, #fdfdfd 0%, #f4f4f4 100%);
+    position: relative;
+    z-index: 1;
+    column-gap: 28px;
+    border-top: 1px solid rgba(0,0,0,0.06);
+}
+.call-diary-body::after {
+    content: '';
+    display: block;
+    height: 1px;
+    margin-top: 14px;
+    background: linear-gradient(90deg, transparent, rgba(0,0,0,0.35), transparent);
+}
+.call-diary-body.long-form {
+    column-count: 2;
+}
+.call-diary-body::first-letter {
+    float: left;
+    font-size: 3.2em;
+    line-height: 0.9;
+    margin-right: 0.16em;
+    margin-top: 0.1em;
+    font-weight: 700;
+    font-family: "Playfair Display", "Noto Serif SC", serif;
+    color: #1a1a1a;
+}
+@media (max-width: 720px) {
+    .call-diary-body.long-form {
+        column-count: 1;
+    }
+}
 
 .sticker-tab-item {
     flex-shrink: 0;
@@ -20265,6 +20424,669 @@ label {
         var(--live-app-bg, url("https://img.heliar.top/file/1774163610764_1774163583725.png"))
         center center / cover no-repeat;
 }
+
+/* 最左页：角色手机模拟 */
+.home-page-left-peek .grid-6x4 {
+    padding: 4px;
+}
+.home-page-left-peek .grid-row-1-6 {
+    grid-column: 1 / 5;
+    grid-row: 1 / 7;
+}
+.home-page-left-peek .grid-cell {
+    padding: 0;
+}
+.left-peek-cell {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+.left-peek-container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 6px;
+    background: rgba(0,0,0,0.02);
+    border-radius: 0;
+}
+.left-peek-container.dark {
+    background: rgba(0,0,0,0.2);
+}
+.left-peek-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    flex-shrink: 0;
+}
+.left-peek-select {
+    flex: 1;
+    height: 32px;
+    padding: 0 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(0,0,0,0.12);
+    background: rgba(255,255,255,0.9);
+    font-size: 12px;
+}
+.left-peek-theme-btn {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.9);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.left-peek-ai-btn {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.9);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.left-peek-ai-btn:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
+.left-peek-container.dark .left-peek-select,
+.left-peek-container.dark .left-peek-theme-btn,
+.left-peek-container.dark .left-peek-ai-btn {
+    background: rgba(40,40,42,0.92);
+    color: #f2f2f4;
+    border-color: rgba(255,255,255,0.16);
+}
+.left-peek-empty {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    color: rgba(0,0,0,0.5);
+}
+.left-peek-phone-wrap {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+.left-peek-phone-frame {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    background: #1c1c1e;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+}
+.left-peek-notch {
+    display: none;
+}
+.left-peek-screen {
+    width: 100%;
+    height: 100%;
+    border-radius: 16px;
+    overflow: hidden;
+    background: #000;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+/* Read App 占位 */
+.read-app { display: flex; flex-direction: column; }
+.read-placeholder {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    color: rgba(0,0,0,0.5);
+}
+.read-placeholder i { font-size: 48px; }
+.read-placeholder p { margin: 0; font-size: 14px; }
+
+/* Peek App（原全屏版已移除，保留共用样式） */
+.peek-app {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px;
+    padding-bottom: 0;
+    background: #f6f6f8;
+    min-height: 0;
+}
+.peek-app.dark {
+    background: #16171b;
+    color: #f2f2f4;
+}
+.peek-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.peek-icon-btn {
+    width: 36px;
+    height: 36px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.9);
+    cursor: pointer;
+}
+.peek-app.dark .peek-icon-btn {
+    background: #262831;
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #f2f2f4;
+}
+.peek-title-wrap h2 {
+    margin: 0;
+    font-size: 16px;
+    letter-spacing: 0.08em;
+}
+.peek-title-wrap p {
+    margin: 2px 0 0 0;
+    font-size: 11px;
+    opacity: 0.7;
+}
+.peek-character-picker {
+    display: flex;
+}
+.peek-select {
+    width: 100%;
+    height: 38px;
+    border-radius: 10px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    background: #ffffff;
+    padding: 0 10px;
+}
+.peek-app.dark .peek-select {
+    background: #262831;
+    border-color: rgba(255, 255, 255, 0.14);
+    color: #f2f2f4;
+}
+.peek-empty {
+    padding: 24px 12px;
+    text-align: center;
+    font-size: 13px;
+    opacity: 0.75;
+}
+
+/* 手机外框 */
+.peek-phone-wrapper {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 0;
+}
+.peek-phone-frame {
+    width: min(260px, 85vw);
+    aspect-ratio: 9 / 19.5;
+    max-height: calc(100vh - 180px);
+    background: #1c1c1e;
+    border-radius: 36px;
+    padding: 10px;
+    box-shadow:
+        0 0 0 3px #2c2c2e,
+        0 0 0 6px #1c1c1e,
+        0 20px 50px rgba(0, 0, 0, 0.4),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+    position: relative;
+}
+.peek-phone-notch {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90px;
+    height: 22px;
+    background: #1c1c1e;
+    border-radius: 0 0 16px 16px;
+    z-index: 10;
+}
+.peek-phone-screen {
+    width: 100%;
+    height: 100%;
+    border-radius: 28px;
+    overflow: hidden;
+    background: #000;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+.peek-phone-screen.dark {
+    background: #000;
+}
+
+/* 锁屏 */
+.peek-lockscreen {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background-size: cover;
+    background-position: center;
+    position: relative;
+    cursor: pointer;
+}
+.peek-lockscreen::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.6) 100%);
+    pointer-events: none;
+}
+.peek-lockscreen-widget {
+    position: absolute;
+    top: 60px;
+    left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 14px;
+    color: rgba(255,255,255,0.95);
+    z-index: 1;
+}
+.peek-lockscreen-widget i {
+    margin-right: 6px;
+    opacity: 0.9;
+}
+.peek-lockscreen-quick {
+    position: absolute;
+    bottom: 36px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 48px;
+    z-index: 1;
+}
+.peek-lockscreen-quick-item {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+}
+.peek-lockscreen-time {
+    font-size: 48px;
+    font-weight: 200;
+    color: #fff;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    letter-spacing: -2px;
+    position: relative;
+    z-index: 1;
+}
+.peek-lockscreen-date {
+    font-size: 14px;
+    color: rgba(255,255,255,0.9);
+    margin-top: 4px;
+    position: relative;
+    z-index: 1;
+}
+.peek-lockscreen-hint {
+    position: absolute;
+    bottom: 110px;
+    font-size: 12px;
+    color: rgba(255,255,255,0.8);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    z-index: 1;
+}
+
+/* 状态栏 */
+.peek-statusbar {
+    height: 44px;
+    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 14px;
+    font-weight: 600;
+    color: #000;
+    background: transparent;
+    flex-shrink: 0;
+}
+.peek-phone-screen.dark .peek-statusbar {
+    color: #fff;
+}
+.peek-status-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    opacity: 0.9;
+}
+
+/* 主屏 */
+.peek-home-content {
+    flex: 1;
+    min-height: 0;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background: linear-gradient(180deg, #e8e8ed 0%, #d1d1d6 50%, #c7c7cc 100%);
+}
+.peek-phone-screen.dark .peek-home-content {
+    background: linear-gradient(180deg, #1c1c1e 0%, #0d0d0f 100%);
+}
+
+/* 小组件 */
+.peek-widget-row {
+    flex-shrink: 0;
+}
+.peek-widget-top {
+    padding: 4px 0;
+}
+.peek-widget-greeting {
+    font-size: 20px;
+    font-weight: 600;
+    color: #1c1c1e;
+    letter-spacing: -0.5px;
+}
+.peek-phone-screen.dark .peek-widget-greeting {
+    color: #fff;
+}
+.peek-widget-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 4px;
+    font-size: 13px;
+    color: rgba(60,60,67,0.8);
+}
+.peek-phone-screen.dark .peek-widget-meta {
+    color: rgba(235,235,245,0.8);
+}
+.peek-widget-weather i {
+    margin-right: 4px;
+    opacity: 0.9;
+}
+.peek-widget-photos {
+    display: flex;
+    gap: 6px;
+    padding: 10px 12px;
+    background: rgba(255,255,255,0.6);
+    border-radius: 14px;
+    cursor: pointer;
+}
+.peek-phone-screen.dark .peek-widget-photos {
+    background: rgba(255,255,255,0.08);
+}
+.peek-widget-photo {
+    flex: 1;
+    aspect-ratio: 1;
+    border-radius: 10px;
+    overflow: hidden;
+}
+.peek-widget-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.peek-widget-note {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: rgba(255,255,255,0.6);
+    border-radius: 12px;
+    cursor: pointer;
+}
+.peek-phone-screen.dark .peek-widget-note {
+    background: rgba(255,255,255,0.08);
+}
+.peek-widget-note > i {
+    font-size: 18px;
+    opacity: 0.7;
+}
+.peek-widget-note-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.peek-widget-note-title {
+    font-size: 14px;
+    font-weight: 600;
+}
+.peek-widget-note-preview {
+    font-size: 12px;
+    color: rgba(60,60,67,0.7);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.peek-phone-screen.dark .peek-widget-note-preview {
+    color: rgba(235,235,245,0.6);
+}
+.peek-app-icon {
+    position: relative;
+}
+.peek-app-badge {
+    position: absolute;
+    top: -2px;
+    right: 50%;
+    transform: translate(50%, 0);
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    background: #ff3b30;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 600;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.peek-home-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: rgba(120,120,128,0.16);
+    border-radius: 12px;
+    font-size: 15px;
+    color: rgba(60,60,67,0.6);
+    cursor: pointer;
+}
+.peek-generate-tip {
+    font-size: 11px;
+    color: rgba(60,60,67,0.65);
+    margin-top: -4px;
+}
+.peek-phone-screen.dark .peek-generate-tip {
+    color: rgba(235,235,245,0.62);
+}
+.peek-phone-screen.dark .peek-home-search {
+    background: rgba(120,120,128,0.24);
+    color: rgba(235,235,245,0.6);
+}
+.peek-home-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    flex: 1;
+    min-height: 0;
+    align-content: start;
+}
+.peek-app-icon {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 4px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 10px;
+    color: #000;
+}
+.peek-phone-screen.dark .peek-app-icon {
+    color: #fff;
+}
+.peek-app-icon i {
+    font-size: 24px;
+}
+
+/* 底部 Dock */
+.peek-dock {
+    padding: 8px 20px 24px;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    background: rgba(255,255,255,0.72);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 24px 24px 0 0;
+    margin: 0 -4px -4px;
+    flex-shrink: 0;
+}
+.peek-phone-screen.dark .peek-dock {
+    background: rgba(50,50,52,0.8);
+}
+.peek-dock-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 12px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 9px;
+    color: #000;
+}
+.peek-phone-screen.dark .peek-dock-item {
+    color: #fff;
+}
+.peek-dock-item i {
+    font-size: 22px;
+}
+.peek-home-indicator {
+    position: absolute;
+    bottom: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 120px;
+    height: 4px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 2px;
+}
+.peek-phone-screen.dark .peek-home-indicator {
+    background: rgba(255,255,255,0.35);
+}
+
+/* 应用内导航 */
+.peek-app-nav {
+    height: 44px;
+    padding: 0 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    background: rgba(255,255,255,0.92);
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+.peek-phone-screen.dark .peek-app-nav {
+    background: rgba(50,50,52,0.92);
+    border-bottom-color: rgba(255,255,255,0.12);
+}
+.peek-app-back {
+    padding: 8px 12px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    color: #007aff;
+}
+.peek-app-title {
+    font-size: 17px;
+    font-weight: 600;
+}
+.peek-app-lock {
+    color: inherit;
+    font-size: 14px;
+}
+.peek-app-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 12px;
+    background: #f2f2f7;
+}
+.peek-phone-screen.dark .peek-app-body {
+    background: #1c1c1e;
+}
+.peek-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow-y: auto;
+}
+.peek-list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.04);
+    font-size: 12px;
+}
+.peek-app.dark .peek-list-item {
+    background: rgba(255, 255, 255, 0.07);
+}
+.peek-note {
+    padding: 10px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.04);
+}
+.peek-note h4 {
+    margin: 0 0 6px;
+    font-size: 13px;
+}
+.peek-note p {
+    margin: 0;
+    white-space: pre-wrap;
+    font-size: 12px;
+    line-height: 1.45;
+}
+.peek-app.dark .peek-note {
+    background: rgba(255, 255, 255, 0.07);
+}
+.peek-photo-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    overflow-y: auto;
+}
+.peek-photo-grid img {
+    width: 100%;
+    height: 130px;
+    object-fit: cover;
+    border-radius: 10px;
+    display: block;
+}
 .live-bg-overlay {
     position: absolute;
     inset: 0;
@@ -20800,7 +21622,8 @@ label {
     left: 14px;
     right: 14px;
     top: 282px;
-    bottom: 236px;
+    /* 手机上避免留言区/输入框被挤出视口：底部预留给语音底部按钮与 BGM 小卡片 */
+    bottom: calc(16px + 46px + 10px + 70px + env(safe-area-inset-bottom));
     z-index: 3;
     border-radius: 20px;
     padding: 14px;
@@ -20813,6 +21636,12 @@ label {
     flex-direction: column;
     overflow: hidden;
     min-height: 0;
+}
+
+@media (max-height: 720px) {
+    .live-chat-panel {
+        top: 240px;
+    }
 }
 /* 语音厅动态 · 留言区透明，透出全屏背景图 */
 .live-feed-head {
