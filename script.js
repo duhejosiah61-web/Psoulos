@@ -8,6 +8,7 @@ import { useNotice } from './notice.js';
 import { useGames } from './games.js';
 import { useLive } from './live.js';
 import { usePeek } from './peek.js';
+import { useRead } from './read.js';
 
 
 export function setupApp() {
@@ -81,13 +82,15 @@ export function setupApp() {
             if (file) {
                 const reader = new FileReader();
                 reader.onload = (event) => {
-                    stickerWidgetUrl.value = event.target.result;
-                    try {
-                        localStorage.setItem('stickerWidgetUrl', event.target.result);
-                    } catch (e) {
-                        console.warn('图片太大，无法保存到本地存储');
-                        alert('贴纸已更换，但无法永久保存（超出存储限制）');
-                    }
+                    compressAvatarImage(event.target.result, 'widgetSticker', (croppedDataUrl) => {
+                        stickerWidgetUrl.value = croppedDataUrl;
+                        try {
+                            localStorage.setItem('stickerWidgetUrl', croppedDataUrl);
+                        } catch (e) {
+                            console.warn('图片太大，无法保存到本地存储');
+                            alert('贴纸已更换，但无法永久保存（超出存储限制）');
+                        }
+                    });
                 };
                 reader.readAsDataURL(file);
             }
@@ -126,16 +129,19 @@ export function setupApp() {
         input.onchange = (e) => {
             const file = e.target.files[0];
             if (file) {
-                // 更激进的压缩，使用更小的尺寸和更低的质量
-                compressImage(file, 400, 0.5).then(compressedDataUrl => {
-                    photoWidgetPhotos.value[index].url = compressedDataUrl;
-                    try {
-                        localStorage.setItem(`photoWidgetPhoto${index}`, compressedDataUrl);
-                    } catch (e) {
-                        console.warn('图片太大，无法保存到本地存储');
-                        alert('图片已更换，但无法永久保存（超出存储限制）');
-                    }
-                });
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    compressAvatarImage(ev.target.result, 'widgetPhoto', (croppedDataUrl) => {
+                        photoWidgetPhotos.value[index].url = croppedDataUrl;
+                        try {
+                            localStorage.setItem(`photoWidgetPhoto${index}`, croppedDataUrl);
+                        } catch (e) {
+                            console.warn('图片太大，无法保存到本地存储');
+                            alert('图片已更换，但无法永久保存（超出存储限制）');
+                        }
+                    });
+                };
+                reader.readAsDataURL(file);
             }
         };
         input.click();
@@ -1095,16 +1101,198 @@ const saveFont = () => {
             console.log('addNewCharacter: created new character with id:', newId);
         };
 
-        const compressAvatarImage = (dataUrl, callback) => {
+        const enableManualImageCrop = ref(true);
+        const showImageCropModal = ref(false);
+        const imageCropSource = ref('');
+        const imageCropPreset = ref('avatar');
+        const imageCropAspect = ref(1);
+        const imageCropScale = ref(0.82);
+        const imageCropRect = ref({ x: 0.1, y: 0.1, w: 0.8, h: 0.8 }); // normalized [0,1]
+        let imageCropDragState = null;
+        let imageCropPendingCallback = null;
+
+        const getImageCropPresetConfig = (preset) => {
+            const presetMap = {
+                avatar: { maxWidth: 400, maxHeight: 400, ratio: 1 },           // 头像 / 群头像
+                background: { maxWidth: 1280, maxHeight: 720, ratio: 16 / 9 }, // 聊天背景
+                chatImage: { maxWidth: 960, maxHeight: 960, ratio: 4 / 3 },    // 聊天图片
+                widgetPhoto: { maxWidth: 560, maxHeight: 840, ratio: 2 / 3 },  // 桌面照片小组件
+                widgetSticker: { maxWidth: 520, maxHeight: 520, ratio: 1 },    // 桌面贴纸小组件
+                free: { maxWidth: 960, maxHeight: 960, ratio: null }           // 不固定
+            };
+            return presetMap[preset] || presetMap.avatar;
+        };
+
+        const resetImageCropRect = () => {
+            const aspect = imageCropAspect.value;
+            const scale = Math.max(0.45, Math.min(0.95, Number(imageCropScale.value) || 0.82));
+            let w = 0.8 * scale;
+            let h = 0.8 * scale;
+            if (aspect && aspect > 0) {
+                if (aspect >= 1) {
+                    w = 0.86 * scale;
+                    h = w / aspect;
+                } else {
+                    h = 0.86 * scale;
+                    w = h * aspect;
+                }
+                if (w > 0.92) {
+                    w = 0.92;
+                    h = w / aspect;
+                }
+                if (h > 0.92) {
+                    h = 0.92;
+                    w = h * aspect;
+                }
+            }
+            imageCropRect.value = {
+                x: (1 - w) / 2,
+                y: (1 - h) / 2,
+                w,
+                h
+            };
+        };
+
+        const openImageCropModal = (dataUrl, preset, callback) => {
+            imageCropSource.value = String(dataUrl || '');
+            imageCropPreset.value = preset || 'avatar';
+            imageCropPendingCallback = callback;
+            const cfg = getImageCropPresetConfig(imageCropPreset.value);
+            imageCropAspect.value = cfg.ratio || 1;
+            imageCropScale.value = 0.82;
+            resetImageCropRect();
+            showImageCropModal.value = true;
+        };
+
+        const closeImageCropModal = () => {
+            showImageCropModal.value = false;
+            imageCropDragState = null;
+            imageCropPendingCallback = null;
+        };
+
+        const onImageCropScaleChange = () => {
+            resetImageCropRect();
+        };
+
+        const getEventClientXY = (e) => {
+            if (e.touches && e.touches[0]) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            if (e.changedTouches && e.changedTouches[0]) return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+            return { x: e.clientX, y: e.clientY };
+        };
+
+        const onImageCropDragStart = (e) => {
+            const container = document.querySelector('.image-cropper-canvas');
+            if (!container) return;
+            const rect = container.getBoundingClientRect();
+            const p = getEventClientXY(e);
+            imageCropDragState = {
+                startX: p.x,
+                startY: p.y,
+                originX: imageCropRect.value.x,
+                originY: imageCropRect.value.y,
+                containerW: rect.width,
+                containerH: rect.height
+            };
+            window.addEventListener('mousemove', onImageCropDragMove);
+            window.addEventListener('mouseup', onImageCropDragEnd);
+            window.addEventListener('touchmove', onImageCropDragMove, { passive: false });
+            window.addEventListener('touchend', onImageCropDragEnd);
+        };
+
+        const onImageCropDragMove = (e) => {
+            if (!imageCropDragState) return;
+            if (e.cancelable) e.preventDefault();
+            const p = getEventClientXY(e);
+            const dx = (p.x - imageCropDragState.startX) / Math.max(1, imageCropDragState.containerW);
+            const dy = (p.y - imageCropDragState.startY) / Math.max(1, imageCropDragState.containerH);
+            const w = imageCropRect.value.w;
+            const h = imageCropRect.value.h;
+            const nextX = Math.min(1 - w, Math.max(0, imageCropDragState.originX + dx));
+            const nextY = Math.min(1 - h, Math.max(0, imageCropDragState.originY + dy));
+            imageCropRect.value = { ...imageCropRect.value, x: nextX, y: nextY };
+        };
+
+        const onImageCropDragEnd = () => {
+            imageCropDragState = null;
+            window.removeEventListener('mousemove', onImageCropDragMove);
+            window.removeEventListener('mouseup', onImageCropDragEnd);
+            window.removeEventListener('touchmove', onImageCropDragMove);
+            window.removeEventListener('touchend', onImageCropDragEnd);
+        };
+
+        const confirmImageCrop = () => {
+            if (!imageCropPendingCallback) {
+                closeImageCropModal();
+                return;
+            }
+            const cfg = getImageCropPresetConfig(imageCropPreset.value);
+            const img = new Image();
+            img.onload = () => {
+                const r = imageCropRect.value;
+                const sx = Math.round(r.x * img.width);
+                const sy = Math.round(r.y * img.height);
+                const sw = Math.max(1, Math.round(r.w * img.width));
+                const sh = Math.max(1, Math.round(r.h * img.height));
+
+                let tw = sw;
+                let th = sh;
+                const scale = Math.min(cfg.maxWidth / tw, cfg.maxHeight / th, 1);
+                tw = Math.max(1, Math.round(tw * scale));
+                th = Math.max(1, Math.round(th * scale));
+
+                const canvas = document.createElement('canvas');
+                canvas.width = tw;
+                canvas.height = th;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, sx, sy, sw, sh, 0, 0, tw, th);
+                const out = canvas.toDataURL('image/jpeg', 0.82);
+                const done = imageCropPendingCallback;
+                closeImageCropModal();
+                done(out);
+            };
+            img.src = imageCropSource.value;
+        };
+
+        const compressAvatarImage = (dataUrl, presetOrCallback, maybeCallback) => {
+            const callback = typeof presetOrCallback === 'function' ? presetOrCallback : maybeCallback;
+            const preset = typeof presetOrCallback === 'string' ? presetOrCallback : 'avatar';
+            if (typeof callback !== 'function') return;
+            if (enableManualImageCrop.value && preset !== 'free') {
+                openImageCropModal(dataUrl, preset, callback);
+                return;
+            }
             const img = new Image();
             img.onload = () => {
                 const canvas = document.createElement('canvas');
-                const maxWidth = 400;
-                const maxHeight = 400;
-                
-                let width = img.width;
-                let height = img.height;
-                
+                const presetMap = {
+                    avatar: { maxWidth: 400, maxHeight: 400, ratio: 1 },          // 头像/群头像
+                    background: { maxWidth: 1280, maxHeight: 720, ratio: 16 / 9 }, // 聊天背景
+                    chatImage: { maxWidth: 960, maxHeight: 960, ratio: 4 / 3 },    // 聊天图片
+                    free: { maxWidth: 960, maxHeight: 960, ratio: null }           // 不裁剪
+                };
+                const cfg = presetMap[preset] || presetMap.avatar;
+                const maxWidth = cfg.maxWidth;
+                const maxHeight = cfg.maxHeight;
+                const cropRatio = cfg.ratio;
+                const shouldCrop = !!cropRatio;
+
+                let sx = 0;
+                let sy = 0;
+                let sw = img.width;
+                let sh = img.height;
+                if (shouldCrop) {
+                    const srcRatio = img.width / img.height;
+                    if (srcRatio > cropRatio) {
+                        sw = Math.round(img.height * cropRatio);
+                        sx = Math.round((img.width - sw) / 2);
+                    } else if (srcRatio < cropRatio) {
+                        sh = Math.round(img.width / cropRatio);
+                        sy = Math.round((img.height - sh) / 2);
+                    }
+                }
+
+                let width = sw;
+                let height = sh;
                 if (width > height) {
                     if (width > maxWidth) {
                         height = Math.round((height * maxWidth) / width);
@@ -1116,13 +1304,13 @@ const saveFont = () => {
                         height = maxHeight;
                     }
                 }
-                
+
                 canvas.width = width;
                 canvas.height = height;
                 const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
+                ctx.drawImage(img, sx, sy, sw, sh, 0, 0, width, height);
                 
-                const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
                 callback(compressedDataUrl);
             };
             img.src = dataUrl;
@@ -2751,8 +2939,9 @@ const saveFont = () => {
         const mate = reactive(useMate(soulLinkMessages, characters, activeProfile));
         const feed = reactive(useFeed(profiles, activeProfile));
         const notice = reactive(useNotice());
-        const peek = reactive(usePeek(characters, activeProfile));
+        const peek = reactive(usePeek(characters, activeProfile, soulLinkMessages, soulLinkGroups));
         const games = reactive(useGames());
+        const read = reactive(useRead(characters, worldbooks, presets, activeProfile));
 
         // --- Console：全量备份（localStorage + SoulOS_DB / FeedDB，思路类似 kmain 里 JSON 导出） ---
         const SOULOS_BACKUP_SLOT_KEY = 'soulos_backup_slot_v1';
@@ -3289,9 +3478,27 @@ const saveFont = () => {
         const showLocationPanel = ref(false);
         const showTransferPanel = ref(false);
         const showChatSettings = ref(false);
-        // 外语翻译（reply / OS 下方横线译文）
+        // Timezone system
+        const timeZoneSystemEnabled = ref(false);
+        const userTimeZone = ref('Asia/Shanghai');
+        const roleTimeZone = ref('Asia/Tokyo');
+        // Active message / social system
+        const activeMessageEnabled = ref(false);
+        const activeMessageFrequencyMin = ref(15);
+        const activeReplyDelaySec = ref(8);
+        const socialUserBlockedRole = ref(false);
+        const socialRoleBlockedUser = ref(false);
+        const socialPendingRoleRequest = ref(false);
+        // Chat Summary (token saver)
+        const chatSummaryEnabled = ref(true);
+        const chatSummaryEveryN = ref(12); // 每N次用户消息自动总结一次
+        const chatSummaryGenerating = ref(false);
+        const chatSummaryBoard = ref([]); // {id,title,body,createdAt,createdAtText}
+        // 外语翻译（reply / OS 下方横线译文 + AI双语输出约束）
+        // A：主输出语言；B：下方翻译语言（自动识别输入语种）
         const soulLinkForeignTranslationEnabled = ref(false);
-        const soulLinkForeignTranslationLang = ref('zh-CN');
+        const soulLinkForeignPrimaryLang = ref('zh-CN'); // A
+        const soulLinkForeignSecondaryLang = ref('en');  // B
         // 时间感知（像微信一样隔一段时间显示相对时间）
         const timeSenseEnabled = ref(true);
         const messageTimeNow = ref(Date.now());
@@ -3353,6 +3560,7 @@ const saveFont = () => {
         const gradientEndColor = ref('#ffffff');
         const solidBackgroundColor = ref('#f2f2f7');
         const chatBackgroundImage = ref('');
+        const chatBackgroundImageInput = ref('');
         const virtualImageDesc = ref('');
         const transferAmount = ref(0);
         const transferNote = ref('');
@@ -4233,7 +4441,14 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                     .trim();
             }
 
-            const osContent = taggedOs && taggedOs.trim() ? taggedOs.trim() : null;
+            let osContent = taggedOs && taggedOs.trim() ? taggedOs.trim() : null;
+            if (osContent) {
+                // AI 自判断标签不需要展示在 OS 区域
+                osContent = osContent
+                    .replace(/\[\s*AI_ACTION\s*\][\s\S]*?\[\s*\/\s*AI_ACTION\s*\]/gi, '')
+                    .trim();
+                if (!osContent) osContent = null;
+            }
             return { content, osContent };
         };
 
@@ -5001,14 +5216,35 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                 'zh-CN': '简体中文',
                 'en': 'English',
                 'ja': '日本語',
-                'ko': '한국어'
+                'ko': '한국어',
+                'zh-TW': '繁體中文',
+                'fr': 'Français',
+                'de': 'Deutsch',
+                'es': 'Español',
+                'it': 'Italiano',
+                'ru': 'Русский',
+                'pt-BR': 'Português (Brasil)',
+                'ar': 'العربية',
+                'hi': 'हिन्दी',
+                'th': 'ไทย',
+                'vi': 'Tiếng Việt',
+                'id': 'Bahasa Indonesia',
+                'tr': 'Türkçe'
             };
             return map[v] || v || '简体中文';
         };
 
-        // 外语翻译 UI 文案：xx翻译成xx（前置为“原文/自动识别语言”）
-        const soulLinkForeignTranslationTargetLabel = computed(() => getTargetLangLabel(soulLinkForeignTranslationLang.value));
-        const soulLinkForeignTranslationDirectionText = computed(() => `${soulLinkForeignTranslationTargetLabel.value}翻译成（自动识别原语言）`);
+        // 外语翻译 UI 文案：双语输出 + 自动翻译方向
+        const soulLinkForeignTranslationPrimaryLabel = computed(() => getTargetLangLabel(soulLinkForeignPrimaryLang.value));
+        const soulLinkForeignTranslationSecondaryLabel = computed(() => getTargetLangLabel(soulLinkForeignSecondaryLang.value));
+        const soulLinkForeignTranslationDirectionText = computed(() => {
+            const a = soulLinkForeignTranslationPrimaryLabel.value;
+            const b = soulLinkForeignTranslationSecondaryLabel.value;
+            if (String(soulLinkForeignPrimaryLang.value) === String(soulLinkForeignSecondaryLang.value)) {
+                return `启用后强制输出为：${a}（A与B相同将不额外附加翻译）`;
+            }
+            return `启用后强制输出为：上方${a}（A）+ 下方${b}（B翻译，自动识别原语言）`;
+        });
 
         const isForeignLikelyText = (text) => {
             const t = String(text || '').trim();
@@ -5203,7 +5439,7 @@ ${osForPrompt || ''}`;
             const replyText = typeof msg.text === 'string' ? normalizeForTranslate(msg.text) : '';
             const osText = typeof msg.osContent === 'string' ? normalizeForTranslate(msg.osContent) : '';
 
-            const targetLangValue = soulLinkForeignTranslationLang.value;
+            const targetLangValue = soulLinkForeignSecondaryLang.value;
 
             // 只翻译“新生成出来的”：有回复/内心文本且尚未翻译时才入队
             const needReply = !msg.replyTranslation && replyText;
@@ -5287,6 +5523,17 @@ ${osForPrompt || ''}`;
         const sendSoulLinkMessage = async () => {
             const text = soulLinkInput.value.trim();
             if (!soulLinkActiveChat.value) return;
+            if (socialUserBlockedRole.value) {
+                pushMessageToActiveChat({
+                    id: Date.now(),
+                    sender: 'system',
+                    text: '你已拉黑对方，取消拉黑后才能正常聊天。',
+                    timestamp: Date.now(),
+                    isSystem: true
+                });
+                soulLinkInput.value = '';
+                return;
+            }
             
             // 如果有文字，发送用户消息
             if (text) {
@@ -5375,6 +5622,10 @@ ${osForPrompt || ''}`;
                     newMsg.senderAvatar = userAvatar;
                 }
                 pushMessageToActiveChat(newMsg);
+                // 用户主动发消息时，暂停角色“主动发消息”的计时
+                clearActiveMessageTimer();
+                maybeRoleBlocksUser();
+                queueRoleReplyAfterUserMessage();
                 
                 soulLinkInput.value = '';
                 soulLinkReplyTarget.value = null;
@@ -5386,8 +5637,22 @@ ${osForPrompt || ''}`;
             return text.replace(/\{user\}/g, '我').replace(/\$\{user\}/g, '我').replace(/{{user}}/g, '我');
         };
 
-        const triggerSoulLinkAiReply = async () => {
+        const triggerSoulLinkAiReply = async (options = {}) => {
+            const skipBusySimulation = !!options.skipBusySimulation;
+            const busyLaterDepth = Number(options.busyLaterDepth) || 0;
+            const enableAiBusyDecision = !!options.enableAiBusyDecision;
             if (!soulLinkActiveChat.value) return;
+            if (socialUserBlockedRole.value) return;
+            if (socialRoleBlockedUser.value) {
+                pushMessageToActiveChat({
+                    id: Date.now(),
+                    sender: 'system',
+                    text: '你当前被对方拉黑，可尝试发送好友申请。',
+                    timestamp: Date.now(),
+                    isSystem: true
+                });
+                return;
+            }
 
             const isGroupChat = soulLinkActiveChatType.value === 'group';
             const char = isGroupChat ? null : characters.value.find(c => c.id === soulLinkActiveChat.value);
@@ -5439,29 +5704,42 @@ ${osForPrompt || ''}`;
                 const groupName = activeGroup && activeGroup.name ? activeGroup.name : '群聊';
                 const members = activeGroup && Array.isArray(activeGroup.members) && activeGroup.members.length > 0 ? activeGroup.members : [];
                 systemPrompt = `你正在群聊【${groupName}】中与用户对话。\n\n`;
-                systemPrompt += `# 群成员\n`;
+                systemPrompt += getForeignBilingualConstraintPrompt();
+                systemPrompt += buildSummaryPromptBlock();
+                systemPrompt += buildTimeZonePromptBlock();
+                if (enableAiBusyDecision) systemPrompt += buildAiBusyDecisionPromptBlock();
+                systemPrompt += `# 群成员（你需要在他们之间切换口吻）\n`;
                 if (members.length > 0) {
                     members.forEach((member, idx) => {
                         const memberName = typeof member === 'string' ? member : (member.name || member);
                         const memberPersona = typeof member !== 'string' && member.persona ? member.persona : '';
                         systemPrompt += `${idx + 1}. ${memberName}`;
-                        if (memberPersona) {
-                            systemPrompt += ` - ${memberPersona}`;
-                        }
+                        if (memberPersona) systemPrompt += ` - ${replaceUserPlaceholder(memberPersona)}`;
                         systemPrompt += `\n`;
                     });
                 } else {
                     systemPrompt += `成员A、成员B、成员C\n`;
                 }
-                systemPrompt += `\n# 行为规则\n1. 回复要简短自然，像真实群聊一样。\n2. 每次回复只扮演其中一名群成员。\n3. 回复格式为「成员名: 内容」。\n4. 可以用emoji和口语表达。\n5. 根据每个成员的人设来扮演他们的说话风格和性格特点。\n6. 回复格式：[REPLY]正式内容[/REPLY] [OS]内心独白（必须输出，且与REPLY有反差感）[/OS]\n7. 需要更强语气/情绪表达时，主动发送语音消息（文字假装语音）。把 [语音] 语音文字内容（至少 5 个字）放在 [REPLY] 里，严禁只输出[语音]标签。\n不要说没有该功能。\n\n`;
+                systemPrompt += `\n# 群聊规则（以单聊能力为基准）\n`;
+                systemPrompt += `1. 你要像真人一样自然聊天，回复简短（1-3句话），可以用emoji和口语化表达。\n`;
+                systemPrompt += `2. 每次只扮演其中一名群成员来回复（不要同时用多个人说话）。\n`;
+                systemPrompt += `3. 你输出的整条消息必须以“成员名: ”开头，用来标记是谁说的。\n`;
+                systemPrompt += `4. 回复格式必须为：成员名: [REPLY]正式内容[/REPLY] [OS]内心独白（必须输出且与REPLY反差感）[/OS]\n`;
+                systemPrompt += `5. 需要更强语气/情绪时：在 [REPLY] 内追加语音标签 [语音] 语音文字内容（至少 5 个字），严禁只输出[语音]标签。不要说没有这个功能。\n`;
+                systemPrompt += `6. 如果要发照片，请用“[图片] 照片内容描述”的格式。\n`;
                 if (availableStickers.length > 0) {
-                    systemPrompt += `你可以发送表情包来表达情感！使用格式：[表情名] 或 [表情:表情名]。可用的表情包有：${availableStickers.map(s => s.name).join('、')}。当情绪适合时自然地发送表情包。\n\n`;
+                    systemPrompt += `你可以发送表情包来表达情感！使用格式：[表情名] 或 [表情:表情名]。可用的表情包有：${availableStickers.map(s => s.name).join('、')}。当情绪适合时自然地发送表情包，有时可以连续发多个表情包来表达强烈情感。\n`;
                 }
-                systemPrompt += `现在请开始回复。`;
+                systemPrompt += `\n# 购物卡片功能（重要）\n你可以发送购物卡片：\n- [购买:商品名:价格] - 表示你买了东西送给用户\n- [帮买请求:商品名:价格] - 表示你想让用户帮你买\n当用户发送帮买请求时，如果愿意帮买，回复"好的，我帮你买！"即可。\n`;
+                systemPrompt += `\n现在开始回复。`;
             } else if (char && char.persona) {
                 const charName = char.name || '角色';
                 systemPrompt = `你正在通过 SoulLink 和朋友聊天。\n\n`;
                 systemPrompt += `# 用户人称与称呼规则\n${getUserPronounInstruction()}\n\n`;
+                systemPrompt += getForeignBilingualConstraintPrompt();
+                systemPrompt += buildSummaryPromptBlock();
+                systemPrompt += buildTimeZonePromptBlock();
+                if (enableAiBusyDecision) systemPrompt += buildAiBusyDecisionPromptBlock();
                 systemPrompt += `# 你是谁\n`;
                 systemPrompt += `你的名字是【${charName}】。\n`;
                 systemPrompt += `${replaceUserPlaceholder(char.persona)}\n\n`;
@@ -5546,8 +5824,8 @@ ${osForPrompt || ''}`;
                 role: 'system',
                 content: systemPrompt
             });
-            history.forEach(m => {
-                if (m.isSystem || m.isHidden) return;
+            const modelHistory = getModelHistorySlice(history);
+            modelHistory.forEach(m => {
                 const ctx = buildSoulLinkReplyContext(m);
                 const raw = ctx.text || (m.text || '');
                 if (m.sender === 'user') {
@@ -5626,6 +5904,20 @@ ${osForPrompt || ''}`;
                     }
                     // 移除回复中的帮买标记
                     reply = reply.replace(/\[帮买:[^\]]+\]/g, '').trim();
+                }
+
+                // 由模型输出的“忙/不忙”决策标签（只在启用时生效）
+                let aiAction = null;
+                let aiActionDelaySec = null;
+                if (enableAiBusyDecision) {
+                    const aiActionMatch = reply.match(/\[\s*AI_ACTION\s*\]\s*(reply_now|busy_later)\s*(?:(?:[:=])\s*([0-9]+(?:\.[0-9]+)?))?\s*\[\s*\/\s*AI_ACTION\s*\]/i);
+                    if (aiActionMatch) {
+                        aiAction = String(aiActionMatch[1] || '').toLowerCase();
+                        aiActionDelaySec = aiActionMatch[2] != null ? Number(aiActionMatch[2]) : null;
+                    }
+
+                    // 不要把标签显示到聊天里（OS 区域也会二次清理）
+                    reply = reply.replace(/\[\s*AI_ACTION\s*\][\s\S]*?\[\s*\/\s*AI_ACTION\s*\]/gi, '').trim();
                 }
                 
                 // 备用方案：检测AI是否用自然语言表示愿意帮买
@@ -5712,7 +6004,7 @@ ${osForPrompt || ''}`;
                                 // 只对“普通文字气泡”(messageType 为空)做 reply/os 翻译，避免图片/语音/转账等带 text 字段时触发无意义翻译
                                 if (soulLinkForeignTranslationEnabled.value && m && m.sender === 'ai' && !m.isSystem) {
                                     const normalizeForTranslate = (s) => String(s || '').replace(/\u200b/g, '').trim();
-                                    const targetLangValue = soulLinkForeignTranslationLang.value;
+                                    const targetLangValue = soulLinkForeignSecondaryLang.value;
 
                                     // reply / os：普通文字气泡
                                     if (!m.messageType) {
@@ -6175,13 +6467,34 @@ ${osForPrompt || ''}`;
                 } else {
                     appendAiMessage(reply, 0);
                 }
-                if (pendingUserMessages.length > 0) {
+                const baseReplyDelayMs = Math.max(1, Number(activeReplyDelaySec.value) || 8) * 1000;
+                const isBusyLater = pendingUserMessages.length > 0 && aiAction === 'busy_later';
+
+                // 忙碌状态：不标记用户消息已回复，并延迟再发起一次完整回复
+                if (isBusyLater && busyLaterDepth < 2) {
+                    clearPendingRoleReplyTimer();
+                    const followUpDelayMs = aiActionDelaySec != null
+                        ? Math.max(800, Math.round(aiActionDelaySec * 1000))
+                        : baseReplyDelayMs + 12000;
+                    pendingRoleReplyTimer = setTimeout(() => {
+                        triggerSoulLinkAiReply({ skipBusySimulation: true, enableAiBusyDecision, busyLaterDepth: busyLaterDepth + 1 });
+                    }, followUpDelayMs);
+                }
+
+                if (pendingUserMessages.length > 0 && !isBusyLater) {
                     const targetHistory = currentChatType === 'group'
                         ? (soulLinkGroups.value.find(g => String(g.id) === String(currentChatId))?.history || [])
                         : (soulLinkMessages.value[currentChatId] || []);
                     markMessagesReplied(targetHistory, pendingUserMessages.map(m => m.id));
                 }
                 addConsoleLog('SoulLink 会话：已成功从模型获取回复。', 'success');
+                // AI回复落地后，重新安排角色主动发消息
+                if (activeMessageEnabled.value) {
+                    if (aiAction === 'busy_later') clearActiveMessageTimer();
+                    else scheduleRoleActiveMessage();
+                } else {
+                    clearActiveMessageTimer();
+                }
             } catch (error) {
                 isAiTyping.value = false;
                 if (currentChatId && currentChatType) {
@@ -6229,6 +6542,8 @@ ${osForPrompt || ''}`;
                 const charName = char.name || '角色';
                 systemPrompt = `你正在通过 SoulLink 和朋友聊天。\n\n`;
                 systemPrompt += `# 用户人称与称呼规则\n${getUserPronounInstruction()}\n\n`;
+                systemPrompt += getForeignBilingualConstraintPrompt();
+                systemPrompt += buildTimeZonePromptBlock();
                 systemPrompt += `你的名字是【${charName}】。\n`;
                 systemPrompt += `${char.persona}\n\n`;
                 if (char.worldbookId) {
@@ -6245,21 +6560,28 @@ ${osForPrompt || ''}`;
                 systemPrompt += `1. 像真实的人类那样自然地聊天。\n2. 回复保持简短（1-3句）。\n3. 使用符合角色的语气与口头禅。\n4. 如果要发照片，请用“[图片] 照片内容描述”的格式。\n5. 重要：如果要给对方转账，请用“[转账] 金额 备注(可选)”格式，并单独成一条消息。例如：“[转账] 520 情人节快乐”。\n6. 如果用户让你发朋友圈，请用“[发布朋友圈] 动态内容”的格式。\n7. 如果要发语音消息，请用"[语音] 语音文字内容"的格式。\n8. 请积极主动地与用户互动，包括但不限于发送转账消息、照片、朋友圈动态和语音消息。`;
             } else if (!isGroupChat) {
                 systemPrompt = '你是一个友好的朋友，正在通过SoulLink聊天。请自然、简短地对话。';
+            systemPrompt += getForeignBilingualConstraintPrompt();
+            systemPrompt += buildTimeZonePromptBlock();
             systemPrompt += '\n如果要发照片，请用“[图片] 照片内容描述”的格式。';
             systemPrompt += '\n重要：如果要给对方转账，请用“[转账] 金额 备注(可选)”格式，并单独成一条消息。例如：“[转账] 520 情人节快乐”。';
             systemPrompt += '\n如果要发朋友圈，请用“[发布朋友圈] 动态内容”的格式。';
             systemPrompt += '\n请积极主动地与用户互动，包括但不限于发送转账消息、照片和朋友圈动态。';
             } else {
                 const groupName = activeGroup && activeGroup.name ? activeGroup.name : '群聊';
-                const members = activeGroup && Array.isArray(activeGroup.members) && activeGroup.members.length > 0 ? activeGroup.members : ['成员A', '成员B', '成员C'];
                 systemPrompt = `你正在群聊【${groupName}】中与用户交流附件内容。\n\n`;
-                systemPrompt += `群成员\n${members.join('、')}\n\n`;
-                systemPrompt += `回复要简短自然。每次回复以其中一名成员口吻，格式为「成员名: 内容」。\n如果要发照片，请用“[图片] 照片内容描述”的格式。`;
-            systemPrompt += `\n重要：如果要给对方转账，请用“[转账] 金额 备注(可选)”格式，并单独成一条消息。例如：“[转账] 520 情人节快乐”。`;
-            systemPrompt += `\n请积极主动地与用户互动，包括但不限于发送转账消息、照片和朋友圈动态。`;
-            if (availableStickers.length > 0) {
-                systemPrompt += `\n你可以发送表情包来表达情感！使用格式：[表情名] 或 [表情:表情名]。可用的表情包有：${availableStickers.map(s => s.name).join('、')}。当情绪适合时自然地发送表情包。`;
-            }
+                systemPrompt += getForeignBilingualConstraintPrompt();
+                systemPrompt += buildTimeZonePromptBlock();
+                const members = activeGroup && Array.isArray(activeGroup.members) && activeGroup.members.length > 0 ? activeGroup.members : ['成员A', '成员B', '成员C'];
+                systemPrompt += `群成员（你需要在他们之间切换口吻）\n${members.map(m => (typeof m === 'string' ? m : (m.name || String(m)))).join('、')}\n\n`;
+                systemPrompt += `规则：每次只扮演其中一名成员回复，且必须以“成员名: ”开头。\n`;
+                systemPrompt += `格式：成员名: [REPLY]正式内容[/REPLY] [OS]内心独白（必须输出且与REPLY反差感）[/OS]\n`;
+                systemPrompt += `如果要发照片，请用“[图片] 照片内容描述”的格式。`;
+                systemPrompt += `\n重要：如果要给对方转账，请用“[转账] 金额 备注(可选)”格式，并单独成一条消息。例如：“[转账] 520 情人节快乐”。`;
+                systemPrompt += `\n如果要发朋友圈，请用“[发布朋友圈] 动态内容”的格式。`;
+                systemPrompt += `\n请积极主动地与用户互动，包括但不限于发送转账消息、照片和朋友圈动态。`;
+                if (availableStickers.length > 0) {
+                    systemPrompt += `\n你可以发送表情包来表达情感！使用格式：[表情名] 或 [表情:表情名]。可用的表情包有：${availableStickers.map(s => s.name).join('、')}。当情绪适合时自然地发送表情包。`;
+                }
             }
             messagesPayload.push({ role: 'system', content: systemPrompt });
             const newMsgId = newMsg.id;
@@ -6485,6 +6807,10 @@ ${osForPrompt || ''}`;
                             text: trimmedText,
                             timestamp: Date.now()
                         });
+                        // 自动总结：在AI回复落地后触发（不阻塞）
+                        if (chatSummaryEnabled.value) {
+                            void summarizeChatIncremental(false);
+                        }
                     } else {
                         const parsed = parseGroupReply(trimmedText);
                         if (!parsed.content) return;
@@ -6635,6 +6961,9 @@ ${osForPrompt || ''}`;
                             text: parsed.content,
                             timestamp: Date.now()
                         });
+                        if (chatSummaryEnabled.value) {
+                            void summarizeChatIncremental(false);
+                        }
                     }
                 };
                 if (reply.includes(separator)) {
@@ -7049,6 +7378,464 @@ ${osForPrompt || ''}`;
             const relationText = userRelation.value ? `你和用户关系：${userRelation.value}。` : '';
             return `${base}${identityText}${relationText}`;
         };
+        const getForeignBilingualConstraintPrompt = () => {
+            if (!soulLinkForeignTranslationEnabled.value) return '';
+            const aValue = String(soulLinkForeignPrimaryLang.value || '').trim() || 'zh-CN';
+            const bValue = String(soulLinkForeignSecondaryLang.value || '').trim() || 'en';
+            const aLabel = getTargetLangLabel(aValue);
+            const bLabel = getTargetLangLabel(bValue);
+            if (aValue === bValue) {
+                return `# 语言输出（强制）\n启用外语翻译时，你的所有输出必须使用${aLabel}。\n\n`;
+            }
+            return `# 双语输出（强制，最高优先级）\n无论用户输入什么语种，你的所有输出都必须严格为“两行双语”。\n- 第1行：${aLabel}（A语种）\n- 第2行：${bLabel}（B语种翻译）\n规则：不要添加“翻译/译文/English:”等标签；不要解释；两行含义必须一致。\n重要：在 [REPLY] 与 [OS] 内也必须各自保持“两行双语”，不要把B语种翻译丢到标签外。\n\n`;
+        };
+        const normalizeUtcOffset = (s) => {
+            const m = String(s || '').trim().match(/^UTC([+-])(\d{1,2})(?::?(\d{2}))?$/i);
+            if (!m) return null;
+            const sign = m[1];
+            const hh = String(Math.min(23, Number(m[2]) || 0)).padStart(2, '0');
+            const mm = String(Math.min(59, Number(m[3]) || 0)).padStart(2, '0');
+            return `UTC${sign}${hh}:${mm}`;
+        };
+        const formatNowInZone = (zoneInput) => {
+            const zone = String(zoneInput || '').trim();
+            if (!zone) return null;
+            const utc = normalizeUtcOffset(zone);
+            try {
+                if (utc) {
+                    const now = new Date();
+                    const local = now.getTime() + now.getTimezoneOffset() * 60000;
+                    const sign = utc.includes('+') ? 1 : -1;
+                    const part = utc.replace('UTC', '');
+                    const [h, m] = part.slice(1).split(':').map((x) => Number(x) || 0);
+                    const shifted = new Date(local + sign * (h * 60 + m) * 60000);
+                    const t = shifted.toLocaleString('zh-CN', { hour12: false });
+                    return `${t} (${utc})`;
+                }
+                const t = new Intl.DateTimeFormat('zh-CN', {
+                    timeZone: zone,
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                }).format(new Date());
+                return `${t} (${zone})`;
+            } catch {
+                return null;
+            }
+        };
+        const buildTimeZonePromptBlock = () => {
+            if (!timeZoneSystemEnabled.value) return '';
+            const userZone = String(userTimeZone.value || '').trim();
+            const roleZone = String(roleTimeZone.value || '').trim();
+            const userNow = formatNowInZone(userZone);
+            const roleNow = formatNowInZone(roleZone);
+            if (!userNow || !roleNow) {
+                return `\n\n# 时差系统（已启用）\n用户时区：${userZone || '未填写'}\n角色时区：${roleZone || '未填写'}\n规则：你必须感知双方时差来交流（问候语、作息建议、是否方便回复等），不要把对方当成与你同一时区。\n`;
+            }
+            return `\n\n# 时差系统（已启用）\n用户当前本地时间：${userNow}\n你（角色）当前本地时间：${roleNow}\n规则：\n1. 你必须按双方时差来表达时间感知（如早安/晚安、是否打扰、作息建议）。\n2. 不要把双方当成同一时区。\n3. 除非用户要求，否则不要机械重复报时。\n`;
+        };
+
+        // 角色在忙/不忙之间的“决策标签”，由模型根据当前时间判断输出
+        const buildAiBusyDecisionPromptBlock = () => {
+            if (!timeZoneSystemEnabled.value) {
+                return `\n\n# AI忙碌决策标签（可选）\n如果你无法获得“角色本地时间”，请始终在 [OS] 内以第一行输出 [AI_ACTION]reply_now[/AI_ACTION]，其后仍需继续输出内心独白（与REPLY反差感）。\n`;
+            }
+
+            return `\n\n# AI忙碌决策标签（必须遵守）\n请根据你（角色）当前本地时间：判断此刻你是否方便回复。\n- 若不方便/正在忙：在 [OS] 内以第一行输出 [AI_ACTION]busy_later[/AI_ACTION]，其后仍需继续输出内心独白（与REPLY反差感）；并且 [REPLY] 只能写一句短句（如“我这会儿有点忙，晚点回你/先忙一会儿”），不要解释原因。\n- 若方便/可回复：在 [OS] 内以第一行输出 [AI_ACTION]reply_now[/AI_ACTION]，其后仍需继续输出内心独白（与REPLY反差感）；然后正常回复。\n`;
+        };
+        let activeMessageTimer = null;
+        let pendingRoleReplyTimer = null;
+        const clearActiveMessageTimer = () => {
+            if (activeMessageTimer) clearTimeout(activeMessageTimer);
+            activeMessageTimer = null;
+        };
+        const clearPendingRoleReplyTimer = () => {
+            if (pendingRoleReplyTimer) clearTimeout(pendingRoleReplyTimer);
+            pendingRoleReplyTimer = null;
+        };
+        const scheduleRoleActiveMessage = () => {
+            clearActiveMessageTimer();
+            if (!activeMessageEnabled.value || !soulLinkActiveChat.value) return;
+            if (socialUserBlockedRole.value || socialRoleBlockedUser.value) return;
+            const base = Math.max(1, Number(activeMessageFrequencyMin.value) || 15) * 60 * 1000;
+            const jitter = Math.floor(base * 0.35 * Math.random());
+            activeMessageTimer = setTimeout(() => {
+                if (!soulLinkActiveChat.value || socialUserBlockedRole.value || socialRoleBlockedUser.value) return;
+                const hints = ['在吗？', '我刚忙完，想和你聊聊。', '你现在方便回消息吗？', '今天过得怎么样？', '刚想起你了。'];
+                const text = hints[Math.floor(Math.random() * hints.length)];
+                pushMessageToActiveChat({
+                    id: Date.now(),
+                    sender: 'ai',
+                    text,
+                    timestamp: Date.now()
+                });
+                saveSoulLinkMessages();
+                scheduleRoleActiveMessage();
+            }, base + jitter);
+        };
+        const maybeRoleBlocksUser = () => {
+            if (socialRoleBlockedUser.value || socialUserBlockedRole.value) return;
+            if (Math.random() < 0.02) {
+                socialRoleBlockedUser.value = true;
+                pushMessageToActiveChat({
+                    id: Date.now(),
+                    sender: 'system',
+                    text: '对方暂时把你拉黑了。你可以稍后发送好友申请。',
+                    timestamp: Date.now(),
+                    isSystem: true
+                });
+            }
+        };
+        const queueRoleReplyAfterUserMessage = () => {
+            clearPendingRoleReplyTimer();
+            if (!activeMessageEnabled.value) return;
+            if (socialUserBlockedRole.value || socialRoleBlockedUser.value) return;
+            const history = getActiveChatHistory();
+            const pending = getPendingUserMessages(history);
+            if (pending.length >= 3) {
+                pushMessageToActiveChat({
+                    id: Date.now(),
+                    sender: 'system',
+                    text: '检测到你连续发消息，已召回对方。',
+                    timestamp: Date.now(),
+                    isSystem: true
+                });
+                pendingRoleReplyTimer = setTimeout(() => {
+                    triggerSoulLinkAiReply({ skipBusySimulation: true });
+                }, 1200);
+                return;
+            }
+
+            const baseDelay = Math.max(1, Number(activeReplyDelaySec.value) || 8) * 1000;
+            pendingRoleReplyTimer = setTimeout(() => {
+                // 仅在“角色主动发消息那条链路”中启用 busy 决策标签
+                triggerSoulLinkAiReply({ skipBusySimulation: true, enableAiBusyDecision: true });
+            }, baseDelay);
+        };
+        const toggleUserBlockRole = () => {
+            socialUserBlockedRole.value = !socialUserBlockedRole.value;
+            if (socialUserBlockedRole.value) {
+                clearActiveMessageTimer();
+                clearPendingRoleReplyTimer();
+                pushMessageToActiveChat({
+                    id: Date.now(),
+                    sender: 'system',
+                    text: '你已拉黑对方。',
+                    timestamp: Date.now(),
+                    isSystem: true
+                });
+            } else {
+                pushMessageToActiveChat({
+                    id: Date.now(),
+                    sender: 'system',
+                    text: '你已取消拉黑。',
+                    timestamp: Date.now(),
+                    isSystem: true
+                });
+                scheduleRoleActiveMessage();
+            }
+        };
+        const sendFriendRequestToRole = () => {
+            if (!socialRoleBlockedUser.value) return;
+            pushMessageToActiveChat({
+                id: Date.now(),
+                sender: 'user',
+                messageType: 'friendRequest',
+                requestDirection: 'outgoing',
+                requestStatus: 'pending',
+                text: '已发送好友申请',
+                timestamp: Date.now()
+            });
+            setTimeout(() => {
+                const pass = Math.random() < 0.55;
+                if (pass) {
+                    socialRoleBlockedUser.value = false;
+                    pushMessageToActiveChat({
+                        id: Date.now() + 1,
+                        sender: 'system',
+                        text: '对方通过了你的好友申请。',
+                        timestamp: Date.now(),
+                        isSystem: true
+                    });
+                    scheduleRoleActiveMessage();
+                } else {
+                    pushMessageToActiveChat({
+                        id: Date.now() + 1,
+                        sender: 'system',
+                        text: '对方暂未通过好友申请。',
+                        timestamp: Date.now(),
+                        isSystem: true
+                    });
+                }
+            }, 2500 + Math.floor(Math.random() * 2500));
+        };
+        const maybeRoleSendsFriendRequest = () => {
+            if (socialPendingRoleRequest.value) return;
+            if (socialUserBlockedRole.value && Math.random() < 0.15) {
+                socialPendingRoleRequest.value = true;
+                pushMessageToActiveChat({
+                    id: Date.now(),
+                    sender: 'ai',
+                    messageType: 'friendRequest',
+                    requestDirection: 'incoming',
+                    requestStatus: 'pending',
+                    text: '对方向你发来了好友申请',
+                    timestamp: Date.now()
+                });
+            }
+        };
+        const acceptRoleFriendRequest = () => {
+            socialPendingRoleRequest.value = false;
+            socialUserBlockedRole.value = false;
+            socialRoleBlockedUser.value = false;
+            pushMessageToActiveChat({
+                id: Date.now(),
+                sender: 'system',
+                text: '你已同意好友申请，双方恢复可聊天状态。',
+                timestamp: Date.now(),
+                isSystem: true
+            });
+            scheduleRoleActiveMessage();
+        };
+        const rejectRoleFriendRequest = () => {
+            socialPendingRoleRequest.value = false;
+            pushMessageToActiveChat({
+                id: Date.now(),
+                sender: 'system',
+                text: '你已拒绝好友申请。',
+                timestamp: Date.now(),
+                isSystem: true
+            });
+        };
+
+        const getChatContextKey = () => {
+            if (!soulLinkActiveChat.value) return '';
+            return soulLinkActiveChatType.value === 'group'
+                ? `group:${String(soulLinkActiveChat.value)}`
+                : `char:${String(soulLinkActiveChat.value)}`;
+        };
+        const getChatSummaryStorageKey = () => {
+            const k = getChatContextKey();
+            return k ? `soulos_chat_summary_v1::${k}` : '';
+        };
+        const getChatSummaryCursorKey = () => {
+            const k = getChatContextKey();
+            return k ? `soulos_chat_summary_cursor_v1::${k}` : '';
+        };
+        const loadChatSummaryState = () => {
+            const key = getChatSummaryStorageKey();
+            if (!key) {
+                chatSummaryBoard.value = [];
+                return;
+            }
+            const saved = loadFromStorage(key);
+            chatSummaryBoard.value = Array.isArray(saved) ? saved : [];
+        };
+        const saveChatSummaryState = () => {
+            const key = getChatSummaryStorageKey();
+            if (!key) return;
+            saveToStorage(key, chatSummaryBoard.value || []);
+        };
+        const getChatSummaryCursor = () => {
+            const key = getChatSummaryCursorKey();
+            if (!key) return 0;
+            try {
+                const raw = localStorage.getItem(key);
+                const n = Number(raw);
+                return Number.isFinite(n) ? n : 0;
+            } catch {
+                return 0;
+            }
+        };
+        const setChatSummaryCursor = (n) => {
+            const key = getChatSummaryCursorKey();
+            if (!key) return;
+            try { localStorage.setItem(key, String(Number(n) || 0)); } catch { /* ignore */ }
+        };
+        const formatChatSummaryItem = (entry) => {
+            const d = entry?.createdAt ? new Date(entry.createdAt) : new Date();
+            return {
+                ...entry,
+                createdAtText: `${d.toLocaleDateString('zh-CN')} ${d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`
+            };
+        };
+        const getLatestSummaryText = () => {
+            const list = Array.isArray(chatSummaryBoard.value) ? chatSummaryBoard.value : [];
+            const latest = list[0];
+            return typeof latest?.body === 'string' ? latest.body.trim() : '';
+        };
+        const buildSummaryPromptBlock = () => {
+            const text = getLatestSummaryText();
+            if (!text) return '';
+            return `\n\n# 对话摘要（用于节省token，请严格参考）\n${text}\n`;
+        };
+        const getModelHistorySlice = (history) => {
+            const arr = Array.isArray(history) ? history : [];
+            const filtered = arr.filter((m) => m && !m.isSystem && !m.isHidden);
+            const cursor = Math.max(0, getChatSummaryCursor());
+            if (cursor <= 0) return filtered;
+            if (cursor >= filtered.length) return [];
+            return filtered.slice(cursor);
+        };
+
+        const generateChatSummaryByModel = async ({ charName, groupName, isGroupChat, summarySoFar, newMessages }) => {
+            if (!activeProfile.value) return null;
+            const profile = activeProfile.value;
+            const endpoint = (profile.endpoint || '').trim();
+            const key = (profile.key || '').trim();
+            if (!endpoint || !key) return null;
+            const model = profile.model || profile.openai_model || profile.claude_model || profile.openrouter_model || 'gpt-4o-mini';
+
+            const base = endpoint.replace(/\/+$/, '');
+            const candidateUrls = /\/chat\/completions$/i.test(base)
+                ? [base]
+                : /\/v1$/i.test(base)
+                    ? [`${base}/chat/completions`]
+                    : [`${base}/v1/chat/completions`, `${base}/chat/completions`];
+
+            const nameLine = isGroupChat ? `群聊：${groupName || '群聊'}` : `角色：${charName || 'TA'}`;
+            const sys = '你是一个“对话压缩器/摘要器”。输出必须精炼、可供后续对话参考，不要复述流水账。只输出摘要正文。';
+            const user = `
+请把这段对话增量总结成“可持续更新的摘要”。
+
+【对象】
+${nameLine}
+
+【已有摘要（可能为空）】
+${String(summarySoFar || '').slice(0, 2000)}
+
+【新增对话片段】
+${JSON.stringify((newMessages || []).slice(-60).map((m) => ({
+  sender: m.sender,
+  senderName: m.senderName || '',
+  text: (m.text || '').slice(0, 240),
+  messageType: m.messageType || '',
+  timestamp: m.timestamp || ''
+})), null, 2)}
+
+【要求】
+- 用极简要点输出（建议 3-6 条，每条尽量短）
+- 必须包含：关系/立场变化、关键事实、未解决问题、用户偏好、下一步约定
+- 总长度尽量控制在 220-420 个中文字符内
+- 不要出现“摘要如下/总结：”这种开头
+- 不要输出代码块/markdown围栏
+`.trim();
+
+            for (const url of candidateUrls) {
+                try {
+                    const resp = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            Authorization: `Bearer ${key}`
+                        },
+                        body: JSON.stringify({
+                            model,
+                            temperature: 0.4,
+                            messages: [
+                                { role: 'system', content: sys },
+                                { role: 'user', content: user }
+                            ],
+                            stream: false
+                        })
+                    });
+                    if (!resp.ok) continue;
+                    const data = await resp.json();
+                    const raw = data?.choices?.[0]?.message?.content || data?.message?.content || data?.output_text || data?.text || '';
+                    const text = String(raw || '').replace(/```[\s\S]*?```/g, '').trim();
+                    if (text) return text;
+                } catch {
+                    // try next
+                }
+            }
+            return null;
+        };
+
+        const compactSummaryText = (text) => {
+            const raw = String(text || '').trim();
+            if (!raw) return '';
+            const lines = raw
+                .split(/\r?\n/)
+                .map((x) => x.trim())
+                .filter(Boolean)
+                .slice(0, 6);
+            const merged = lines.join('\n');
+            const MAX_SUMMARY_LEN = 420;
+            if (merged.length <= MAX_SUMMARY_LEN) return merged;
+            return `${merged.slice(0, MAX_SUMMARY_LEN - 1)}…`;
+        };
+
+        const createSummaryPlaceholder = (title = '聊天总结') => {
+            const now = new Date();
+            const item = formatChatSummaryItem({
+                id: `sum_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`,
+                title,
+                body: '正在总结...',
+                status: 'pending',
+                createdAt: now.toISOString()
+            });
+            if (!Array.isArray(chatSummaryBoard.value)) chatSummaryBoard.value = [];
+            chatSummaryBoard.value.unshift(item);
+            saveChatSummaryState();
+            return item;
+        };
+
+        const finalizeSummaryItem = (item, bodyText, status = 'ready') => {
+            if (!item) return;
+            item.body = String(bodyText || '').trim() || (status === 'failed' ? '总结失败（可稍后再试）。' : '');
+            item.status = status;
+            saveChatSummaryState();
+        };
+
+        const summarizeChatIncremental = async (force = false) => {
+            if (!chatSummaryEnabled.value && !force) return null;
+            if (!soulLinkActiveChat.value) return null;
+            if (chatSummaryGenerating.value) return null;
+
+            const isGroupChat = soulLinkActiveChatType.value === 'group';
+            const activeGroup = isGroupChat ? activeGroupChat.value : null;
+            const history = isGroupChat ? (activeGroup?.history || []) : (soulLinkMessages.value[soulLinkActiveChat.value] || []);
+            const visible = Array.isArray(history) ? history.filter((m) => m && !m.isSystem && !m.isHidden) : [];
+            const cursor = getChatSummaryCursor();
+            const newChunk = visible.slice(Math.max(0, cursor));
+            if (!force && newChunk.length < Math.max(1, Number(chatSummaryEveryN.value) || 1)) return null;
+
+            chatSummaryGenerating.value = true;
+            const placeholder = createSummaryPlaceholder('聊天总结');
+            try {
+                const char = !isGroupChat ? characters.value.find(c => String(c.id) === String(soulLinkActiveChat.value)) : null;
+                const charName = char?.nickname || char?.name || currentChatName.value || 'TA';
+                const groupName = activeGroup?.name || currentChatName.value || '群聊';
+                const summarySoFar = getLatestSummaryText();
+                const text = await generateChatSummaryByModel({
+                    charName,
+                    groupName,
+                    isGroupChat,
+                    summarySoFar,
+                    newMessages: newChunk
+                });
+                if (!text) {
+                    finalizeSummaryItem(placeholder, '总结失败（可稍后再试）。', 'failed');
+                    return null;
+                }
+                finalizeSummaryItem(placeholder, compactSummaryText(text), 'ready');
+                setChatSummaryCursor(visible.length);
+                return text;
+            } finally {
+                chatSummaryGenerating.value = false;
+            }
+        };
+
+        const manualSummarizeChat = () => summarizeChatIncremental(true);
+        const clearChatSummaryBoard = () => {
+            chatSummaryBoard.value = [];
+            saveChatSummaryState();
+            setChatSummaryCursor(0);
+        };
         const saveChatMenuSettings = () => {
             if (!soulLinkActiveChat.value) return;
             
@@ -7060,8 +7847,28 @@ ${osForPrompt || ''}`;
                 userPronoun: userPronoun.value,
                 bubbleStyle: bubbleStyle.value,
                 customBubbleCSS: customBubbleCSS.value,
+                chatBackgroundStyle: chatBackgroundStyle.value,
+                gradientStartColor: gradientStartColor.value,
+                gradientEndColor: gradientEndColor.value,
+                solidBackgroundColor: solidBackgroundColor.value,
+                chatBackgroundImage: chatBackgroundImage.value,
+                enableManualImageCrop: enableManualImageCrop.value,
                 soulLinkForeignTranslationEnabled: soulLinkForeignTranslationEnabled.value,
-                soulLinkForeignTranslationLang: soulLinkForeignTranslationLang.value,
+                soulLinkForeignPrimaryLang: soulLinkForeignPrimaryLang.value,
+                soulLinkForeignSecondaryLang: soulLinkForeignSecondaryLang.value,
+                timeZoneSystemEnabled: timeZoneSystemEnabled.value,
+                userTimeZone: userTimeZone.value,
+                roleTimeZone: roleTimeZone.value,
+                activeMessageEnabled: activeMessageEnabled.value,
+                activeMessageFrequencyMin: activeMessageFrequencyMin.value,
+                activeReplyDelaySec: activeReplyDelaySec.value,
+                socialUserBlockedRole: socialUserBlockedRole.value,
+                socialRoleBlockedUser: socialRoleBlockedUser.value,
+                socialPendingRoleRequest: socialPendingRoleRequest.value,
+                // 兼容旧字段（历史版本用 soulLinkForeignTranslationLang 作为目标语言）
+                soulLinkForeignTranslationLang: soulLinkForeignSecondaryLang.value,
+                chatSummaryEnabled: chatSummaryEnabled.value,
+                chatSummaryEveryN: chatSummaryEveryN.value,
                 timeSenseEnabled: timeSenseEnabled.value
             });
             
@@ -7079,8 +7886,30 @@ ${osForPrompt || ''}`;
                 userPronoun.value = saved.userPronoun || 'unknown';
                 bubbleStyle.value = saved.bubbleStyle || 'default';
                 customBubbleCSS.value = saved.customBubbleCSS || '';
+                chatBackgroundStyle.value = saved.chatBackgroundStyle || 'default';
+                gradientStartColor.value = saved.gradientStartColor || '#f2f2f7';
+                gradientEndColor.value = saved.gradientEndColor || '#ffffff';
+                solidBackgroundColor.value = saved.solidBackgroundColor || '#f2f2f7';
+                chatBackgroundImage.value = saved.chatBackgroundImage || '';
+                chatBackgroundImageInput.value = chatBackgroundImage.value || '';
+                enableManualImageCrop.value = saved.enableManualImageCrop !== false;
                 soulLinkForeignTranslationEnabled.value = !!saved.soulLinkForeignTranslationEnabled;
-                soulLinkForeignTranslationLang.value = saved.soulLinkForeignTranslationLang || 'zh-CN';
+                soulLinkForeignPrimaryLang.value = saved.soulLinkForeignPrimaryLang || 'zh-CN';
+                soulLinkForeignSecondaryLang.value =
+                    saved.soulLinkForeignSecondaryLang ||
+                    saved.soulLinkForeignTranslationLang || // 兼容旧字段
+                    'en';
+                timeZoneSystemEnabled.value = !!saved.timeZoneSystemEnabled;
+                userTimeZone.value = saved.userTimeZone || 'Asia/Shanghai';
+                roleTimeZone.value = saved.roleTimeZone || 'Asia/Tokyo';
+                activeMessageEnabled.value = !!saved.activeMessageEnabled;
+                activeMessageFrequencyMin.value = Number(saved.activeMessageFrequencyMin) > 0 ? Number(saved.activeMessageFrequencyMin) : 15;
+                activeReplyDelaySec.value = Number(saved.activeReplyDelaySec) > 0 ? Number(saved.activeReplyDelaySec) : 8;
+                socialUserBlockedRole.value = !!saved.socialUserBlockedRole;
+                socialRoleBlockedUser.value = !!saved.socialRoleBlockedUser;
+                socialPendingRoleRequest.value = !!saved.socialPendingRoleRequest;
+                chatSummaryEnabled.value = saved.chatSummaryEnabled !== false;
+                chatSummaryEveryN.value = Number(saved.chatSummaryEveryN) > 0 ? Number(saved.chatSummaryEveryN) : 12;
                 timeSenseEnabled.value = saved.timeSenseEnabled !== false;
             } else {
                 // 如果没有保存的设置，使用默认值
@@ -7089,11 +7918,37 @@ ${osForPrompt || ''}`;
                 userPronoun.value = 'unknown';
                 bubbleStyle.value = 'default';
                 customBubbleCSS.value = '';
+                chatBackgroundStyle.value = 'default';
+                gradientStartColor.value = '#f2f2f7';
+                gradientEndColor.value = '#ffffff';
+                solidBackgroundColor.value = '#f2f2f7';
+                chatBackgroundImage.value = '';
+                chatBackgroundImageInput.value = '';
+                enableManualImageCrop.value = true;
                 soulLinkForeignTranslationEnabled.value = false;
-                soulLinkForeignTranslationLang.value = 'zh-CN';
+                soulLinkForeignPrimaryLang.value = 'zh-CN';
+                soulLinkForeignSecondaryLang.value = 'en';
+                timeZoneSystemEnabled.value = false;
+                userTimeZone.value = 'Asia/Shanghai';
+                roleTimeZone.value = 'Asia/Tokyo';
+                activeMessageEnabled.value = false;
+                activeMessageFrequencyMin.value = 15;
+                activeReplyDelaySec.value = 8;
+                socialUserBlockedRole.value = false;
+                socialRoleBlockedUser.value = false;
+                socialPendingRoleRequest.value = false;
+                chatSummaryEnabled.value = true;
+                chatSummaryEveryN.value = 12;
                 timeSenseEnabled.value = true;
             }
             applyBubbleStyle();
+            updateChatBackground();
+            loadChatSummaryState();
+            if (activeMessageEnabled.value) {
+                scheduleRoleActiveMessage();
+            } else {
+                clearActiveMessageTimer();
+            }
         };
         const confirmChatMenu = () => {
             if (bubbleStyle.value === 'custom' && !customBubbleCSS.value.trim()) {
@@ -7249,6 +8104,26 @@ ${styleGuide}
                     ? [`${base}/chat/completions`]
                     : [`${base}/v1/chat/completions`, `${base}/chat/completions`];
 
+            const extractContentFromAnyResponse = (data) => {
+                if (!data) return '';
+                const raw = data?.choices?.[0]?.message || data?.choices?.[0]?.delta;
+                if (raw?.content != null) {
+                    if (typeof raw.content === 'string') return raw.content;
+                    if (Array.isArray(raw.content)) {
+                        return raw.content
+                            .map((c) => (typeof c === 'string' ? c : (c?.text ?? c?.content ?? '')) || '')
+                            .join('');
+                    }
+                }
+                if (typeof data?.message?.content === 'string') return data.message.content;
+                const parts = data?.candidates?.[0]?.content?.parts;
+                if (Array.isArray(parts) && parts.length) return parts.map((p) => p?.text ?? '').join('');
+                if (typeof data?.output_text === 'string') return data.output_text;
+                if (typeof data?.result === 'string') return data.result;
+                if (typeof data?.text === 'string') return data.text;
+                return '';
+            };
+
             for (const url of candidateUrls) {
                 try {
                     const resp = await fetch(url, {
@@ -7268,12 +8143,7 @@ ${styleGuide}
                     });
                     if (!resp.ok) continue;
                     const data = await resp.json();
-                    const text = (
-                        data?.choices?.[0]?.message?.content ||
-                        data?.choices?.[0]?.delta?.content ||
-                        data?.message?.content ||
-                        ''
-                    ).trim();
+                    const text = extractContentFromAnyResponse(data).trim();
                     if (text) return text.replace(/```[\s\S]*?```/g, '').trim();
                 } catch {
                     // try next candidate url
@@ -7282,6 +8152,22 @@ ${styleGuide}
 
             alert('通话日记生成失败：API 调用异常或返回为空。');
             return null;
+        };
+
+        const generateCallDiaryFallback = ({ charName, duration, type, sessionMessages }) => {
+            const talkType = type === 'video' ? '视频' : '语音';
+            const lines = (Array.isArray(sessionMessages) ? sessionMessages : [])
+                .filter((m) => m && typeof m.text === 'string' && m.text.trim())
+                .slice(-8)
+                .map((m) => `${m.sender === 'user' ? '你' : charName}：${m.text.trim()}`);
+            const sample = lines.length ? lines.join('\n') : '（本次通话未留下可用文本片段）';
+            return [
+                `这次${talkType}通话结束后，我还在回味刚才的节奏。`,
+                `我们聊了大约${duration || '00:00'}，有些话并不长，却很有温度。`,
+                `我把印象最深的片段记下来：`,
+                sample,
+                `写到这里，我的心情慢慢安静下来。下次通话前，我会记得今天这份感觉。`
+            ].join('\n\n');
         };
 
         const createCallDiaryEntry = async () => {
@@ -7300,18 +8186,9 @@ ${styleGuide}
             const vol = String(nextNo).padStart(2, '0');
             const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
             const fileNo = `${datePart}-${String(nextNo).padStart(4, '0')}`;
-            const diaryText = await generateCallDiaryByModel({
-                charName,
-                duration: callTimer.value || '00:00',
-                type: callType.value,
-                charPersona: char?.persona || '',
-                recentChatMessages: chatHistory,
-                sessionMessages: callMessages.value || []
-            });
-            if (!diaryText) return null;
-            const closing = `\n\n—— ${now.toLocaleDateString('zh-CN')} · ${charName}`;
+            const entryId = `call_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
             const entry = {
-                id: `call_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`,
+                id: entryId,
                 chatId: String(soulLinkActiveChat.value || ''),
                 chatType: soulLinkActiveChatType.value,
                 name: charName,
@@ -7321,11 +8198,48 @@ ${styleGuide}
                 volNo: vol,
                 fileNo,
                 title: `${charName} · ${callType.value === 'video' ? '视频' : '语音'}通话档案`,
-                body: `${diaryText}${closing}`
+                body: '正在总结...',
+                status: 'pending'
             };
+
             if (!Array.isArray(callDiaryRecords.value[key])) callDiaryRecords.value[key] = [];
             callDiaryRecords.value[key].unshift(entry);
             saveCallDiaryRecords();
+
+            // 后台生成，不阻塞“立即出现”
+            void (async () => {
+                try {
+                    const diaryText = await generateCallDiaryByModel({
+                        charName,
+                        duration: entry.duration || '00:00',
+                        type: entry.callType,
+                        charPersona: char?.persona || '',
+                        recentChatMessages: chatHistory,
+                        sessionMessages: callMessages.value || []
+                    });
+                    const finalDiaryText = diaryText || generateCallDiaryFallback({
+                        charName,
+                        duration: entry.duration || '00:00',
+                        type: entry.callType,
+                        sessionMessages: callMessages.value || []
+                    });
+                    if (!finalDiaryText) {
+                        entry.status = 'failed';
+                        entry.body = '总结失败（可稍后再试）。';
+                    } else {
+                        const closing = `\n\n—— ${new Date(entry.createdAt).toLocaleDateString('zh-CN')} · ${charName}`;
+                        entry.body = `${finalDiaryText}${closing}`;
+                        entry.status = 'ready';
+                    }
+                } catch {
+                    entry.status = 'failed';
+                    entry.body = '总结失败（可稍后再试）。';
+                } finally {
+                    // 持久化更新
+                    saveCallDiaryRecords();
+                }
+            })();
+
             return entry;
         };
         const openCallDiary = (msg) => {
@@ -7470,6 +8384,8 @@ ${styleGuide}
                 const charName = char.name || '角色';
                 systemPrompt = `你正在通过语音通话与对方交流。\n\n`;
                 systemPrompt += `# 用户人称与称呼规则\n${getUserPronounInstruction()}\n\n`;
+                systemPrompt += getForeignBilingualConstraintPrompt();
+                systemPrompt += buildTimeZonePromptBlock();
                 systemPrompt += `你的名字是【${charName}】。\n`;
                 systemPrompt += `${char.persona}\n\n`;
                 systemPrompt += `1. 像真实的人类那样自然通话。\n`;
@@ -7479,6 +8395,8 @@ ${styleGuide}
                 systemPrompt += `5. 对方通过文字输入与你交流，请自然回应。`;
             } else {
                 systemPrompt = '你正在和朋友语音通话。请自然、简短地对话，每次1-2句话。对方通过文字输入与你交流。';
+                systemPrompt += `\n\n${getForeignBilingualConstraintPrompt()}`;
+                systemPrompt += buildTimeZonePromptBlock();
             }
             
             messagesPayload.push({ role: 'system', content: systemPrompt });
@@ -7633,7 +8551,7 @@ ${styleGuide}
                 callIcon: isVideo ? '🎥' : '📞',
                 text: `${isVideo ? '视频通话' : '语音通话'}结束 ${callTimer.value || ''}`.trim(),
                 callDiaryId: diaryEntry?.id || null,
-                callDiaryHint: diaryEntry ? '点击查看通话档案' : '',
+                callDiaryHint: diaryEntry ? '正在总结...（可点开查看）' : '',
                 timestamp: Date.now()
             });
             syncActiveChatState();
@@ -7805,6 +8723,7 @@ ${styleGuide}
             
             if (showChatSettings.value) {
                 loadChatMenuSettings();
+                loadChatSummaryState();
             }
             // 不调用closeAllPanels，因为它会关闭聊天设置面板
         };
@@ -8027,11 +8946,46 @@ ${styleGuide}
 
             const reader = new FileReader();
             reader.onload = (e) => {
-                chatBackgroundImage.value = e.target.result;
-                updateChatBackground();
+                compressAvatarImage(e.target.result, 'background', (compressedDataUrl) => {
+                    chatBackgroundImage.value = compressedDataUrl;
+                    chatBackgroundImageInput.value = compressedDataUrl;
+                    chatBackgroundStyle.value = 'image';
+                    updateChatBackground();
+                });
             };
             reader.readAsDataURL(file);
         };
+        const applyBackgroundImageLink = () => {
+            const url = String(chatBackgroundImageInput.value || '').trim();
+            if (!url) return;
+            chatBackgroundImage.value = url;
+            chatBackgroundStyle.value = 'image';
+            updateChatBackground();
+        };
+        const clearBackgroundImage = () => {
+            chatBackgroundImage.value = '';
+            chatBackgroundImageInput.value = '';
+            if (chatBackgroundStyle.value === 'image') {
+                chatBackgroundStyle.value = 'default';
+            }
+            updateChatBackground();
+        };
+        const chatSettingsPanelStyle = computed(() => {
+            if (chatBackgroundStyle.value === 'image' && chatBackgroundImage.value) {
+                return {
+                    background: `linear-gradient(rgba(255,255,255,.88), rgba(250,250,248,.92)), url(${chatBackgroundImage.value}) center/cover no-repeat`
+                };
+            }
+            if (chatBackgroundStyle.value === 'gradient') {
+                return {
+                    background: `linear-gradient(135deg, ${gradientStartColor.value} 0%, ${gradientEndColor.value} 100%)`
+                };
+            }
+            if (chatBackgroundStyle.value === 'color') {
+                return { background: solidBackgroundColor.value };
+            }
+            return {};
+        });
         
         // --- Location Panel Logic ---
         const locationNameOptions = ['家', '咖啡馆', '学校', '公司', '公园', '图书馆', '便利店', '地铁站', '健身房'];
@@ -8086,7 +9040,7 @@ ${styleGuide}
             locationTarget.value = aiLoc;
             locationDistance.value = distance;
             locationTrajectoryPoints.value = [];
-            const newMsg = sendLocationMessage();
+            sendLocationMessage();
             closeLocationPanel();
         };
 
@@ -8961,6 +9915,9 @@ ${styleGuide}
                 isReplied: false,
                 time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
             };
+            if (soulLinkActiveChatType.value === 'group') {
+                msg.senderName = '我';
+            }
             
             pushMessageToActiveChat(msg);
             saveSoulLinkMessages();
@@ -9079,6 +10036,7 @@ ${styleGuide}
             } else {
                 triggerSoulLinkAiReply();
             }
+            maybeRoleSendsFriendRequest();
         };
         
         const selectFromAlbum = () => {
@@ -9090,7 +10048,7 @@ ${styleGuide}
                 if (file) {
                     const reader = new FileReader();
                     reader.onload = (e) => {
-                        compressAvatarImage(e.target.result, (compressedDataUrl) => {
+                        compressAvatarImage(e.target.result, 'chatImage', (compressedDataUrl) => {
                             const msg = {
                                 id: Date.now(),
                                 sender: 'user',
@@ -9101,22 +10059,12 @@ ${styleGuide}
                                 isReplied: false,
                                 time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
                             };
-                            
-                            if (soulLinkActiveChatType.value === 'group' && activeGroupChat.value) {
-                                if (!Array.isArray(activeGroupChat.value.history)) {
-                                    activeGroupChat.value.history = [];
-                                }
-                                activeGroupChat.value.history.push(msg);
-                                activeGroupChat.value.lastMessage = msg.text;
-                                activeGroupChat.value.lastTime = msg.time;
-                                saveSoulLinkGroups();
-                            } else {
-                                if (!soulLinkMessages.value[soulLinkActiveChat.value]) {
-                                    soulLinkMessages.value[soulLinkActiveChat.value] = [];
-                                }
-                                soulLinkMessages.value[soulLinkActiveChat.value].push(msg);
-                                saveSoulLinkMessages();
+                            if (soulLinkActiveChatType.value === 'group') {
+                                msg.senderName = '我';
                             }
+
+                            pushMessageToActiveChat(msg);
+                            saveSoulLinkMessages();
                             
                             scrollToBottom();
                         });
@@ -9142,22 +10090,11 @@ ${styleGuide}
                 isReplied: false,
                 time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
             };
-            
-            if (soulLinkActiveChatType.value === 'group' && activeGroupChat.value) {
-                if (!Array.isArray(activeGroupChat.value.history)) {
-                    activeGroupChat.value.history = [];
-                }
-                activeGroupChat.value.history.push(msg);
-                activeGroupChat.value.lastMessage = msg.text;
-                activeGroupChat.value.lastTime = msg.time;
-                saveSoulLinkGroups();
-            } else {
-                if (!soulLinkMessages.value[soulLinkActiveChat.value]) {
-                    soulLinkMessages.value[soulLinkActiveChat.value] = [];
-                }
-                soulLinkMessages.value[soulLinkActiveChat.value].push(msg);
-                saveSoulLinkMessages();
+            if (soulLinkActiveChatType.value === 'group') {
+                msg.senderName = '我';
             }
+            pushMessageToActiveChat(msg);
+            saveSoulLinkMessages();
             
             textImageText.value = '';
             showTextImagePanel.value = false;
@@ -9397,6 +10334,10 @@ ${styleGuide}
 
         const pushMessageToActiveChat = (msg) => {
             if (!soulLinkActiveChat.value) return;
+            if (msg && msg.sender === 'user') {
+                // 用户发言时，暂停角色主动计时，避免在“忙着回消息”时插话
+                clearActiveMessageTimer();
+            }
             if (msg && msg.sender === 'ai' && msg.isSystem !== true && typeof msg.isReadByUser === 'undefined') {
                 const isViewingThisChatNow = openedApp.value === 'chat' && !!soulLinkActiveChat.value;
                 msg.isReadByUser = !!isViewingThisChatNow;
@@ -9572,11 +10513,26 @@ ${styleGuide}
             // Chat Settings
             showChatSettings, toggleChatSettings,
             // Foreign translation / time sense
-            soulLinkForeignTranslationEnabled, soulLinkForeignTranslationLang,
-            soulLinkForeignTranslationTargetLabel, soulLinkForeignTranslationDirectionText,
+            soulLinkForeignTranslationEnabled,
+            soulLinkForeignPrimaryLang, soulLinkForeignSecondaryLang,
+            soulLinkForeignTranslationPrimaryLabel, soulLinkForeignTranslationSecondaryLabel,
+            soulLinkForeignTranslationDirectionText,
+            // Timezone system
+            timeZoneSystemEnabled, userTimeZone, roleTimeZone,
+            // Active message / social system
+            activeMessageEnabled, activeMessageFrequencyMin, activeReplyDelaySec,
+            socialUserBlockedRole, socialRoleBlockedUser, socialPendingRoleRequest,
+            toggleUserBlockRole, sendFriendRequestToRole, acceptRoleFriendRequest, rejectRoleFriendRequest,
+            // Chat summary (token saver)
+            chatSummaryEnabled,
+            chatSummaryEveryN,
+            chatSummaryGenerating,
+            chatSummaryBoard,
+            manualSummarizeChat,
+            clearChatSummaryBoard,
             timeSenseEnabled, messageTimeNow, shouldShowTimeDivider,
-            chatBackgroundStyle, gradientStartColor, gradientEndColor, solidBackgroundColor, chatBackgroundImage,
-            updateChatBackground, selectBackgroundImage, handleBackgroundImageSelect,
+            chatBackgroundStyle, gradientStartColor, gradientEndColor, solidBackgroundColor, chatBackgroundImage, chatBackgroundImageInput,
+            updateChatBackground, selectBackgroundImage, handleBackgroundImageSelect, applyBackgroundImageLink, clearBackgroundImage, chatSettingsPanelStyle,
             // Profile & Navigation
             profileChar, viewCharacterProfile, goBackInSoulLink, showProfile, showChatMenu,
             // New Input Logic
@@ -9589,6 +10545,8 @@ ${styleGuide}
             showSharePanel, shareSource, shareContent, shareSources, sendShareCard,
             showPhotoSelectPanel, showTextImagePanel, textImageText, textImageBgColor, textImageColors,
             showVoiceInputPanel, voiceInputText, sendVoiceMessage, closeVoiceInputPanel, toggleVoicePlayback, onChatBackgroundClick,
+            enableManualImageCrop, showImageCropModal, imageCropSource, imageCropRect, imageCropScale,
+            closeImageCropModal, confirmImageCrop, onImageCropDragStart, onImageCropScaleChange,
             // App Launch
             openApp, closeApp, goBack, openGame, joinGame, startGameSession, castVote, endDay, closeGame, getAppIcon,
             // Console
@@ -9648,6 +10606,8 @@ ${styleGuide}
             mate,
             // peek
             peek,
+            // read
+            read,
             // notice
             notice,
             // games
@@ -9824,6 +10784,44 @@ ${styleGuide}
             showGreetingSelect: ref(false),
             showTransferPanel: ref(false),
             showChatSettings: ref(false),
+            chatBackgroundStyle: ref('default'),
+            gradientStartColor: ref('#f2f2f7'),
+            gradientEndColor: ref('#ffffff'),
+            solidBackgroundColor: ref('#f2f2f7'),
+            chatBackgroundImage: ref(''),
+            chatBackgroundImageInput: ref(''),
+            applyBackgroundImageLink: noop,
+            clearBackgroundImage: noop,
+            selectBackgroundImage: noop,
+            chatSettingsPanelStyle: ref({}),
+            enableManualImageCrop: ref(true),
+            showImageCropModal: ref(false),
+            imageCropSource: ref(''),
+            imageCropRect: ref({ x: 0.1, y: 0.1, w: 0.8, h: 0.8 }),
+            imageCropScale: ref(0.82),
+            closeImageCropModal: noop,
+            confirmImageCrop: noop,
+            onImageCropDragStart: noop,
+            onImageCropScaleChange: noop,
+            timeZoneSystemEnabled: ref(false),
+            userTimeZone: ref(''),
+            roleTimeZone: ref(''),
+            activeMessageEnabled: ref(false),
+            activeMessageFrequencyMin: ref(15),
+            activeReplyDelaySec: ref(8),
+            socialUserBlockedRole: ref(false),
+            socialRoleBlockedUser: ref(false),
+            socialPendingRoleRequest: ref(false),
+            toggleUserBlockRole: noop,
+            sendFriendRequestToRole: noop,
+            acceptRoleFriendRequest: noop,
+            rejectRoleFriendRequest: noop,
+            chatSummaryEnabled: ref(false),
+            chatSummaryEveryN: ref(12),
+            chatSummaryGenerating: ref(false),
+            chatSummaryBoard: ref([]),
+            manualSummarizeChat: noop,
+            clearChatSummaryBoard: noop,
             showPhotoWidgetEditDialog: ref(false),
             showCapsuleEditDialog: ref(false),
             showDashboardEditDialog: ref(false),

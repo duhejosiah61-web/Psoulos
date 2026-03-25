@@ -6348,6 +6348,35 @@ label {
     color: #000000;
 }
 
+/* Bubble Beautify Variants */
+#app.bubble-style-blue .message.user .bubble {
+    background: #dbeafe;
+    border-color: #1d4ed8;
+    box-shadow: 4px 4px 0px #1d4ed8;
+}
+#app.bubble-style-blue .message.ai .bubble {
+    background: #eff6ff;
+    border-color: #60a5fa;
+}
+
+#app.bubble-style-orange .message.user .bubble {
+    background: #ffedd5;
+    border-color: #ea580c;
+    box-shadow: 4px 4px 0px #ea580c;
+}
+#app.bubble-style-orange .message.ai .bubble {
+    background: #fff7ed;
+    border-color: #fdba74;
+}
+
+#app.bubble-style-round .message .bubble {
+    border-radius: 28px;
+}
+
+#app.bubble-style-sharp .message .bubble {
+    border-radius: 8px;
+}
+
 /* System messages */
 .message.system {
     align-self: center;
@@ -10159,6 +10188,80 @@ label {
     transition: all 0.15s ease;
 }
 
+/* Special cards follow bubble contrast palette */
+#app.bubble-style-blue .message.user .special-card {
+    background: #dbeafe;
+    border-color: #1d4ed8;
+}
+#app.bubble-style-blue .message.ai .special-card {
+    background: #eff6ff;
+    border-color: #60a5fa;
+}
+
+#app.bubble-style-orange .message.user .special-card {
+    background: #ffedd5;
+    border-color: #ea580c;
+}
+#app.bubble-style-orange .message.ai .special-card {
+    background: #fff7ed;
+    border-color: #fdba74;
+}
+
+/* Ensure concrete special-card variants are also recolored */
+#app.bubble-style-blue .message.user .location-card,
+#app.bubble-style-blue .message.user .transfer-card,
+#app.bubble-style-blue .message.user .takeaway-card,
+#app.bubble-style-blue .message.user .pet-card,
+#app.bubble-style-blue .message.user .vote-card,
+#app.bubble-style-blue .message.user .order-card,
+#app.bubble-style-blue .message.user .help-buy-card,
+#app.bubble-style-blue .message.user .share-card {
+    background: #dbeafe !important;
+    border-color: #1d4ed8 !important;
+}
+#app.bubble-style-blue .message.ai .location-card,
+#app.bubble-style-blue .message.ai .transfer-card,
+#app.bubble-style-blue .message.ai .takeaway-card,
+#app.bubble-style-blue .message.ai .pet-card,
+#app.bubble-style-blue .message.ai .vote-card,
+#app.bubble-style-blue .message.ai .order-card,
+#app.bubble-style-blue .message.ai .help-buy-card,
+#app.bubble-style-blue .message.ai .share-card {
+    background: #eff6ff !important;
+    border-color: #60a5fa !important;
+}
+
+#app.bubble-style-orange .message.user .location-card,
+#app.bubble-style-orange .message.user .transfer-card,
+#app.bubble-style-orange .message.user .takeaway-card,
+#app.bubble-style-orange .message.user .pet-card,
+#app.bubble-style-orange .message.user .vote-card,
+#app.bubble-style-orange .message.user .order-card,
+#app.bubble-style-orange .message.user .help-buy-card,
+#app.bubble-style-orange .message.user .share-card {
+    background: #ffedd5 !important;
+    border-color: #ea580c !important;
+}
+#app.bubble-style-orange .message.ai .location-card,
+#app.bubble-style-orange .message.ai .transfer-card,
+#app.bubble-style-orange .message.ai .takeaway-card,
+#app.bubble-style-orange .message.ai .pet-card,
+#app.bubble-style-orange .message.ai .vote-card,
+#app.bubble-style-orange .message.ai .order-card,
+#app.bubble-style-orange .message.ai .help-buy-card,
+#app.bubble-style-orange .message.ai .share-card {
+    background: #fff7ed !important;
+    border-color: #fdba74 !important;
+}
+
+/* Round / sharp also apply to special cards */
+#app.bubble-style-round .special-card {
+    border-radius: 22px;
+}
+#app.bubble-style-sharp .special-card {
+    border-radius: 8px;
+}
+
 .special-card:hover {
     box-shadow: 2px 2px 0px #000000;
     transform: translate(4px, 4px);
@@ -11306,7 +11409,8 @@ label {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.3);
+    background: radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.12), transparent 45%), rgba(0, 0, 0, 0.42);
+    backdrop-filter: blur(4px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -11315,38 +11419,38 @@ label {
 }
 
 .art-settings-panel {
-    background: #FDFDFB;
+    background: linear-gradient(180deg, #fffefc 0%, #f8f8f4 100%);
     border: 2px solid #000000;
-    border-radius: 24px;
-    padding: 32px 28px;
-    max-width: 320px;
+    border-radius: 26px;
+    padding: 28px 24px;
+    max-width: 380px;
     width: 100%;
     max-height: 80vh;
     overflow-y: auto;
-    box-shadow: 8px 8px 0px #000000;
+    box-shadow: 10px 10px 0px #000000, 0 16px 30px rgba(0, 0, 0, 0.18);
     position: relative;
 }
 
 .art-settings-close {
     position: absolute;
-    top: 20px;
-    right: 20px;
+    top: 14px;
+    right: 14px;
     width: 36px;
     height: 36px;
     border: 2px solid #000000;
     border-radius: 50%;
-    background: #FFFFFF;
+    background: rgba(255, 255, 255, 0.95);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: all 0.18s ease;
     color: #000000;
 }
 
 .art-settings-close:hover {
-    box-shadow: 3px 3px 0px #000000;
-    transform: translate(-3px, -3px);
+    box-shadow: 2px 2px 0px #000000;
+    transform: translate(-2px, -2px) scale(1.02);
 }
 
 .art-settings-close:active {
@@ -11360,7 +11464,7 @@ label {
     font-weight: 700;
     letter-spacing: -2px;
     color: #000000;
-    margin: 0 0 28px 0;
+    margin: 4px 0 20px 0;
     line-height: 1;
 }
 
@@ -11370,17 +11474,17 @@ label {
     gap: 16px;
     background: #FFFFFF;
     border: 2px solid #000000;
-    border-radius: 20px;
-    padding: 20px;
-    margin-bottom: 24px;
-    box-shadow: 8px 8px 0px #000000;
+    border-radius: 18px;
+    padding: 16px;
+    margin-bottom: 18px;
+    box-shadow: 5px 5px 0px #000000;
     transition: all 0.15s ease;
     cursor: pointer;
 }
 
 .art-profile-card:hover {
-    box-shadow: 4px 4px 0px #000000;
-    transform: translate(4px, 4px);
+    box-shadow: 2px 2px 0px #000000;
+    transform: translate(3px, 3px);
 }
 
 .art-profile-avatar {
@@ -11449,8 +11553,8 @@ label {
 .art-settings-section {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    margin-bottom: 24px;
+    gap: 10px;
+    margin-bottom: 18px;
 }
 
 .art-settings-item {
@@ -11568,10 +11672,10 @@ label {
 
 .art-section-title {
     font-family: 'Playfair Display', Georgia, serif;
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 700;
     color: #000000;
-    margin: 0 0 16px 0;
+    margin: 0 0 10px 0;
     letter-spacing: -0.5px;
 }
 
@@ -11581,16 +11685,16 @@ label {
     gap: 14px;
     background: #FFFFFF;
     border: 2px solid #000000;
-    border-radius: 16px;
-    padding: 16px 18px;
-    box-shadow: 6px 6px 0px #000000;
-    transition: all 0.15s ease;
-    margin-bottom: 12px;
+    border-radius: 14px;
+    padding: 14px 14px;
+    box-shadow: 4px 4px 0px #000000;
+    transition: all 0.18s ease;
+    margin-bottom: 8px;
 }
 
 .art-settings-input-item:hover {
-    box-shadow: 2px 2px 0px #000000;
-    transform: translate(4px, 4px);
+    box-shadow: 1px 1px 0px #000000;
+    transform: translate(2px, 2px);
 }
 
 .art-input-wrapper {
@@ -11602,7 +11706,7 @@ label {
 
 .art-input-label {
     font-family: 'Inter', sans-serif;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
     color: #666666;
     text-transform: uppercase;
@@ -11612,18 +11716,19 @@ label {
 .art-settings-input {
     width: 100%;
     border: 2px solid #000000;
-    border-radius: 10px;
-    padding: 10px 14px;
+    border-radius: 12px;
+    padding: 9px 12px;
     font-family: 'Inter', sans-serif;
     font-size: 14px;
     color: #000000;
-    background: #FDFDFB;
+    background: #ffffff;
     outline: none;
     transition: all 0.2s ease;
 }
 
 .art-settings-input:focus {
-    box-shadow: 3px 3px 0px rgba(0, 0, 0, 0.1);
+    border-color: #1f2937;
+    box-shadow: 0 0 0 3px rgba(31, 41, 55, 0.08);
 }
 
 .art-settings-input::placeholder {
@@ -11647,7 +11752,7 @@ label {
 }
 
 .art-save-section {
-    margin-top: 8px;
+    margin-top: 4px;
     margin-bottom: 16px;
 }
 
@@ -11656,20 +11761,20 @@ label {
     background: #000000;
     color: #FFFFFF;
     border: 2px solid #000000;
-    border-radius: 14px;
-    padding: 14px 24px;
+    border-radius: 12px;
+    padding: 12px 20px;
     font-family: 'Playfair Display', Georgia, serif;
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 700;
     letter-spacing: 1px;
     cursor: pointer;
     transition: all 0.15s ease;
-    box-shadow: 6px 6px 0px rgba(0, 0, 0, 0.3);
+    box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.3);
 }
 
 .art-save-btn:hover {
-    transform: translate(3px, 3px);
-    box-shadow: 3px 3px 0px rgba(0, 0, 0, 0.3);
+    transform: translate(2px, 2px);
+    box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.3);
 }
 
 /* 上下文菜单 */
@@ -20544,6 +20649,165 @@ label {
 
 /* Read App 占位 */
 .read-app { display: flex; flex-direction: column; }
+.read-app .card {
+    /* 让 Read App 的卡片更像“页面组件”而不是“粗边框海报卡片” */
+    background: rgba(255,255,255,0.92);
+    border: 1px solid rgba(0,0,0,0.12) !important;
+    border-radius: 14px !important;
+    box-shadow: 2px 2px 0 rgba(0,0,0,0.06) !important;
+    margin-bottom: 10px !important;
+}
+.read-app .btn-small {
+    border-radius: 12px !important;
+}
+
+/* =======================================
+   Read App · Black/White/Grey editorial
+   ======================================= */
+.read-app {
+    /* 更“画报”的灰阶纸面 + 光感 */
+    background:
+        radial-gradient(120% 90% at 20% 0%, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0) 60%),
+        radial-gradient(120% 100% at 90% 40%, rgba(0,0,0,0.06) 0%, rgba(0,0,0,0) 55%),
+        #f2f3f5;
+    color: #0f0f10;
+    font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+}
+.read-app .app-header {
+    background: rgba(242,243,245,0.72);
+    border-bottom: 1px solid rgba(0,0,0,0.12);
+    backdrop-filter: blur(10px);
+}
+.read-app .app-title {
+    font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-size: 12px;
+    font-weight: 700;
+    opacity: 0.9;
+}
+.read-app .app-content {
+    background: #f2f3f5;
+}
+.read-app input,
+.read-app textarea,
+.read-app select {
+    background: #fff !important;
+    border: 1px solid rgba(0,0,0,0.18) !important;
+    border-radius: 10px !important;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.04);
+}
+.read-app .btn-small {
+    background: transparent;
+    border: 1px solid rgba(0,0,0,0.26);
+    color: #111;
+    transition: transform 0.12s ease, background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.read-app .btn-small.primary {
+    background: #111;
+    border-color: #111;
+    color: #fff;
+}
+.read-app .btn-small.primary:disabled,
+.read-app .btn-small:disabled {
+    opacity: 0.55;
+}
+.read-app .btn-small:hover:not(:disabled) {
+    background: rgba(0,0,0,0.03);
+    border-color: rgba(0,0,0,0.34);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    transform: translateY(-1px);
+}
+.read-app .btn-small.primary:hover:not(:disabled) {
+    filter: brightness(0.94);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.16);
+    transform: translateY(-1px);
+}
+.read-app .btn-small:active:not(:disabled) {
+    transform: translateY(0px) scale(0.99);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+.read-app .card {
+    background: rgba(255,255,255,0.96);
+    border: 1px solid rgba(0,0,0,0.14) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.06) !important;
+    position: relative;
+    overflow: hidden;
+}
+.read-app .card::before {
+    /* 杂志感：顶部细线 */
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(0,0,0,0), rgba(0,0,0,0.18), rgba(0,0,0,0));
+}
+.read-app .card b,
+.read-app .card strong {
+    color: #111;
+}
+.read-app .read-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.read-app .read-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(0,0,0,0.16);
+    background: rgba(255,255,255,0.7);
+    font-size: 12px;
+    line-height: 1.2;
+    backdrop-filter: blur(6px);
+}
+.read-app .read-tag.warning {
+    border-color: rgba(0,0,0,0.28);
+    background: rgba(0,0,0,0.04);
+}
+.read-app .read-tag.muted {
+    background: rgba(0,0,0,0.02);
+    border-color: rgba(0,0,0,0.12);
+}
+.read-app .read-title {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+    line-height: 1.15;
+}
+.read-app .read-body {
+    font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.95;
+    color: rgba(0,0,0,0.86);
+    letter-spacing: 0.01em;
+}
+.read-app .read-notes {
+    background: rgba(0,0,0,0.04) !important;
+    border: 1px solid rgba(0,0,0,0.12);
+}
+.read-app .back-btn {
+    border-color: rgba(0,0,0,0.16) !important;
+    background: rgba(255,255,255,0.6) !important;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+}
+.read-app .back-btn:hover {
+    background: rgba(0,0,0,0.06) !important;
+}
+.read-app a,
+.read-app .linkish {
+    color: #111;
+    text-decoration: none;
+}
+.read-app a:hover,
+.read-app .linkish:hover {
+    text-decoration: underline;
+}
 .read-placeholder {
     flex: 1;
     display: flex;

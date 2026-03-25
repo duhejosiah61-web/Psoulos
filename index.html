@@ -182,8 +182,18 @@
                                                                 </div>
                                                             </div>
                                                             <div class="peek-widget-row peek-widget-photos" @click="peek.openPeekInnerApp('album')">
-                                                                <div class="peek-widget-photo" v-for="(p, i) in peek.peekWidgetPhotos" :key="i">
-                                                                    <img :src="p" alt="">
+                                                                <div class="peek-widget-photo" v-for="(p, i) in peek.peekWidgetPhotos" :key="p.id || i">
+                                                                    <div
+                                                                        class="mock-image"
+                                                                        :style="{
+                                                                            width: '100%',
+                                                                            height: '100%',
+                                                                            borderRadius: '10px',
+                                                                            background: 'linear-gradient(135deg,' + (p.bgColor || '#dbeafe') + ',' + (p.bgColor2 || '#fce7f3') + ')'
+                                                                        }"
+                                                                    >
+                                                                        <div class="mock-image-desc">{{ p.description }}</div>
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                             <div class="peek-widget-row peek-widget-note" v-if="peek.peekWidgetFirstNote" @click="peek.openPeekInnerApp('notes')">
@@ -226,7 +236,19 @@
                                                                 <div class="peek-list-item" v-for="c in peek.peekCalls" :key="c.id"><div><b>{{ c.who }}</b> · {{ c.type === 'missed' ? '未接来电' : '已拨出' }}</div><span>{{ c.at }}</span></div>
                                                             </div>
                                                             <div v-else-if="peek.peekInnerApp === 'album'" class="peek-photo-grid">
-                                                                <img v-for="(p, i) in peek.peekPhotos" :key="i" :src="p" alt="photo">
+                                                                <div v-for="(p, i) in peek.peekPhotos" :key="p.id || i">
+                                                                    <div
+                                                                        class="mock-image"
+                                                                        :style="{
+                                                                            width: '100%',
+                                                                            height: '130px',
+                                                                            borderRadius: '10px',
+                                                                            background: 'linear-gradient(135deg,' + (p.bgColor || '#dbeafe') + ',' + (p.bgColor2 || '#fce7f3') + ')'
+                                                                        }"
+                                                                    >
+                                                                        <div class="mock-image-desc">{{ p.description }}</div>
+                                                                    </div>
+                                                                </div>
                                                             </div>
                                                             <div v-else-if="peek.peekInnerApp === 'notes'" class="peek-list">
                                                                 <div class="peek-note" v-for="n in peek.peekNotes" :key="n.id"><h4>{{ n.title }}</h4><p>{{ n.content }}</p></div>
@@ -967,6 +989,17 @@
                                     </div>
                                     <div class="share-content">{{ msg.content }}</div>
                                 </div>
+                                <div v-else-if="msg.messageType === 'friendRequest'" class="special-card share-card">
+                                    <div class="share-header">
+                                        <i class="fas fa-user-plus"></i>
+                                        <span>{{ msg.requestDirection === 'incoming' ? '好友申请' : '申请已发送' }}</span>
+                                    </div>
+                                    <div class="share-content">{{ msg.text || '好友申请' }}</div>
+                                    <div v-if="msg.requestDirection === 'incoming' && socialPendingRoleRequest" style="margin-top:8px; display:flex; gap:8px;">
+                                        <button class="btn-small" @click="acceptRoleFriendRequest">同意</button>
+                                        <button class="btn-small" @click="rejectRoleFriendRequest">拒绝</button>
+                                    </div>
+                                </div>
                                 <div v-else-if="msg.messageType === 'voice'" class="voice-message-bubble" :class="{ 'playing': msg.isPlaying }" @click="toggleVoicePlayback(msg)">
                                     <div class="voice-waveform">
                                         <span></span><span></span><span></span><span></span><span></span>
@@ -1225,7 +1258,7 @@
 
         <!-- 聊天设置面板 -->
         <div v-if="showChatSettings" class="art-settings-overlay" @click.self="showChatSettings = false">
-            <div class="art-settings-panel">
+            <div class="art-settings-panel" :style="chatSettingsPanelStyle">
                 <button class="art-settings-close" @click="showChatSettings = false">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -1270,7 +1303,7 @@
                         </div>
                         <div class="art-input-wrapper">
                             <label class="art-input-label">我的身份</label>
-                            <input type="text" v-model="userIdentity" class="art-settings-input" placeholder="例如：朋友、恋人、同事...">
+                            <input type="text" v-model="userIdentity" class="art-settings-input" placeholder="向ta介绍一下我自己....">
                         </div>
                     </div>
 
@@ -1361,15 +1394,328 @@
                             </svg>
                         </div>
                         <div class="art-input-wrapper">
-                            <label class="art-input-label">翻译方向</label>
-                            <select v-model="soulLinkForeignTranslationLang" class="art-settings-input">
-                                <option value="zh-CN">中文(简体)</option>
-                                <option value="en">English</option>
-                                <option value="ja">日本語</option>
-                                <option value="ko">한국어</option>
-                            </select>
+                            <label class="art-input-label">输出语言(A) / 翻译语言(B)</label>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <select v-model="soulLinkForeignPrimaryLang" class="art-settings-input">
+                                    <option value="zh-CN">中文(简体)</option>
+                                    <option value="zh-TW">中文(繁體)</option>
+                                    <option value="en">English</option>
+                                    <option value="ja">日本語</option>
+                                    <option value="ko">한국어</option>
+                                    <option value="fr">Français</option>
+                                    <option value="de">Deutsch</option>
+                                    <option value="es">Español</option>
+                                    <option value="it">Italiano</option>
+                                    <option value="ru">Русский</option>
+                                    <option value="pt-BR">Português (Brasil)</option>
+                                    <option value="ar">العربية</option>
+                                    <option value="hi">हिन्दी</option>
+                                    <option value="th">ไทย</option>
+                                    <option value="vi">Tiếng Việt</option>
+                                    <option value="id">Bahasa Indonesia</option>
+                                    <option value="tr">Türkçe</option>
+                                </select>
+                                <select v-model="soulLinkForeignSecondaryLang" class="art-settings-input">
+                                    <option value="zh-CN">中文(简体)</option>
+                                    <option value="zh-TW">中文(繁體)</option>
+                                    <option value="en">English</option>
+                                    <option value="ja">日本語</option>
+                                    <option value="ko">한국어</option>
+                                    <option value="fr">Français</option>
+                                    <option value="de">Deutsch</option>
+                                    <option value="es">Español</option>
+                                    <option value="it">Italiano</option>
+                                    <option value="ru">Русский</option>
+                                    <option value="pt-BR">Português (Brasil)</option>
+                                    <option value="ar">العربية</option>
+                                    <option value="hi">हिन्दी</option>
+                                    <option value="th">ไทย</option>
+                                    <option value="vi">Tiếng Việt</option>
+                                    <option value="id">Bahasa Indonesia</option>
+                                    <option value="tr">Türkçe</option>
+                                </select>
+                            </div>
                             <div style="font-size: 12px; color: rgba(0, 0, 0, 0.55); margin-top: 6px;">
                                 {{ soulLinkForeignTranslationDirectionText }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="art-settings-section">
+                    <h2 class="art-section-title">聊天背景</h2>
+                    <div class="art-settings-input-item">
+                        <div class="art-settings-icon-wrapper">
+                            <div class="art-settings-blob blob-color-1"></div>
+                            <svg class="art-settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <rect x="3" y="5" width="18" height="14" rx="2"></rect>
+                                <circle cx="9" cy="10" r="1.5"></circle>
+                                <path d="M3 16l5-4 4 3 3-2 6 5"></path>
+                            </svg>
+                        </div>
+                        <div class="art-input-wrapper">
+                            <label class="art-input-label">背景样式</label>
+                            <select v-model="chatBackgroundStyle" class="art-settings-input" @change="updateChatBackground">
+                                <option value="default">默认</option>
+                                <option value="gradient">渐变</option>
+                                <option value="color">纯色</option>
+                                <option value="image">图片</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div v-if="chatBackgroundStyle === 'gradient'" class="art-settings-input-item">
+                        <div class="art-settings-icon-wrapper">
+                            <div class="art-settings-blob blob-color-4"></div>
+                            <svg class="art-settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M4 20L20 4"></path>
+                                <circle cx="6" cy="18" r="2"></circle>
+                                <circle cx="18" cy="6" r="2"></circle>
+                            </svg>
+                        </div>
+                        <div class="art-input-wrapper">
+                            <label class="art-input-label">渐变颜色</label>
+                            <div style="display:flex; gap:10px; align-items:center;">
+                                <input type="color" v-model="gradientStartColor" class="art-settings-input" @input="updateChatBackground" style="padding:6px; height:40px;">
+                                <input type="color" v-model="gradientEndColor" class="art-settings-input" @input="updateChatBackground" style="padding:6px; height:40px;">
+                            </div>
+                        </div>
+                    </div>
+                    <div v-if="chatBackgroundStyle === 'color'" class="art-settings-input-item">
+                        <div class="art-settings-icon-wrapper">
+                            <div class="art-settings-blob blob-color-2"></div>
+                            <svg class="art-settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <rect x="4" y="4" width="16" height="16"></rect>
+                            </svg>
+                        </div>
+                        <div class="art-input-wrapper">
+                            <label class="art-input-label">纯色</label>
+                            <input type="color" v-model="solidBackgroundColor" class="art-settings-input" @input="updateChatBackground" style="padding:6px; height:40px;">
+                        </div>
+                    </div>
+                    <div v-if="chatBackgroundStyle === 'image'" class="art-settings-input-item">
+                        <div class="art-settings-icon-wrapper">
+                            <div class="art-settings-blob blob-color-5"></div>
+                            <svg class="art-settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="17 8 12 3 7 8"></polyline>
+                            </svg>
+                        </div>
+                        <div class="art-input-wrapper">
+                            <label class="art-input-label">图片链接 / 相册</label>
+                            <input type="text" v-model="chatBackgroundImageInput" class="art-settings-input" placeholder="https://... 或 data:image/...">
+                            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
+                                <button class="btn-small" @click="applyBackgroundImageLink">应用链接</button>
+                                <button class="btn-small" @click="selectBackgroundImage">从相册选择</button>
+                                <button class="btn-small" @click="clearBackgroundImage">清除图片</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="art-settings-input-item">
+                        <div class="art-settings-icon-wrapper">
+                            <div class="art-settings-blob blob-color-3"></div>
+                            <svg class="art-settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <rect x="4" y="4" width="16" height="16"></rect>
+                                <path d="M9 4v16M15 4v16M4 9h16M4 15h16"></path>
+                            </svg>
+                        </div>
+                        <div class="art-input-wrapper">
+                            <label class="art-input-label">手动裁剪图片</label>
+                            <div style="display:flex; align-items:center; gap:10px; padding-top:6px;">
+                                <input id="enableManualImageCrop" type="checkbox" v-model="enableManualImageCrop">
+                                <label for="enableManualImageCrop" style="font-family:'Inter',sans-serif; font-size:14px; color:#000;">上传后手动选框</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="art-settings-section">
+                    <h2 class="art-section-title">气泡美化（CSS）</h2>
+                    <div class="art-settings-input-item">
+                        <div class="art-settings-icon-wrapper">
+                            <div class="art-settings-blob blob-color-6"></div>
+                            <svg class="art-settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                            </svg>
+                        </div>
+                        <div class="art-input-wrapper">
+                            <label class="art-input-label">样式方案</label>
+                            <select v-model="bubbleStyle" class="art-settings-input" @change="setBubbleStyle(bubbleStyle)">
+                                <option value="default">默认</option>
+                                <option value="blue">蓝色</option>
+                                <option value="orange">橙色</option>
+                                <option value="round">圆角</option>
+                                <option value="sharp">锐角</option>
+                                <option value="custom">自定义 CSS</option>
+                            </select>
+                            <textarea v-if="bubbleStyle === 'custom'" v-model="customBubbleCSS" class="art-settings-input" rows="4" placeholder="例如：background:#111;color:#fff;border-radius:16px;" style="margin-top:8px; resize: vertical;"></textarea>
+                            <div v-if="bubbleStyle === 'custom'" style="margin-top:8px;">
+                                <button class="btn-small" @click="applyCustomCSS">应用CSS</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="art-settings-section">
+                    <h2 class="art-section-title">聊天总结</h2>
+                    <div class="art-settings-input-item">
+                        <div class="art-settings-icon-wrapper">
+                            <div class="art-settings-blob blob-color-6"></div>
+                            <svg class="art-settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M4 4h16v16H4z"></path>
+                                <path d="M7 8h10"></path>
+                                <path d="M7 12h10"></path>
+                                <path d="M7 16h7"></path>
+                            </svg>
+                        </div>
+                        <div class="art-input-wrapper">
+                            <label class="art-input-label">自动总结</label>
+                            <div style="display: flex; align-items: center; gap: 10px; padding-top: 6px;">
+                                <input id="chatSummaryEnabled" type="checkbox" v-model="chatSummaryEnabled">
+                                <label for="chatSummaryEnabled" style="font-family: 'Inter', sans-serif; font-size: 14px; color: #000000;">开启聊天总结</label>
+                            </div>
+                            <div v-if="chatSummaryEnabled" style="margin-top: 10px; display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 13px; color: rgba(0,0,0,.65);">每</span>
+                                <input type="number" v-model.number="chatSummaryEveryN" min="1" step="1" class="art-settings-input" style="max-width: 110px;">
+                                <span style="font-size: 13px; color: rgba(0,0,0,.65);">次对话自动总结一次</span>
+                            </div>
+                            <div style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap;">
+                                <button class="btn-small" @click="manualSummarizeChat" :disabled="chatSummaryGenerating">
+                                    {{ chatSummaryGenerating ? '总结中...' : '立即总结' }}
+                                </button>
+                                <button class="btn-small" @click="clearChatSummaryBoard" :disabled="chatSummaryGenerating || (chatSummaryBoard && chatSummaryBoard.length===0)">
+                                    清空留言板
+                                </button>
+                            </div>
+                            <div style="font-size: 12px; color: rgba(0, 0, 0, 0.55); margin-top: 8px;">
+                                开启后会用“摘要 + 最近少量消息”与AI对话，减少token。
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="art-settings-input-item" style="align-items: flex-start;">
+                        <div class="art-settings-icon-wrapper">
+                            <div class="art-settings-blob blob-color-3"></div>
+                            <svg class="art-settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M21 15a4 4 0 0 1-4 4H7l-4 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"></path>
+                            </svg>
+                        </div>
+                        <div class="art-input-wrapper" style="width: 100%;">
+                            <label class="art-input-label">留言板（总结区）</label>
+                            <div v-if="!chatSummaryBoard || chatSummaryBoard.length === 0" style="font-size: 13px; color: rgba(0,0,0,.55); padding-top: 6px;">
+                                还没有总结。你可以点“立即总结”生成第一条。
+                            </div>
+                            <div v-else style="display: flex; flex-direction: column; gap: 10px; margin-top: 8px;">
+                                <div v-for="item in chatSummaryBoard.slice(0, 6)" :key="item.id" style="border: 1px solid rgba(0,0,0,.12); border-radius: 12px; padding: 10px; background: #fff;">
+                                    <div style="display: flex; justify-content: space-between; gap: 10px;">
+                                        <div style="font-weight: 600; font-size: 13px; color: #111;">{{ item.title || '聊天总结' }}</div>
+                                        <div style="font-size: 12px; color: rgba(0,0,0,.55); white-space: nowrap;">{{ item.createdAtText }}</div>
+                                    </div>
+                                    <div style="margin-top: 6px; font-size: 13px; line-height: 1.5; color: rgba(0,0,0,.75); white-space: pre-wrap;">
+                                        {{ item.body }}
+                                    </div>
+                                </div>
+                                <div v-if="chatSummaryBoard.length > 6" style="font-size: 12px; color: rgba(0,0,0,.55);">
+                                    仅展示最近 6 条（其余已保存在本地）。
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="art-settings-section">
+                    <h2 class="art-section-title">时差系统</h2>
+                    <div class="art-settings-input-item">
+                        <div class="art-settings-icon-wrapper">
+                            <div class="art-settings-blob blob-color-2"></div>
+                            <svg class="art-settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <circle cx="12" cy="12" r="9"></circle>
+                                <path d="M12 7v5l3 2"></path>
+                            </svg>
+                        </div>
+                        <div class="art-input-wrapper">
+                            <label class="art-input-label">时差感知</label>
+                            <div style="display: flex; align-items: center; gap: 10px; padding-top: 6px;">
+                                <input id="timeZoneSystemEnabled" type="checkbox" v-model="timeZoneSystemEnabled">
+                                <label for="timeZoneSystemEnabled" style="font-family: 'Inter', sans-serif; font-size: 14px; color: #000000;">开启时差系统</label>
+                            </div>
+                            <div style="font-size: 12px; color: rgba(0, 0, 0, 0.55); margin-top: 8px;">
+                                可填写 IANA 时区（如 `Asia/Shanghai`）或 UTC 偏移（如 `UTC+8` / `UTC-5:30`）。
+                            </div>
+                        </div>
+                    </div>
+                    <div v-if="timeZoneSystemEnabled" class="art-settings-input-item">
+                        <div class="art-settings-icon-wrapper">
+                            <div class="art-settings-blob blob-color-4"></div>
+                            <svg class="art-settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="12" cy="7" r="4"></circle>
+                            </svg>
+                        </div>
+                        <div class="art-input-wrapper">
+                            <label class="art-input-label">用户时区</label>
+                            <input type="text" v-model="userTimeZone" class="art-settings-input" placeholder="例如：Asia/Shanghai 或 UTC+8">
+                        </div>
+                    </div>
+                    <div v-if="timeZoneSystemEnabled" class="art-settings-input-item">
+                        <div class="art-settings-icon-wrapper">
+                            <div class="art-settings-blob blob-color-5"></div>
+                            <svg class="art-settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            </svg>
+                        </div>
+                        <div class="art-input-wrapper">
+                            <label class="art-input-label">角色时区</label>
+                            <input type="text" v-model="roleTimeZone" class="art-settings-input" placeholder="例如：Asia/Tokyo 或 UTC+9">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="art-settings-section">
+                    <h2 class="art-section-title">主动发消息</h2>
+                    <div class="art-settings-input-item">
+                        <div class="art-settings-icon-wrapper">
+                            <div class="art-settings-blob blob-color-4"></div>
+                            <svg class="art-settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                            </svg>
+                        </div>
+                        <div class="art-input-wrapper">
+                            <label class="art-input-label">启用主动消息</label>
+                            <div style="display:flex; align-items:center; gap:10px; padding-top:6px;">
+                                <input id="activeMessageEnabled" type="checkbox" v-model="activeMessageEnabled">
+                                <label for="activeMessageEnabled" style="font-family:'Inter',sans-serif; font-size:14px; color:#000;">开启</label>
+                            </div>
+                            <div v-if="activeMessageEnabled" style="display:flex; gap:10px; margin-top:8px; align-items:center;">
+                                <span style="font-size:13px; color:#666;">频率(分钟)</span>
+                                <input type="number" min="1" step="1" v-model.number="activeMessageFrequencyMin" class="art-settings-input" style="max-width:110px;">
+                                <span style="font-size:13px; color:#666;">回复延迟(秒)</span>
+                                <input type="number" min="1" step="1" v-model.number="activeReplyDelaySec" class="art-settings-input" style="max-width:110px;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="art-settings-section">
+                    <h2 class="art-section-title">拉黑与好友申请</h2>
+                    <div class="art-settings-input-item">
+                        <div class="art-settings-icon-wrapper">
+                            <div class="art-settings-blob blob-color-6"></div>
+                            <svg class="art-settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <circle cx="12" cy="12" r="9"></circle>
+                                <path d="M7 17l10-10"></path>
+                            </svg>
+                        </div>
+                        <div class="art-input-wrapper">
+                            <label class="art-input-label">关系状态</label>
+                            <div style="font-size:13px; color:#555; margin-bottom:8px;">
+                                你拉黑对方：{{ socialUserBlockedRole ? '是' : '否' }} ｜ 对方拉黑你：{{ socialRoleBlockedUser ? '是' : '否' }}
+                            </div>
+                            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                                <button class="btn-small" @click="toggleUserBlockRole">{{ socialUserBlockedRole ? '取消拉黑' : '拉黑对方' }}</button>
+                                <button class="btn-small" @click="sendFriendRequestToRole" :disabled="!socialRoleBlockedUser">发送好友申请</button>
                             </div>
                         </div>
                     </div>
@@ -1464,6 +1810,28 @@
                         <span>.</span>
                         <span>0</span>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="showImageCropModal" class="modal-overlay" @click.self="closeImageCropModal">
+            <div class="art-savearchive-panel" style="max-width: 420px;">
+                <h3 style="margin:0 0 10px 0;">裁剪图片</h3>
+                <div class="image-cropper-canvas" style="position:relative; width:100%; aspect-ratio: 1/1; background:#111; border-radius:12px; overflow:hidden; touch-action:none;">
+                    <img :src="imageCropSource" style="width:100%; height:100%; object-fit:contain; display:block; user-select:none; pointer-events:none;">
+                    <div
+                        :style="{ position:'absolute', left:(imageCropRect.x*100)+'%', top:(imageCropRect.y*100)+'%', width:(imageCropRect.w*100)+'%', height:(imageCropRect.h*100)+'%', border:'2px solid #fff', boxShadow:'0 0 0 9999px rgba(0,0,0,.35)', borderRadius:'10px', cursor:'move' }"
+                        @mousedown.stop.prevent="onImageCropDragStart"
+                        @touchstart.stop.prevent="onImageCropDragStart"
+                    ></div>
+                </div>
+                <div style="margin-top:10px;">
+                    <label style="font-size:12px; color:#666;">框选大小</label>
+                    <input type="range" min="0.45" max="0.95" step="0.01" v-model.number="imageCropScale" @input="onImageCropScaleChange" style="width:100%;">
+                </div>
+                <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px;">
+                    <button class="btn-small" @click="closeImageCropModal">取消</button>
+                    <button class="btn-small" @click="confirmImageCrop">确定</button>
                 </div>
             </div>
         </div>
@@ -3187,16 +3555,485 @@
             </div>
         </div>
 
-        <!-- Read App（暂定占位） -->
+        <!-- Read App -->
         <div v-else-if="openedApp === 'read'" class="app-view read-app">
             <div class="app-header">
-                <button class="back-btn" @click="closeApp"><i class="fas fa-chevron-left"></i></button>
+                <button class="back-btn" @click="read.view === 'explore' ? closeApp() : read.goExplore()"><i class="fas fa-chevron-left"></i></button>
                 <span class="app-title">Read</span>
-                <div style="width: 40px;"></div>
+                <div style="display:flex; gap:8px; align-items:center; justify-content:flex-end; width: 40px;">
+                    <button class="btn-small" @click="read.openWriterCreate" title="生成新作品"><i class="fas fa-pen-nib"></i></button>
+                </div>
             </div>
-            <div class="read-placeholder">
-                <i class="fas fa-book-open"></i>
-                <p>阅读功能即将上线</p>
+
+            <div class="app-content" style="flex:1; overflow-y:auto; padding:12px;">
+                <!-- Explore -->
+                <div v-if="read.view === 'explore'" style="display:flex; flex-direction:column; gap:12px;">
+                    <div class="card" style="padding:12px;">
+                        <div style="display:flex; gap:10px; align-items:center;">
+                            <i class="fas fa-search" style="opacity:0.7;"></i>
+                            <input
+                                v-model="read.searchQuery"
+                                placeholder="搜索作品标题/标签/简介..."
+                                style="flex:1; border:1px solid rgba(0,0,0,0.12); border-radius:10px; padding:10px; outline:none;"
+                            />
+                            <button class="btn-small" @click="read.searchQuery=''">清空</button>
+                        </div>
+                        <div style="margin-top:10px; font-size:12px; color:rgba(0,0,0,0.6);">
+                            提示：可配置 Console 里的 API 后使用 Writer 生成。
+                        </div>
+                    </div>
+
+                <!-- AO3 Tag Filters -->
+                <div class="card" style="padding:12px;">
+                    <div style="font-weight:700; margin-bottom:8px;">筛选（AO3：警告 & 额外标签，AND 逻辑）</div>
+
+                    <div style="font-size:12px; font-weight:700; margin:6px 0 8px;">归档警告（Archive Warnings）</div>
+                    <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                        <button
+                            v-for="t in read.allWarningTags"
+                            :key="'w_'+t.tag"
+                            class="btn-small"
+                            :style="{
+                                borderColor: (read.selectedWarningTags.includes(t.tag) ? 'rgba(224,0,0,0.35)' : 'rgba(0,0,0,0.12)'),
+                                background: read.selectedWarningTags.includes(t.tag) ? 'rgba(224,0,0,0.06)' : 'transparent'
+                            }"
+                            @click="read.toggleWarningTag(t.tag)"
+                        >
+                            ⚠ {{ t.tag }}
+                        </button>
+                        <div v-if="!read.allWarningTags.length" style="font-size:12px; color:rgba(0,0,0,0.6);">
+                            暂无可筛选的警告
+                        </div>
+                    </div>
+
+                    <div style="font-size:12px; font-weight:700; margin:12px 0 8px;">额外标签（Additional Tags）</div>
+                    <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                        <button
+                            v-for="t in read.allAdditionalTags"
+                            :key="'t_'+t.tag"
+                            class="btn-small"
+                            :style="{
+                                borderColor: (read.selectedAdditionalTags.includes(t.tag) ? 'rgba(0,0,0,0.35)' : 'rgba(0,0,0,0.12)'),
+                                background: read.selectedAdditionalTags.includes(t.tag) ? 'rgba(0,0,0,0.06)' : 'transparent'
+                            }"
+                            @click="read.toggleAdditionalTag(t.tag)"
+                        >
+                            #{{ t.tag }}
+                        </button>
+                        <div v-if="!read.allAdditionalTags.length" style="font-size:12px; color:rgba(0,0,0,0.6);">
+                            暂无可筛选的额外标签
+                        </div>
+                    </div>
+
+                    <div v-if="read.selectedWarningTags.length || read.selectedAdditionalTags.length" style="margin-top:10px; display:flex; justify-content:flex-end; gap:8px;">
+                        <button class="btn-small" @click="read.clearSelectedTags">清空筛选</button>
+                    </div>
+                </div>
+
+                    <div v-if="read.filteredWorks.length === 0" class="read-placeholder" style="padding-top:50px;">
+                        <i class="fas fa-book-open"></i>
+                        <p>还没有作品。点击右上角按钮生成第一部同人文。</p>
+                    </div>
+
+                    <div v-else style="display:flex; flex-direction:column; gap:12px;">
+                        <div v-for="w in read.filteredWorks" :key="w.id" class="card" style="padding:12px;">
+                            <div style="display:flex; justify-content:space-between; gap:12px;">
+                                <div style="flex:1; min-width:0;">
+                                    <div class="read-title" style="font-weight:700; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                        {{ w.title }}
+                                    </div>
+                                    <div style="font-size:12px; color:rgba(0,0,0,0.65); margin-bottom:6px;">
+                                        CP：{{ w.pairing || '未知' }} · 状态：{{ w.status || 'ongoing' }}
+                                    </div>
+                                    <div style="font-size:12px; color:rgba(0,0,0,0.75); line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
+                                        {{ w.summary || '暂无简介' }}
+                                    </div>
+                                </div>
+                                <div style="display:flex; flex-direction:column; gap:8px; align-items:flex-end;">
+                                    <button class="btn-small primary" @click="read.openWork(w.id)">进入</button>
+                                    <button class="btn-small" @click="read.toggleBookmark(w.id)" :title="read.isBookmarked(w.id) ? '已在书架' : '加入书架'">
+                                        <i :class="read.isBookmarked(w.id) ? 'fas fa-star' : 'far fa-star'"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="read-tags" style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+                                <span
+                                    v-for="t in ((w.archiveWarnings || [])).slice(0,2)"
+                                    :key="'w_'+t"
+                                    class="read-tag warning"
+                                >
+                                    警告：{{ t }}
+                                </span>
+                                <span
+                                    v-for="t in ((w.additionalTags || [])).slice(0,3)"
+                                    :key="'t_'+t"
+                                    class="read-tag muted"
+                                >
+                                    {{ t }}
+                                </span>
+                                <span v-if="(!w.additionalTags || w.additionalTags.length === 0) && (!w.archiveWarnings || w.archiveWarnings.length === 0)" style="font-size:12px; color:rgba(0,0,0,0.5);">
+                                    暂无标签
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detail -->
+                <div v-else-if="read.view === 'detail'" style="display:flex; flex-direction:column; gap:12px;">
+                    <div class="card" style="padding:12px;">
+                        <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start;">
+                            <div style="flex:1; min-width:0;">
+                                <div class="read-title" style="font-weight:800; font-size:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                    {{ read.activeWork?.title || '作品' }}
+                                </div>
+                                <div style="font-size:12px; color:rgba(0,0,0,0.65); margin-top:6px;">
+                                    CP：{{ read.activeWork?.pairing || '未知' }} · 更新至：第{{ read.activeWork?.lastChapterIndex || 1 }}章
+                                </div>
+                                <div style="font-size:12px; color:rgba(0,0,0,0.65); margin-top:6px;">
+                                    状态：{{ read.activeWork?.status || 'ongoing' }}
+                                </div>
+                                <div style="margin-top:10px;">
+                                    <div style="font-weight:700; font-size:12px; color:rgba(0,0,0,0.6); margin-bottom:6px;">
+                                        作品简介（Summary）
+                                    </div>
+                                    <div style="font-size:13px; color:rgba(0,0,0,0.75); line-height:1.5;">
+                                        {{ read.activeWork?.summary || '暂无简介' }}
+                                    </div>
+                                </div>
+
+                                <div style="margin-top:10px; font-size:12px; color:rgba(0,0,0,0.65); line-height:1.6;">
+                                    <div>作者：{{ read.activeWork?.author || '我' }} · 评级：{{ read.activeWork?.rating || 'PG-13' }}</div>
+                                    <div style="margin-top:6px;">
+                                        <span style="font-weight:700;">警告：</span>
+                                        <span v-if="(read.activeWork?.archiveWarnings || []).length">
+                                            {{ (read.activeWork?.archiveWarnings || []).slice(0, 4).join('、') }}
+                                        </span>
+                                        <span v-else>无</span>
+                                    </div>
+                                    <div style="margin-top:6px;">
+                                        <span style="font-weight:700;">标签：</span>
+                                        <span v-if="(read.activeWork?.additionalTags || []).length">
+                                            {{ (read.activeWork?.additionalTags || []).slice(0, 4).join('、') }}
+                                        </span>
+                                        <span v-else>无</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="display:flex; flex-direction:column; gap:8px; align-items:flex-end;">
+                                <button class="btn-small" @click="read.toggleBookmark(read.activeWorkId)" :title="read.isBookmarked(read.activeWorkId) ? '已在书架' : '加入书架'">
+                                    <i :class="read.isBookmarked(read.activeWorkId) ? 'fas fa-star' : 'far fa-star'"></i>
+                                </button>
+                                <button class="btn-small" @click="read.toggleKudos(read.activeWorkId)" :disabled="read.activeWorkId == null" :title="read.isKudoed(read.activeWorkId) ? '取消点赞' : '点赞该作品'">
+                                    <i :class="read.isKudoed(read.activeWorkId) ? 'fas fa-heart' : 'far fa-heart'"></i>
+                                    <span style="margin-left:6px;">{{ read.kudosCountForWork(read.activeWorkId) }}</span>
+                                </button>
+                                <button class="btn-small primary" @click="read.openWriterContinue(read.activeWorkId)" :disabled="read.activeWorkId == null">
+                                    <i class="fas fa-wand-magic-sparkles" style="margin-right:6px;"></i>添加章节
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card" style="padding:12px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px;">
+                            <div style="font-weight:700;">章节列表</div>
+                            <div style="font-size:12px; color:rgba(0,0,0,0.6);">
+                                共 {{ read.activeChaptersSorted.length }} 章
+                            </div>
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:10px;">
+                            <div v-for="ch in read.activeChaptersSorted" :key="ch.id" class="card" style="padding:10px; background:rgba(0,0,0,0.02);">
+                                <div style="display:flex; justify-content:space-between; gap:10px; align-items:flex-start;">
+                                    <div style="flex:1; min-width:0;">
+                                        <div style="font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                            第{{ ch.chapterIndex }}章：{{ ch.title }}
+                                        </div>
+                                        <div style="font-size:12px; color:rgba(0,0,0,0.65); margin-top:6px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
+                                            {{ ch.summary || '' }}
+                                        </div>
+                                    </div>
+                                    <div style="display:flex; flex-direction:column; gap:8px; align-items:flex-end;">
+                                        <button class="btn-small primary" @click="read.openReader(ch.id)">阅读</button>
+                                    </div>
+                                </div>
+                                <!-- AO3-like: 章节列表只保留阅读入口 -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Comments -->
+                    <div class="card" style="padding:12px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px;">
+                            <div style="font-weight:700;">
+                                留言区
+                                <span style="font-weight:600; color:rgba(0,0,0,0.55);">
+                                    （本作品）
+                                </span>
+                            </div>
+                        </div>
+
+                        <div v-if="read.activeWorkId == null" style="font-size:12px; color:rgba(0,0,0,0.6);">
+                            暂无作品可评论。
+                        </div>
+
+                        <div v-else style="display:flex; flex-direction:column; gap:12px;">
+                            <div style="display:flex; flex-direction:column; gap:10px;">
+                                <div v-for="c in read.activeWorkCommentsTree" :key="c.id" style="border-top:1px solid rgba(0,0,0,0.08); padding-top:12px;">
+                                    <div style="display:flex; justify-content:space-between; gap:10px; align-items:flex-start;">
+                                        <div style="font-weight:700;">
+                                            {{ c.author }}
+                                            <span style="font-weight:500; font-size:12px; color:rgba(0,0,0,0.6); margin-left:8px;">
+                                                {{ read.formatTime(c.createdAt) }}
+                                            </span>
+                                        </div>
+                                        <button class="btn-small" @click="read.openReply(c.id)">回复</button>
+                                    </div>
+                                    <div style="margin-top:8px; white-space:pre-wrap; line-height:1.5;">
+                                        {{ c.content }}
+                                    </div>
+
+                                    <div v-if="read.replyToCommentId === c.id" style="margin-top:10px; display:flex; flex-direction:column; gap:8px;">
+                                        <textarea v-model="read.replyInput" placeholder="写下你的回复..." rows="3" style="border:1px solid rgba(0,0,0,0.12); border-radius:10px; padding:10px; outline:none;"></textarea>
+                                        <div style="display:flex; gap:10px; justify-content:flex-end;">
+                                            <button class="btn-small" @click="read.cancelReply">取消</button>
+                                            <button class="btn-small primary" @click="read.submitReply">发送回复</button>
+                                        </div>
+                                    </div>
+
+                                    <div v-if="c.replies && c.replies.length" style="margin-top:12px; display:flex; flex-direction:column; gap:10px;">
+                                        <div v-for="r in c.replies" :key="r.id" style="background:rgba(0,0,0,0.03); border-radius:12px; padding:10px;">
+                                            <div style="font-size:12px; color:rgba(0,0,0,0.65); font-weight:700;">
+                                                回复 {{ c.author }} · {{ read.formatTime(r.createdAt) }}
+                                            </div>
+                                            <div style="margin-top:6px; white-space:pre-wrap; line-height:1.5;">
+                                                {{ r.content }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style="border-top:1px solid rgba(0,0,0,0.08); padding-top:12px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px;">
+                                    <div style="font-weight:700;">发表评论</div>
+                                    <button class="btn-small" @click="read.generateWorkComment" :disabled="read.isGeneratingComment">
+                                        <i class="fas fa-wand-magic-sparkles" style="margin-right:6px;"></i>
+                                        {{ read.isGeneratingComment ? '生成中...' : 'AI 生成留言' }}
+                                    </button>
+                                </div>
+                                <textarea v-model="read.newCommentInput" placeholder="写下你的评论（支持换行）..." rows="3" style="width:100%; border:1px solid rgba(0,0,0,0.12); border-radius:10px; padding:10px; outline:none;"></textarea>
+                                <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:10px;">
+                                    <button class="btn-small" @click="read.newCommentInput=''" :disabled="!read.newCommentInput">清空</button>
+                                    <button class="btn-small primary" @click="read.submitNewComment" :disabled="!read.newCommentInput">发送</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Reader -->
+                <div v-else-if="read.view === 'reader'" style="display:flex; flex-direction:column; gap:12px; flex:1;">
+                    <div class="card" style="padding:12px;">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+                            <div style="flex:1; min-width:0;">
+                                <div style="font-weight:800; font-size:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                    第{{ read.activeChapter?.chapterIndex || 1 }}章：{{ read.activeChapter?.title || '' }}
+                                </div>
+                                <div v-if="read.activeChapter?.authorNotes && read.activeChapter.authorNotes.trim()" class="read-notes" style="margin-top:10px; padding:10px; border-radius:12px; background:rgba(0,0,0,0.04);">
+                                    <div style="font-weight:700; font-size:12px; color:rgba(0,0,0,0.7); margin-bottom:6px;">作者的话</div>
+                                    <div style="white-space:pre-wrap; line-height:1.6; font-size:13px; color:rgba(0,0,0,0.78);">
+                                        {{ read.activeChapter.authorNotes }}
+                                    </div>
+                                </div>
+                                <div style="font-size:12px; color:rgba(0,0,0,0.65); margin-top:6px;">
+                                    {{ read.activeWork?.title || '' }}
+                                </div>
+                            </div>
+                            <div style="display:flex; flex-direction:column; gap:8px; align-items:flex-end;">
+                                <button class="btn-small" @click="read.backToDetail">返回</button>
+                                <button class="btn-small" @click="read.toggleKudos(read.activeWorkId)" :disabled="read.activeWorkId == null">
+                                    <i :class="read.isKudoed(read.activeWorkId) ? 'fas fa-heart' : 'far fa-heart'"></i>
+                                    <span style="margin-left:6px;">{{ read.kudosCountForWork(read.activeWorkId) }}</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card" style="padding:12px; flex:1; overflow-y:auto;">
+                        <div v-if="!read.activeChapter" style="font-size:13px; color:rgba(0,0,0,0.6);">
+                            暂无内容。
+                        </div>
+                        <div v-else class="read-body" style="white-space:pre-wrap; line-height:1.85; font-size:14px;">
+                            <div v-if="read.activeChapter.content && read.activeChapter.content.trim()">
+                                {{ read.activeChapter.content }}
+                            </div>
+                            <div v-else style="font-size:13px; color:rgba(0,0,0,0.55);">
+                                {{ read.activeChapter.summary || '暂无正文（可尝试重新生成这一章）' }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between; gap:10px;">
+                        <button class="btn-small" @click="read.goPrevChapter" :disabled="!read.activeChapterId">
+                            上一章
+                        </button>
+                        <button class="btn-small primary" @click="read.goNextChapter" :disabled="!read.activeChapterId">
+                            下一章
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Writer -->
+                <div v-else-if="read.view === 'writer'" style="display:flex; flex-direction:column; gap:12px; flex:1;">
+                    <div class="card" style="padding:12px;">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+                            <div style="flex:1; min-width:0;">
+                                <div style="font-weight:800; font-size:16px;">
+                                    {{ read.writerMode === 'create' ? '生成新作品' : '生成下一章' }}
+                                </div>
+                                <div style="font-size:12px; color:rgba(0,0,0,0.65); margin-top:6px;">
+                                    {{ read.writerMode === 'continue' && read.activeWork ? `作品：${read.activeWork.title}` : '选择角色与偏好后生成' }}
+                                </div>
+                            </div>
+                            <div style="display:flex; flex-direction:column; gap:8px; align-items:flex-end;">
+                                <button class="btn-small" @click="read.goExplore" v-if="read.writerMode === 'create'">取消</button>
+                                <button class="btn-small" @click="read.backToDetail" v-else>返回详情</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card" style="padding:12px; display:flex; flex-direction:column; gap:12px;">
+                        <div>
+                            <div style="font-size:12px; color:rgba(0,0,0,0.6); margin-bottom:6px;">
+                                作品标题（Work Title；可留空；续写时默认取原标题）
+                            </div>
+                            <input
+                                v-model="read.writerForm.workTitleText"
+                                placeholder="例如：星夜下的约定"
+                                :disabled="read.writerMode !== 'create'"
+                                style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;"
+                            >
+                        </div>
+
+                        <div>
+                            <div style="font-size:12px; color:rgba(0,0,0,0.6); margin-bottom:6px; margin-top:4px;">
+                                章标题（Chapter Title；可留空则由 AI 生成）
+                            </div>
+                            <input
+                                v-model="read.writerForm.chapterTitleText"
+                                placeholder="例如：在雨里说再见"
+                                style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;"
+                            >
+                        </div>
+
+                        <div>
+                            <div style="font-size:12px; color:rgba(0,0,0,0.6); margin-bottom:6px; margin-top:4px;">
+                                作者的话（Author Notes；可留空）
+                            </div>
+                            <textarea
+                                v-model="read.writerForm.authorNotesText"
+                                placeholder="例如：这章的核心是‘没说出口的那句’。"
+                                rows="3"
+                                style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;"
+                            ></textarea>
+                        </div>
+
+                        <div style="display:flex; gap:10px;">
+                            <div style="flex:1;">
+                                <div style="font-size:12px; color:rgba(0,0,0,0.6); margin-bottom:6px;">角色A</div>
+                                <select v-model="read.writerForm.charAId" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;">
+                                    <option value="__me__">我（当前用户）</option>
+                                    <option v-for="c in characters" :key="c.id" :value="c.id">{{ c.nickname || c.name }}</option>
+                                </select>
+                            </div>
+                            <div style="flex:1;">
+                                <div style="font-size:12px; color:rgba(0,0,0,0.6); margin-bottom:6px;">角色B</div>
+                                <select v-model="read.writerForm.charBId" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;">
+                                    <option value="__me__">我（当前用户）</option>
+                                    <option v-for="c in characters" :key="c.id" :value="c.id">{{ c.nickname || c.name }}</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div style="font-size:12px; color:rgba(0,0,0,0.6); margin-bottom:6px;">配对（可留空自动推断）</div>
+                            <input v-model="read.writerForm.pairingText" placeholder="例如：A x B" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;">
+                        </div>
+
+                        <div>
+                            <div style="font-size:12px; color:rgba(0,0,0,0.6); margin-bottom:6px;">额外标签（Additional Tags；逗号分隔；可留空）</div>
+                            <input v-model="read.writerForm.tagsText" placeholder="例如：校园, 甜文, 误会" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;">
+                        </div>
+
+                        <div>
+                            <div style="font-size:12px; color:rgba(0,0,0,0.6); margin-bottom:6px;">归档警告（Archive Warnings；逗号分隔；可留空）</div>
+                            <input v-model="read.writerForm.archiveWarningsText" placeholder="例如：暴力, 创伤, 自伤（没有就留空）" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;">
+                        </div>
+
+                        <div>
+                            <div style="font-size:12px; color:rgba(0,0,0,0.6); margin-bottom:6px;">作品简介（Work Summary；可留空）</div>
+                            <textarea v-model="read.writerForm.workSummaryText" placeholder="用 2-3 句话说明你想写的核心氛围/冲突/结尾走向（可留空由 AI 推断）" rows="3" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;"></textarea>
+                        </div>
+
+                        <div style="display:flex; gap:10px;">
+                            <div style="flex:1;">
+                                <div style="font-size:12px; color:rgba(0,0,0,0.6); margin-bottom:6px;">世界书（可选）</div>
+                                <select v-model="read.writerForm.worldbookId" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;">
+                                    <option :value="null">不使用世界书</option>
+                                    <option v-for="wb in worldbooks" :key="wb.id" :value="wb.id">{{ wb.name }}</option>
+                                </select>
+                            </div>
+                            <div style="flex:1;">
+                                <div style="font-size:12px; color:rgba(0,0,0,0.6); margin-bottom:6px;">预设（可选）</div>
+                                <select v-model="read.writerForm.presetId" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;">
+                                    <option :value="null">不使用预设</option>
+                                    <option v-for="p in presets" :key="p.id" :value="p.id">{{ p.name }}</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style="display:flex; gap:10px;">
+                            <div style="flex:1;">
+                                <div style="font-size:12px; color:rgba(0,0,0,0.6); margin-bottom:6px;">评级</div>
+                                <input v-model="read.writerForm.ratingText" placeholder="PG-13" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;">
+                            </div>
+                            <div style="flex:1;">
+                                <div style="font-size:12px; color:rgba(0,0,0,0.6); margin-bottom:6px;">字数档位</div>
+                                <select v-model="read.writerForm.lengthPreset" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;">
+                                    <option value="short">短篇</option>
+                                    <option value="medium">中篇</option>
+                                    <option value="long">长篇</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div style="font-size:12px; color:rgba(0,0,0,0.6); margin-bottom:6px;">你的额外 AI 指令（可留空）</div>
+                            <textarea v-model="read.writerForm.userInstruction" placeholder="例如：保持人物语气一致；增加一个误会；结尾留钩子..." rows="4" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;"></textarea>
+                            <div style="font-size:12px; color:rgba(0,0,0,0.55); margin-top:6px;">
+                                当前长度目标：{{ read.lengthHint }}
+                            </div>
+                        </div>
+
+                        <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:4px;">
+                            <button class="btn-small" @click="read.goExplore" type="button">返回探索</button>
+                            <button
+                                class="btn-small primary"
+                                type="button"
+                                @click="read.writerMode === 'create' ? read.generateWorkAndFirstChapter() : read.generateNextChapter()"
+                                :disabled="read.isGenerating"
+                            >
+                                <i class="fas fa-wand-magic-sparkles" style="margin-right:6px;"></i>
+                                {{ read.isGenerating ? '生成中...' : (read.writerMode === 'create' ? '生成作品 + 第一章' : '生成下一章') }}
+                            </button>
+                        </div>
+
+                        <div v-if="read.genError" style="font-size:12px; color:#b00020;">
+                            {{ read.genError }}
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 

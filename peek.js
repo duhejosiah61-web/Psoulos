@@ -37,17 +37,30 @@ const saveState = (state) => {
     }
 };
 
-const samplePhotos = (seedName) => {
-    const q = encodeURIComponent(seedName || 'portrait');
-    return [
-        `https://source.unsplash.com/300x520/?phone,lockscreen,${q}`,
-        `https://source.unsplash.com/300x520/?street,night,${q}`,
-        `https://source.unsplash.com/300x520/?coffee,desk,${q}`,
-        `https://source.unsplash.com/300x520/?city,window,${q}`
-    ];
+const hashToHue = (s) => {
+    const str = String(s || '');
+    let h = 0;
+    for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
+    return h % 360;
 };
 
-export function usePeek(charactersRef, activeProfileRef) {
+const makeMockPhoto = (seed, idx) => {
+    const base = seed || 'portrait';
+    const hue = hashToHue(`${base}_${idx}`);
+    const bgColor = `hsl(${hue}, 55%, 78%)`;
+    const bgColor2 = `hsl(${(hue + 40) % 360}, 55%, 70%)`;
+    const description = `${base}·${['夜景', '咖啡桌', '城市窗', '街灯'][idx % 4]}`;
+    return {
+        id: `mock_${hashToHue(description)}_${idx}`,
+        description,
+        bgColor,
+        bgColor2
+    };
+};
+
+const samplePhotos = (seedName) => [0, 1, 2, 3].map((i) => makeMockPhoto(seedName, i));
+
+export function usePeek(charactersRef, activeProfileRef, soulLinkMessagesRef, soulLinkGroupsRef) {
     const saved = readState();
 
     const peekSelectedCharacterId = ref(saved.peekSelectedCharacterId || '');
@@ -104,6 +117,113 @@ export function usePeek(charactersRef, activeProfileRef) {
     const peekMapTracks = ref([]);
     const peekAiLastGeneratedAt = ref('');
     const peekAiGenerating = ref(false);
+    const PEAK_DIARY_CURSOR_KEY_PREFIX = 'peek_diary_cursor_ts_v1_';
+
+    const getDiaryCursorTs = (charId) => {
+        try {
+            const raw = localStorage.getItem(`${PEAK_DIARY_CURSOR_KEY_PREFIX}${String(charId)}`);
+            const n = Number(raw);
+            return Number.isFinite(n) ? n : 0;
+        } catch {
+            return 0;
+        }
+    };
+
+    const setDiaryCursorTs = (charId, ts) => {
+        try {
+            localStorage.setItem(`${PEAK_DIARY_CURSOR_KEY_PREFIX}${String(charId)}`, String(ts || 0));
+        } catch {
+            // ignore
+        }
+    };
+
+    const formatTs = (ts) => {
+        try {
+            if (!ts) return '';
+            const d = new Date(Number(ts) || 0);
+            return d.toLocaleString('zh-CN', { hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+        } catch {
+            return '';
+        }
+    };
+
+    const getCharDisplayName = (char) => char?.nickname || char?.name || 'TA';
+
+    const formatMessageForDiary = (m, char) => {
+        if (!m) return null;
+        if (m.isSystem || m.sender === 'system' || m.isHidden) return null;
+        if (m.sender !== 'user' && m.sender !== 'ai') return null;
+
+        const roleName = getCharDisplayName(char);
+        const speaker = m.sender === 'user'
+            ? (m.senderName || '用户')
+            : (m.senderName || roleName);
+
+        let content = '';
+        if (typeof m.text === 'string' && m.text.trim()) {
+            content = m.text.trim();
+        } else if (m.messageType === 'transfer') {
+            content = `[转账] ${m.amount ?? ''} ${m.note ? `（${m.note}）` : ''}`.trim();
+        } else if (m.messageType === 'helpBuy') {
+            content = `[帮买请求] ${m.item ?? ''} 价格${m.price ?? ''}`.trim();
+        } else if (m.messageType === 'order') {
+            content = `[订单] ${m.item ?? ''} 价格${m.price ?? ''}`.trim();
+        } else if (m.messageType === 'image') {
+            // 图片统一用“文字假装图”的形式进入日记上下文
+            content = m.text && m.text.trim() && m.text !== '图片'
+                ? `[图片] ${m.text.trim()}`
+                : `[图片]（聊天图片）`;
+        } else if (m.messageType === 'voice') {
+            const t = m.transcription || m.text || '';
+            content = t ? `[语音] ${String(t).trim()}` : '[语音]';
+        } else if (m.messageType === 'textImage') {
+            content = `[文字图] ${m.textImageText || m.text || ''}`.trim();
+        } else {
+            content = '[消息]';
+        }
+
+        const tsNum = Number(m.timestamp ?? 0) || 0;
+        const ts = formatTs(tsNum);
+        const prefix = ts ? `${ts}` : '（时间未知）';
+        return { ts: tsNum, line: `${prefix} ${speaker}: ${content}` };
+    };
+
+    const collectChatSinceDiary = (char, startTs, endTs) => {
+        const roleName = getCharDisplayName(char);
+        const msgsObj = soulLinkMessagesRef?.value || {};
+        const direct = Array.isArray(msgsObj?.[String(char?.id)]) ? msgsObj[String(char.id)] : (Array.isArray(msgsObj?.[char?.id]) ? msgsObj[char.id] : []);
+
+        const fromDirect = direct
+            .filter((m) => (m?.timestamp ?? 0) >= startTs && (m?.timestamp ?? 0) <= endTs)
+            .map((m) => formatMessageForDiary(m, char))
+            .filter(Boolean)
+            .map((x) => x);
+
+        const groups = Array.isArray(soulLinkGroupsRef?.value) ? soulLinkGroupsRef.value : [];
+        const fromGroups = [];
+        for (const g of groups) {
+            const history = Array.isArray(g?.history) ? g.history : [];
+            for (const m of history) {
+                const ts = Number(m?.timestamp ?? 0);
+                if (ts < startTs || ts > endTs) continue;
+                const speakerOk = m?.sender === 'user' || m?.sender === 'ai';
+                if (!speakerOk) continue;
+                // 只保留“用户 + 选中角色”相关消息
+                if (m?.sender === 'ai') {
+                    const sn = m?.senderName || '';
+                    if (!sn || (sn !== roleName && sn !== char?.name && sn !== char?.nickname)) continue;
+                }
+                const line = formatMessageForDiary(m, char);
+                if (line) fromGroups.push(line);
+            }
+        }
+
+        // 合并并按时间排序（line 本身已经包含时间字符串，但我们用 timestamp 排序需要原对象）
+        // 这里用一个简化策略：直接按直聊/群聊顺序追加，然后做一次时间字符串排序
+        const all = [...fromDirect, ...fromGroups].filter(Boolean);
+        all.sort((a, b) => (a.ts || 0) - (b.ts || 0));
+        return all.map((x) => x.line);
+    };
 
     const peekWidgetUnreadCount = computed(() => peekMessages.value.filter((m) => m.app !== '系统提醒').length);
     const peekWidgetFirstNote = computed(() => peekNotes.value[0] || null);
@@ -165,6 +285,36 @@ export function usePeek(charactersRef, activeProfileRef) {
         peekAiGenerating.value = true;
         try {
             const signals = collectLinkedSignals(char);
+            const charId = char?.id;
+            const nowTs = Date.now();
+            const lastCursorTs = getDiaryCursorTs(charId);
+            const chatLines = collectChatSinceDiary(char, lastCursorTs, nowTs);
+            const chatTranscript = (chatLines || []).join('\n');
+            const chatTranscriptForPrompt = chatTranscript.length > 12000
+                ? chatTranscript.slice(chatTranscript.length - 12000)
+                : chatTranscript;
+
+            const mergeById = (existingArr, incomingArr) => {
+                const ex = Array.isArray(existingArr) ? existingArr : [];
+                const inc = Array.isArray(incomingArr) ? incomingArr : [];
+                const exIdSet = new Set(ex.map((e) => String(e?.id)));
+                const exById = new Map(ex.map((e) => [String(e?.id), e]));
+                const newOnes = [];
+                for (const item of inc) {
+                    const id = String(item?.id);
+                    if (!id || id === 'undefined' || id === 'null') continue;
+                    if (exIdSet.has(id)) {
+                        exById.set(id, item);
+                    } else {
+                        newOnes.push(item);
+                        exIdSet.add(id);
+                        exById.set(id, item);
+                    }
+                }
+                const updatedExisting = ex.map((e) => exById.get(String(e?.id)) || e);
+                return [...newOnes, ...updatedExisting];
+            };
+
             let payload = null;
             try {
                 const base = endpoint.replace(/\/+$/, '');
@@ -184,6 +334,17 @@ export function usePeek(charactersRef, activeProfileRef) {
 }
 角色: ${JSON.stringify({ id: char.id, name: char.nickname || char.name || 'TA' })}
 联动数据: ${JSON.stringify(signals)}`;
+                const diaryPromptBlock = `
+上次日记生成时间戳（毫秒）: ${String(lastCursorTs)}
+本次生成时间戳（毫秒）: ${String(nowTs)}
+聊天增量记录（从上次到本次，包含“用户 + 选中角色”）： 
+${chatTranscriptForPrompt || '（无增量聊天内容）'}
+要求：
+1) diaryEntries 只输出“新增日记条目”，不要输出旧条目的重复 id（保证可追加，不要覆盖旧日记）。
+2) 如需提到图片，一律使用文字假装图格式，例如：[图片] 看到了一张夜景。
+3) 日记内容必须基于上面的聊天增量记录生成。
+`;
+                const finalPrompt = prompt + diaryPromptBlock;
                 let completion = null;
                 let lastNon404 = null;
                 for (const url of candidateUrls) {
@@ -199,7 +360,7 @@ export function usePeek(charactersRef, activeProfileRef) {
                             temperature: 0.7,
                             messages: [
                                 { role: 'system', content: '只输出合法 JSON。' },
-                                { role: 'user', content: prompt }
+                                { role: 'user', content: finalPrompt }
                             ]
                         })
                     });
@@ -235,10 +396,26 @@ export function usePeek(charactersRef, activeProfileRef) {
                 alert('生成失败：返回数据格式不正确。');
                 return;
             }
-            peekDiaryEntries.value = Array.isArray(payload.diaryEntries) ? payload.diaryEntries : [];
-            peekBankAccount.value = payload.bankAccount || { balance: 0, monthlySpend: 0, records: [] };
-            peekMapTracks.value = Array.isArray(payload.mapTracks) ? payload.mapTracks : [];
-            peekAiLastGeneratedAt.value = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+
+                // 追加/合并：不覆盖旧内容，生成后“在基础上变多”
+                const incomingDiary = Array.isArray(payload.diaryEntries) ? payload.diaryEntries : [];
+                peekDiaryEntries.value = mergeById(peekDiaryEntries.value, incomingDiary);
+
+                const incomingBank = payload.bankAccount || { balance: null, monthlySpend: null, records: [] };
+                const prevBank = peekBankAccount.value || { balance: 0, monthlySpend: 0, records: [] };
+                const prevRecords = Array.isArray(prevBank.records) ? prevBank.records : [];
+                const incomingRecords = Array.isArray(incomingBank.records) ? incomingBank.records : [];
+                const mergedRecords = mergeById(prevRecords, incomingRecords);
+                peekBankAccount.value = {
+                    balance: typeof incomingBank.balance === 'number' ? incomingBank.balance : prevBank.balance,
+                    monthlySpend: typeof incomingBank.monthlySpend === 'number' ? incomingBank.monthlySpend : prevBank.monthlySpend,
+                    records: mergedRecords
+                };
+
+                peekMapTracks.value = mergeById(peekMapTracks.value, Array.isArray(payload.mapTracks) ? payload.mapTracks : []);
+
+                peekAiLastGeneratedAt.value = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+                setDiaryCursorTs(charId, nowTs);
         } finally {
             peekAiGenerating.value = false;
         }
