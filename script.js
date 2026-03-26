@@ -145,7 +145,9 @@ export function setupApp() {
                 const reader = new FileReader();
                 reader.onload = (ev) => {
                     compressAvatarImage(ev.target.result, 'widgetPhoto', (croppedDataUrl) => {
-                        photoWidgetPhotos.value[index].url = croppedDataUrl;
+                            photoWidgetPhotos.value = photoWidgetPhotos.value.map((p, i) => (
+                                i === index ? { ...p, url: croppedDataUrl } : p
+                            ));
                         try {
                             localStorage.setItem(`photoWidgetPhoto${index}`, croppedDataUrl);
                         } catch (e) {
@@ -1127,7 +1129,7 @@ const saveFont = () => {
         const getImageCropPresetConfig = (preset) => {
             const presetMap = {
                 avatar: { maxWidth: 400, maxHeight: 400, ratio: 1 },           // 头像 / 群头像
-                background: { maxWidth: 1280, maxHeight: 720, ratio: 16 / 9 }, // 聊天背景
+                background: { maxWidth: 1080, maxHeight: 1920, ratio: 9 / 16 }, // 聊天背景（竖屏）
                 chatImage: { maxWidth: 960, maxHeight: 960, ratio: 4 / 3 },    // 聊天图片
                 widgetPhoto: { maxWidth: 560, maxHeight: 840, ratio: 2 / 3 },  // 桌面照片小组件
                 widgetSticker: { maxWidth: 520, maxHeight: 520, ratio: 1 },    // 桌面贴纸小组件
@@ -1135,6 +1137,10 @@ const saveFont = () => {
             };
             return presetMap[preset] || presetMap.avatar;
         };
+        const imageCropCanvasAspect = computed(() => {
+            const ratio = Number(imageCropAspect.value) || 1;
+            return Math.max(0.45, Math.min(1.8, ratio));
+        });
 
         const resetImageCropRect = () => {
             const aspect = imageCropAspect.value;
@@ -1279,8 +1285,10 @@ const saveFont = () => {
                 const canvas = document.createElement('canvas');
                 const presetMap = {
                     avatar: { maxWidth: 400, maxHeight: 400, ratio: 1 },          // 头像/群头像
-                    background: { maxWidth: 1280, maxHeight: 720, ratio: 16 / 9 }, // 聊天背景
+                    background: { maxWidth: 1080, maxHeight: 1920, ratio: 9 / 16 }, // 聊天背景（竖屏）
                     chatImage: { maxWidth: 960, maxHeight: 960, ratio: 4 / 3 },    // 聊天图片
+                    widgetPhoto: { maxWidth: 560, maxHeight: 840, ratio: 2 / 3 },   // 桌面照片小组件
+                    widgetSticker: { maxWidth: 520, maxHeight: 520, ratio: 1 },     // 桌面贴纸小组件
                     free: { maxWidth: 960, maxHeight: 960, ratio: null }           // 不裁剪
                 };
                 const cfg = presetMap[preset] || presetMap.avatar;
@@ -3491,6 +3499,7 @@ const saveFont = () => {
         const activeMessageEnabled = ref(false);
         const activeMessageFrequencyMin = ref(15);
         const activeReplyDelaySec = ref(8);
+        const lastUserActiveAt = ref(Date.now());
         const socialUserBlockedRole = ref(false);
         const socialRoleBlockedUser = ref(false);
         const socialPendingRoleRequest = ref(false);
@@ -3499,8 +3508,8 @@ const saveFont = () => {
         const chatSummaryEveryN = ref(12); // 每N次用户消息自动总结一次
         const chatSummaryGenerating = ref(false);
         const chatSummaryBoard = ref([]); // {id,title,body,createdAt,createdAtText}
-        // 外语翻译（reply / OS 下方横线译文 + AI双语输出约束）
-        // A：主输出语言；B：下方翻译语言（自动识别输入语种）
+        // 外语翻译（reply / OS 下方横线译文）
+        // A：AI主输出语言；B：下方翻译语言
         const soulLinkForeignTranslationEnabled = ref(false);
         const soulLinkForeignPrimaryLang = ref('zh-CN'); // A
         const soulLinkForeignSecondaryLang = ref('en');  // B
@@ -5627,10 +5636,11 @@ ${osForPrompt || ''}`;
                     newMsg.senderAvatar = userAvatar;
                 }
                 pushMessageToActiveChat(newMsg);
+                lastUserActiveAt.value = Date.now();
                 // 用户主动发消息时，暂停角色“主动发消息”的计时
                 clearActiveMessageTimer();
                 maybeRoleBlocksUser();
-                queueRoleReplyAfterUserMessage();
+                scheduleRoleActiveMessage();
                 
                 soulLinkInput.value = '';
                 soulLinkReplyTarget.value = null;
@@ -7386,13 +7396,8 @@ ${osForPrompt || ''}`;
         const getForeignBilingualConstraintPrompt = () => {
             if (!soulLinkForeignTranslationEnabled.value) return '';
             const aValue = String(soulLinkForeignPrimaryLang.value || '').trim() || 'zh-CN';
-            const bValue = String(soulLinkForeignSecondaryLang.value || '').trim() || 'en';
             const aLabel = getTargetLangLabel(aValue);
-            const bLabel = getTargetLangLabel(bValue);
-            if (aValue === bValue) {
-                return `# 语言输出（强制）\n启用外语翻译时，你的所有输出必须使用${aLabel}。\n\n`;
-            }
-            return `# 双语输出（强制，最高优先级）\n无论用户输入什么语种，你的所有输出都必须严格为“两行双语”。\n- 第1行：${aLabel}（A语种）\n- 第2行：${bLabel}（B语种翻译）\n规则：不要添加“翻译/译文/English:”等标签；不要解释；两行含义必须一致。\n重要：在 [REPLY] 与 [OS] 内也必须各自保持“两行双语”，不要把B语种翻译丢到标签外。\n\n`;
+            return `# 语言输出（强制，最高优先级）\n启用外语翻译时，你的所有输出只能使用${aLabel}（A语种）。\n禁止在正文中追加任何B语种/双语重复内容；B语种译文会由系统在气泡下方单独展示。\n在 [REPLY] 与 [OS] 内同样只输出${aLabel}。\n\n`;
         };
         const normalizeUtcOffset = (s) => {
             const m = String(s || '').trim().match(/^UTC([+-])(\d{1,2})(?::?(\d{2}))?$/i);
@@ -7470,7 +7475,13 @@ ${osForPrompt || ''}`;
             const jitter = Math.floor(base * 0.35 * Math.random());
             activeMessageTimer = setTimeout(() => {
                 if (!soulLinkActiveChat.value || socialUserBlockedRole.value || socialRoleBlockedUser.value) return;
-                const hints = ['在吗？', '我刚忙完，想和你聊聊。', '你现在方便回消息吗？', '今天过得怎么样？', '刚想起你了。'];
+                const now = Date.now();
+                const inactiveFor = now - (Number(lastUserActiveAt.value) || 0);
+                if (inactiveFor < base) {
+                    scheduleRoleActiveMessage();
+                    return;
+                }
+                const hints = ['（自言自语）今天突然想到你。', '（自言自语）先记一笔，晚点再聊。', '（自言自语）刚路过一家店，想到你会喜欢。', '（自言自语）这会儿有点安静。'];
                 const text = hints[Math.floor(Math.random() * hints.length)];
                 pushMessageToActiveChat({
                     id: Date.now(),
@@ -7482,19 +7493,7 @@ ${osForPrompt || ''}`;
                 scheduleRoleActiveMessage();
             }, base + jitter);
         };
-        const maybeRoleBlocksUser = () => {
-            if (socialRoleBlockedUser.value || socialUserBlockedRole.value) return;
-            if (Math.random() < 0.02) {
-                socialRoleBlockedUser.value = true;
-                pushMessageToActiveChat({
-                    id: Date.now(),
-                    sender: 'system',
-                    text: '对方暂时把你拉黑了。你可以稍后发送好友申请。',
-                    timestamp: Date.now(),
-                    isSystem: true
-                });
-            }
-        };
+        const maybeRoleBlocksUser = () => {};
         const queueRoleReplyAfterUserMessage = () => {
             clearPendingRoleReplyTimer();
             if (!activeMessageEnabled.value) return;
@@ -10039,6 +10038,7 @@ ${styleGuide}
             if (soulLinkInput.value && soulLinkInput.value.trim()) {
                 sendSoulLinkMessage();
             } else {
+                lastUserActiveAt.value = Date.now();
                 triggerSoulLinkAiReply();
             }
             maybeRoleSendsFriendRequest();
@@ -10550,7 +10550,7 @@ ${styleGuide}
             showSharePanel, shareSource, shareContent, shareSources, sendShareCard,
             showPhotoSelectPanel, showTextImagePanel, textImageText, textImageBgColor, textImageColors,
             showVoiceInputPanel, voiceInputText, sendVoiceMessage, closeVoiceInputPanel, toggleVoicePlayback, onChatBackgroundClick,
-            enableManualImageCrop, showImageCropModal, imageCropSource, imageCropRect, imageCropScale,
+            enableManualImageCrop, showImageCropModal, imageCropSource, imageCropRect, imageCropScale, imageCropCanvasAspect,
             closeImageCropModal, confirmImageCrop, onImageCropDragStart, onImageCropScaleChange,
             // App Launch
             openApp, closeApp, goBack, openGame, joinGame, startGameSession, castVote, endDay, closeGame, getAppIcon,
@@ -10804,6 +10804,7 @@ ${styleGuide}
             imageCropSource: ref(''),
             imageCropRect: ref({ x: 0.1, y: 0.1, w: 0.8, h: 0.8 }),
             imageCropScale: ref(0.82),
+            imageCropCanvasAspect: computed(() => 1),
             closeImageCropModal: noop,
             confirmImageCrop: noop,
             onImageCropDragStart: noop,

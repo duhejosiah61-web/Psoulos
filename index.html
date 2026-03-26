@@ -1817,7 +1817,7 @@
         <div v-if="showImageCropModal" class="modal-overlay" @click.self="closeImageCropModal">
             <div class="art-savearchive-panel" style="max-width: 420px;">
                 <h3 style="margin:0 0 10px 0;">裁剪图片</h3>
-                <div class="image-cropper-canvas" style="position:relative; width:100%; aspect-ratio: 1/1; background:#111; border-radius:12px; overflow:hidden; touch-action:none;">
+                <div class="image-cropper-canvas" :style="{ position:'relative', width:'100%', aspectRatio: String(imageCropCanvasAspect), background:'#111', borderRadius:'12px', overflow:'hidden', touchAction:'none' }">
                     <img :src="imageCropSource" style="width:100%; height:100%; object-fit:contain; display:block; user-select:none; pointer-events:none;">
                     <div
                         :style="{ position:'absolute', left:(imageCropRect.x*100)+'%', top:(imageCropRect.y*100)+'%', width:(imageCropRect.w*100)+'%', height:(imageCropRect.h*100)+'%', border:'2px solid #fff', boxShadow:'0 0 0 9999px rgba(0,0,0,.35)', borderRadius:'10px', cursor:'move' }"
@@ -3557,24 +3557,34 @@
 
         <!-- Read App -->
         <div v-else-if="openedApp === 'read'" class="app-view read-app">
-            <div class="app-header">
+            <div class="app-header read-header">
                 <button class="back-btn" @click="read.view === 'explore' ? closeApp() : read.goExplore()"><i class="fas fa-chevron-left"></i></button>
-                <span class="app-title">Read</span>
-                <div style="display:flex; gap:8px; align-items:center; justify-content:flex-end; width: 40px;">
+                <div class="read-header-center">
+                    <span class="app-title">Read</span>
+                    <div class="read-top-tabs">
+                        <button class="read-top-tab" :class="{ active: read.view === 'explore' }" @click="read.goExplore()">探索</button>
+                        <button class="read-top-tab" :class="{ active: read.view === 'detail' }" @click="read.activeWorkId && (read.view = 'detail')" :disabled="!read.activeWorkId">作品</button>
+                        <button class="read-top-tab" :class="{ active: read.view === 'writer' }" @click="read.openWriterCreate()">创作</button>
+                    </div>
+                </div>
+                <div class="read-header-right">
+                    <div class="read-api-status" :title="activeProfile && activeProfile.endpoint && activeProfile.key ? 'AI 已配置' : 'AI 未配置'">
+                        <span :class="['read-api-dot', activeProfile && activeProfile.endpoint && activeProfile.key ? 'ok' : 'bad']"></span>
+                    </div>
                     <button class="btn-small" @click="read.openWriterCreate" title="生成新作品"><i class="fas fa-pen-nib"></i></button>
                 </div>
             </div>
 
-            <div class="app-content" style="flex:1; overflow-y:auto; padding:12px;">
+            <div class="app-content read-content">
                 <!-- Explore -->
-                <div v-if="read.view === 'explore'" style="display:flex; flex-direction:column; gap:12px;">
-                    <div class="card" style="padding:12px;">
-                        <div style="display:flex; gap:10px; align-items:center;">
+                <div v-if="read.view === 'explore'" class="read-view read-view-explore">
+                    <div class="card read-card">
+                        <div class="read-search-row">
                             <i class="fas fa-search" style="opacity:0.7;"></i>
                             <input
                                 v-model="read.searchQuery"
                                 placeholder="搜索作品标题/标签/简介..."
-                                style="flex:1; border:1px solid rgba(0,0,0,0.12); border-radius:10px; padding:10px; outline:none;"
+                                class="read-input"
                             />
                             <button class="btn-small" @click="read.searchQuery=''">清空</button>
                         </div>
@@ -3584,11 +3594,11 @@
                     </div>
 
                 <!-- AO3 Tag Filters -->
-                <div class="card" style="padding:12px;">
+                <div class="card read-card">
                     <div style="font-weight:700; margin-bottom:8px;">筛选（AO3：警告 & 额外标签，AND 逻辑）</div>
 
                     <div style="font-size:12px; font-weight:700; margin:6px 0 8px;">归档警告（Archive Warnings）</div>
-                    <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                    <div class="read-chip-wrap">
                         <button
                             v-for="t in read.allWarningTags"
                             :key="'w_'+t.tag"
@@ -3607,7 +3617,7 @@
                     </div>
 
                     <div style="font-size:12px; font-weight:700; margin:12px 0 8px;">额外标签（Additional Tags）</div>
-                    <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                    <div class="read-chip-wrap">
                         <button
                             v-for="t in read.allAdditionalTags"
                             :key="'t_'+t.tag"
@@ -3635,8 +3645,8 @@
                         <p>还没有作品。点击右上角按钮生成第一部同人文。</p>
                     </div>
 
-                    <div v-else style="display:flex; flex-direction:column; gap:12px;">
-                        <div v-for="w in read.filteredWorks" :key="w.id" class="card" style="padding:12px;">
+                    <div v-else class="read-works-grid">
+                        <div v-for="w in read.filteredWorks" :key="w.id" class="card read-card read-work-card">
                             <div style="display:flex; justify-content:space-between; gap:12px;">
                                 <div style="flex:1; min-width:0;">
                                     <div class="read-title" style="font-weight:700; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
@@ -3680,8 +3690,8 @@
                 </div>
 
                 <!-- Detail -->
-                <div v-else-if="read.view === 'detail'" style="display:flex; flex-direction:column; gap:12px;">
-                    <div class="card" style="padding:12px;">
+                <div v-else-if="read.view === 'detail'" class="read-view read-view-detail">
+                    <div class="card read-card">
                         <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start;">
                             <div style="flex:1; min-width:0;">
                                 <div class="read-title" style="font-weight:800; font-size:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
@@ -3735,7 +3745,7 @@
                         </div>
                     </div>
 
-                    <div class="card" style="padding:12px;">
+                    <div class="card read-card">
                         <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px;">
                             <div style="font-weight:700;">章节列表</div>
                             <div style="font-size:12px; color:rgba(0,0,0,0.6);">
@@ -3743,7 +3753,7 @@
                             </div>
                         </div>
                         <div style="display:flex; flex-direction:column; gap:10px;">
-                            <div v-for="ch in read.activeChaptersSorted" :key="ch.id" class="card" style="padding:10px; background:rgba(0,0,0,0.02);">
+                            <div v-for="ch in read.activeChaptersSorted" :key="ch.id" class="card read-chapter-item">
                                 <div style="display:flex; justify-content:space-between; gap:10px; align-items:flex-start;">
                                     <div style="flex:1; min-width:0;">
                                         <div style="font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
@@ -3763,7 +3773,7 @@
                     </div>
 
                     <!-- Comments -->
-                    <div class="card" style="padding:12px;">
+                    <div class="card read-card">
                         <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px;">
                             <div style="font-weight:700;">
                                 留言区
@@ -3833,8 +3843,8 @@
                 </div>
 
                 <!-- Reader -->
-                <div v-else-if="read.view === 'reader'" style="display:flex; flex-direction:column; gap:12px; flex:1;">
-                    <div class="card" style="padding:12px;">
+                <div v-else-if="read.view === 'reader'" class="read-view read-view-reader">
+                    <div class="card read-card">
                         <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
                             <div style="flex:1; min-width:0;">
                                 <div style="font-weight:800; font-size:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
@@ -3860,7 +3870,7 @@
                         </div>
                     </div>
 
-                    <div class="card" style="padding:12px; flex:1; overflow-y:auto;">
+                    <div class="card read-card read-reader-body-wrap">
                         <div v-if="!read.activeChapter" style="font-size:13px; color:rgba(0,0,0,0.6);">
                             暂无内容。
                         </div>
@@ -3874,7 +3884,7 @@
                         </div>
                     </div>
 
-                    <div style="display:flex; justify-content:space-between; gap:10px;">
+                    <div class="read-reader-nav">
                         <button class="btn-small" @click="read.goPrevChapter" :disabled="!read.activeChapterId">
                             上一章
                         </button>
@@ -3885,8 +3895,8 @@
                 </div>
 
                 <!-- Writer -->
-                <div v-else-if="read.view === 'writer'" style="display:flex; flex-direction:column; gap:12px; flex:1;">
-                    <div class="card" style="padding:12px;">
+                <div v-else-if="read.view === 'writer'" class="read-view read-view-writer">
+                    <div class="card read-card">
                         <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
                             <div style="flex:1; min-width:0;">
                                 <div style="font-weight:800; font-size:16px;">
@@ -3903,7 +3913,7 @@
                         </div>
                     </div>
 
-                    <div class="card" style="padding:12px; display:flex; flex-direction:column; gap:12px;">
+                    <div class="card read-card read-writer-form">
                         <div>
                             <div style="font-size:12px; color:rgba(0,0,0,0.6); margin-bottom:6px;">
                                 作品标题（Work Title；可留空；续写时默认取原标题）

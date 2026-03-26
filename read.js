@@ -112,10 +112,13 @@ async function callChatCompletions(activeProfileRef, systemPrompt, userPrompt, e
   for (const url of candidateUrls) {
     try {
       const data = await fetchJson(url, body, headers);
+      const msgContent = data?.choices?.[0]?.message?.content;
       const content =
-        data?.choices?.[0]?.message?.content ||
+        (typeof msgContent === 'string' ? msgContent : Array.isArray(msgContent) ? msgContent.map((x) => x?.text || '').join('') : '') ||
         data?.choices?.[0]?.delta?.content ||
         data?.message?.content ||
+        data?.output_text ||
+        data?.text ||
         '';
       return String(content || '');
     } catch (e) {
@@ -212,6 +215,10 @@ function formatTime(iso) {
   } catch {
     return '';
   }
+}
+
+function stripMarkdownFences(text) {
+  return String(text || '').replace(/```json\s*/gi, '').replace(/```/g, '').trim();
 }
 
 export function useRead(charactersRef, worldbooksRef, presetsRef, activeProfileRef) {
@@ -510,7 +517,9 @@ ${latestTail || '（无）'}
       const raw = await callChatCompletions(activeProfileRef, systemPrompt, userPrompt, { temperature: 0.9, max_tokens: 500 });
       const parsed = safeJsonParse(raw) || {};
       const author = String(parsed.author || '匿名读者').trim().slice(0, 20) || '匿名读者';
-      const content = String(parsed.content || '').trim();
+      let content = String(parsed.content || '').trim();
+      // 兼容部分模型返回纯文本而非 JSON 的情况
+      if (!content) content = stripMarkdownFences(raw);
       if (!content) throw new Error('AI 未返回有效留言内容');
 
       const record = {
@@ -1042,7 +1051,31 @@ ${presetText || '(无)'}
 }`;
 
       const content = await callChatCompletions(activeProfileRef, systemPrompt, userPrompt, { temperature: 0.85, max_tokens: 2600 });
-      const parsed = safeJsonParse(content);
+      let parsed = safeJsonParse(content);
+      // 兼容：模型直接返回正文文本时，兜底转成可保存结构
+      if (!parsed?.work || !parsed?.chapter) {
+        const fallbackText = stripMarkdownFences(content);
+        if (fallbackText && fallbackText.length >= 80) {
+          parsed = {
+            work: {
+              title: writerForm.workTitleText?.trim() || '未命名作品',
+              pairing: writerForm.pairingText?.trim() || '',
+              rating: writerForm.ratingText || 'PG-13',
+              archiveWarnings: parseTags(writerForm.archiveWarningsText),
+              additionalTags: parseTags(writerForm.tagsText),
+              status: 'ongoing',
+              summary: writerForm.workSummaryText?.trim() || '',
+            },
+            chapter: {
+              chapterIndex: 1,
+              title: writerForm.chapterTitleText?.trim() || '第一章',
+              summary: '',
+              authorNotes: writerForm.authorNotesText?.trim() || '',
+              content: fallbackText,
+            },
+          };
+        }
+      }
       if (!parsed?.work || !parsed?.chapter) throw new Error('AI 返回的 JSON 结构不正确');
       const chapterText = pickChapterContent(parsed.chapter);
       if (!chapterText || !chapterText.trim() || chapterText.trim().length < 80) {
@@ -1181,7 +1214,22 @@ ${lengthHint.value}
 }`;
 
       const content = await callChatCompletions(activeProfileRef, systemPrompt, userPrompt, { temperature: 0.85, max_tokens: 2600 });
-      const parsed = safeJsonParse(content);
+      let parsed = safeJsonParse(content);
+      // 兼容：模型直接返回正文文本时，兜底保存为下一章
+      if (!parsed?.chapter) {
+        const fallbackText = stripMarkdownFences(content);
+        if (fallbackText && fallbackText.length >= 80) {
+          parsed = {
+            chapter: {
+              chapterIndex: nextIndex,
+              title: writerForm.chapterTitleText?.trim() || `第${nextIndex}章`,
+              summary: '',
+              authorNotes: writerForm.authorNotesText?.trim() || '',
+              content: fallbackText,
+            },
+          };
+        }
+      }
       if (!parsed?.chapter) throw new Error('AI 返回的 JSON 结构不正确');
       const chapterText = pickChapterContent(parsed.chapter);
       if (!chapterText || !chapterText.trim() || chapterText.trim().length < 80) {

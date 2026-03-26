@@ -37,6 +37,25 @@ const saveState = (state) => {
     }
 };
 
+const getPeekCharDataKey = (charId) => `peek_char_data_v1_${String(charId || '')}`;
+const readPeekCharData = (charId) => {
+    if (!charId) return null;
+    try {
+        const raw = localStorage.getItem(getPeekCharDataKey(charId));
+        return raw ? JSON.parse(raw) : null;
+    } catch {
+        return null;
+    }
+};
+const savePeekCharData = (charId, data) => {
+    if (!charId) return;
+    try {
+        localStorage.setItem(getPeekCharDataKey(charId), JSON.stringify(data || {}));
+    } catch {
+        // ignore storage failures
+    }
+};
+
 const hashToHue = (s) => {
     const str = String(s || '');
     let h = 0;
@@ -422,6 +441,24 @@ ${chatTranscriptForPrompt || '（无增量聊天内容）'}
     };
 
     const rebuildCharacterData = (char) => {
+        const charId = String(char?.id || '');
+        const cached = readPeekCharData(charId);
+        if (cached && typeof cached === 'object') {
+            peekMessages.value = Array.isArray(cached.peekMessages) ? cached.peekMessages : [];
+            peekCalls.value = Array.isArray(cached.peekCalls) ? cached.peekCalls : [];
+            peekNotes.value = Array.isArray(cached.peekNotes) ? cached.peekNotes : [];
+            peekPhotos.value = Array.isArray(cached.peekPhotos) ? cached.peekPhotos : [];
+            peekFiles.value = Array.isArray(cached.peekFiles) ? cached.peekFiles : [];
+            peekBrowserHistory.value = Array.isArray(cached.peekBrowserHistory) ? cached.peekBrowserHistory : [];
+            peekDiaryEntries.value = Array.isArray(cached.peekDiaryEntries) ? cached.peekDiaryEntries : [];
+            peekBankAccount.value = cached.peekBankAccount && typeof cached.peekBankAccount === 'object'
+                ? cached.peekBankAccount
+                : { balance: 0, monthlySpend: 0, records: [] };
+            peekMapTracks.value = Array.isArray(cached.peekMapTracks) ? cached.peekMapTracks : [];
+            peekAiLastGeneratedAt.value = String(cached.peekAiLastGeneratedAt || '');
+            return;
+        }
+
         const charName = char?.nickname || char?.name || 'TA';
         peekMessages.value = [
             { id: Date.now() + 1, app: 'SoulLink', text: `今晚见吗？`, at: '22:16' },
@@ -446,6 +483,10 @@ ${chatTranscriptForPrompt || '（无增量聊天内容）'}
             { id: Date.now() + 11, title: '如何快速入睡', url: 'example.com/sleep' },
             { id: Date.now() + 12, title: '附近咖啡店', url: 'example.com/coffee' }
         ];
+        peekDiaryEntries.value = [];
+        peekBankAccount.value = { balance: 0, monthlySpend: 0, records: [] };
+        peekMapTracks.value = [];
+        peekAiLastGeneratedAt.value = '';
     };
 
     const selectPeekCharacter = (id) => {
@@ -478,6 +519,39 @@ ${chatTranscriptForPrompt || '（无增量聊天内容）'}
     watch(peekSelectedCharacter, (char) => {
         if (char) rebuildCharacterData(char);
     }, { immediate: true });
+
+    watch(
+        [
+            peekSelectedCharacterId,
+            peekMessages,
+            peekCalls,
+            peekNotes,
+            peekPhotos,
+            peekFiles,
+            peekBrowserHistory,
+            peekDiaryEntries,
+            peekBankAccount,
+            peekMapTracks,
+            peekAiLastGeneratedAt
+        ],
+        () => {
+            const charId = String(peekSelectedCharacterId.value || '');
+            if (!charId) return;
+            savePeekCharData(charId, {
+                peekMessages: peekMessages.value,
+                peekCalls: peekCalls.value,
+                peekNotes: peekNotes.value,
+                peekPhotos: peekPhotos.value,
+                peekFiles: peekFiles.value,
+                peekBrowserHistory: peekBrowserHistory.value,
+                peekDiaryEntries: peekDiaryEntries.value,
+                peekBankAccount: peekBankAccount.value,
+                peekMapTracks: peekMapTracks.value,
+                peekAiLastGeneratedAt: peekAiLastGeneratedAt.value
+            });
+        },
+        { deep: true }
+    );
 
     watch([peekSelectedCharacterId, peekDark], () => {
         saveState({
