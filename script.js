@@ -31,6 +31,19 @@ export function setupApp() {
     const currentPage = ref(0);
     const homePages = ref(null);
   
+    // 这些核心状态会在 mounted 初始化链路中被引用，
+    // 需要尽早初始化，避免 setup 中途异常导致 TDZ 报错。
+    const soulLinkGroups = ref([]);
+    const soulLinkPet = ref({
+        name: 'PIXEL PET',
+        emoji: '🐾',
+        energy: 80,
+        hunger: 20,
+        mood: 70,
+        lastTick: Date.now()
+    });
+    const userAvatar = ref('');
+
     
     // 照片小组件
     const photoWidgetDate = ref({
@@ -2923,7 +2936,7 @@ const saveFont = () => {
             }
         };
         
-        const loadChatOfflineModes = () => {
+        function loadChatOfflineModes() {
             try {
                 const saved = localStorage.getItem('soulos_chat_offline_modes');
                 if (saved) {
@@ -2933,7 +2946,7 @@ const saveFont = () => {
                 console.error('Failed to load chat offline modes:', e);
                 chatOfflineModes.value = {};
             }
-        };
+        }
 
         // Initialize App Hooks with Dependencies
         const mate = reactive(useMate(soulLinkMessages, characters, activeProfile));
@@ -3463,15 +3476,7 @@ const saveFont = () => {
             }
         } catch { /* ignore */ }
 
-        const soulLinkGroups = ref([]);
-        const soulLinkPet = ref({
-            name: 'PIXEL PET',
-            emoji: '🐾',
-            energy: 80,
-            hunger: 20,
-            mood: 70,
-            lastTick: Date.now()
-        });
+        // soulLinkGroups / soulLinkPet moved to top-level init
         const showEmojiPanel = ref(false);
         const showAttachmentPanel = ref(false);
         const showImageSubmenu = ref(false);
@@ -3983,7 +3988,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
             a.click();
             URL.revokeObjectURL(url);
         };
-        const loadSoulLinkMessages = async () => {
+        async function loadSoulLinkMessages() {
             try {
                 const saved = await dbGet('soulLinkMessages', 'messages');
                 if (saved && saved.data) {
@@ -4002,7 +4007,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                 console.error('Failed to save SoulLink groups:', e);
             }
         };
-        const loadSoulLinkGroups = async () => {
+        async function loadSoulLinkGroups() {
             try {
                 const saved = await dbGet('soulLinkGroups', 'groups');
                 if (saved && saved.data) {
@@ -4030,7 +4035,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                 console.error('Failed to save SoulLink pet:', e);
             }
         };
-        const loadSoulLinkPet = () => {
+        function loadSoulLinkPet() {
             try {
                 const saved = localStorage.getItem('soulos_soullink_pet');
                 if (saved) {
@@ -4727,7 +4732,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
             }
         };
 
-        const loadArchivedChats = async () => {
+        async function loadArchivedChats() {
             try {
                 const saved = await dbGet('archivedChats', 'archives');
                 if (saved && saved.data) {
@@ -4737,7 +4742,7 @@ OK！ https://i.postimg.cc/FFpY1RBG/IMG-4714.gif
                 console.error('Failed to load archived chats:', e);
                 archivedChats.value = [];
             }
-        };
+        }
 
         const archiveCurrentChat = () => {
             if (!soulLinkActiveChat.value || !archiveName.value.trim()) return;
@@ -7282,7 +7287,7 @@ ${osForPrompt || ''}`;
         const userIdentity = ref('');
         const userRelation = ref('');
         const userPronoun = ref('unknown');
-        const userAvatar = ref('');
+        // userAvatar moved to top-level init
         const bubbleStyle = ref('default');
         const customBubbleCSS = ref('');
         const showChatMenu = ref(false);
@@ -7874,7 +7879,7 @@ ${JSON.stringify((newMessages || []).slice(-60).map((m) => ({
             
             showChatSettings.value = false;
         };
-        const loadChatMenuSettings = () => {
+        function loadChatMenuSettings() {
             if (!soulLinkActiveChat.value) return;
             
             // 加载当前角色的设置
