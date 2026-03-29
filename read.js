@@ -223,7 +223,7 @@ function stripMarkdownFences(text) {
 
 export function useRead(charactersRef, worldbooksRef, presetsRef, activeProfileRef) {
   const dbRef = ref(null);
-  const view = ref('explore'); // explore | detail | reader | writer
+  const view = ref('explore'); // explore | detail | reader | writer | settings
 
   // Core stores
   const works = ref([]);
@@ -231,6 +231,157 @@ export function useRead(charactersRef, worldbooksRef, presetsRef, activeProfileR
   const bookmarks = ref([]);
   const kudos = ref([]);
   const comments = ref([]);
+
+  const DEFAULT_READ_BG_URL = 'https://img.heliar.top/file/1774796711944_1774796692918.png';
+  const LS_READ_BG = 'readApp.readerBackgroundUrl';
+  const LS_READ_PREFS = 'readApp.readerPrefs.v1';
+
+  const readerBackgroundUrl = ref(DEFAULT_READ_BG_URL);
+  const readerPrefs = reactive({
+    fontSize: 24,
+    lineHeight: 1.95,
+    contentWidth: 760,
+    overlayOpacity: 0.55,
+    textColor: '#1f2933',
+    fontFamily: 'retro-cursive', // retro-cursive | kaiti | fangsong | serif
+  });
+  const readerFontOptions = [
+    { value: 'retro-cursive', label: '复古手写（默认）' },
+    { value: 'kaiti', label: '楷体' },
+    { value: 'fangsong', label: '仿宋' },
+    { value: 'serif', label: '宋体衬线' },
+  ];
+
+  const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
+
+  const loadReaderBackgroundFromStorage = () => {
+    try {
+      const s = localStorage.getItem(LS_READ_BG);
+      if (s && String(s).trim()) readerBackgroundUrl.value = String(s).trim();
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const saveReaderBackground = () => {
+    let u = String(readerBackgroundUrl.value || '').trim();
+    if (!u) {
+      readerBackgroundUrl.value = DEFAULT_READ_BG_URL;
+      u = DEFAULT_READ_BG_URL;
+    }
+    try {
+      if (u === DEFAULT_READ_BG_URL) {
+        localStorage.removeItem(LS_READ_BG);
+      } else {
+        localStorage.setItem(LS_READ_BG, u);
+      }
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const resetReaderBackground = () => {
+    readerBackgroundUrl.value = DEFAULT_READ_BG_URL;
+    try {
+      localStorage.removeItem(LS_READ_BG);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const loadReaderPrefsFromStorage = () => {
+    try {
+      const raw = localStorage.getItem(LS_READ_PREFS);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return;
+      if (typeof parsed.fontSize === 'number') readerPrefs.fontSize = clamp(parsed.fontSize, 14, 40);
+      if (typeof parsed.lineHeight === 'number') readerPrefs.lineHeight = clamp(parsed.lineHeight, 1.3, 2.6);
+      if (typeof parsed.contentWidth === 'number') readerPrefs.contentWidth = clamp(parsed.contentWidth, 520, 1100);
+      if (typeof parsed.overlayOpacity === 'number') readerPrefs.overlayOpacity = clamp(parsed.overlayOpacity, 0, 0.9);
+      if (typeof parsed.textColor === 'string' && /^#[0-9a-fA-F]{6}$/.test(parsed.textColor)) {
+        readerPrefs.textColor = parsed.textColor;
+      }
+      if (typeof parsed.fontFamily === 'string') {
+        const ok = readerFontOptions.some((x) => x.value === parsed.fontFamily);
+        if (ok) readerPrefs.fontFamily = parsed.fontFamily;
+      }
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const saveReaderPrefs = () => {
+    readerPrefs.fontSize = clamp(Number(readerPrefs.fontSize) || 24, 14, 40);
+    readerPrefs.lineHeight = clamp(Number(readerPrefs.lineHeight) || 1.95, 1.3, 2.6);
+    readerPrefs.contentWidth = clamp(Number(readerPrefs.contentWidth) || 760, 520, 1100);
+    readerPrefs.overlayOpacity = clamp(Number(readerPrefs.overlayOpacity) || 0, 0, 0.9);
+    if (!/^#[0-9a-fA-F]{6}$/.test(String(readerPrefs.textColor || ''))) readerPrefs.textColor = '#1f2933';
+    const payload = {
+      fontSize: readerPrefs.fontSize,
+      lineHeight: readerPrefs.lineHeight,
+      contentWidth: readerPrefs.contentWidth,
+      overlayOpacity: readerPrefs.overlayOpacity,
+      textColor: readerPrefs.textColor,
+      fontFamily: readerPrefs.fontFamily,
+    };
+    try {
+      localStorage.setItem(LS_READ_PREFS, JSON.stringify(payload));
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const resetReaderPrefs = () => {
+    readerPrefs.fontSize = 24;
+    readerPrefs.lineHeight = 1.95;
+    readerPrefs.contentWidth = 760;
+    readerPrefs.overlayOpacity = 0.55;
+    readerPrefs.textColor = '#1f2933';
+    readerPrefs.fontFamily = 'retro-cursive';
+    try {
+      localStorage.removeItem(LS_READ_PREFS);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const readerBodyStyle = computed(() => {
+    const familyMap = {
+      'retro-cursive': "'Long Cang', 'ZCOOL XiaoWei', 'KaiTi', 'STKaiti', 'FangSong', 'SimSun', serif",
+      kaiti: "'KaiTi', 'STKaiti', 'Kaiti SC', serif",
+      fangsong: "'FangSong', 'STFangsong', 'Songti SC', serif",
+      serif: "'Noto Serif SC', 'Songti SC', 'SimSun', serif",
+    };
+    return {
+      fontFamily: familyMap[readerPrefs.fontFamily] || familyMap['retro-cursive'],
+      fontSize: `${readerPrefs.fontSize}px`,
+      lineHeight: `${readerPrefs.lineHeight}`,
+      maxWidth: `${readerPrefs.contentWidth}px`,
+      color: readerPrefs.textColor,
+    };
+  });
+  const readerPreviewText = computed(
+    () =>
+      `第118章 要账（八更）\n\n` +
+      `容斩这几天的日子，的确不好过。\n` +
+      `子嗣相残、争权夺利，本就是帝王最忌讳的事情之一。\n` +
+      `他当然知道这是皇室不可避免的斗争，但没想到最先动手的居然是容斩。`,
+  );
+
+  const readAppBackgroundStyle = computed(() => {
+    const url = String(readerBackgroundUrl.value || '').trim() || DEFAULT_READ_BG_URL;
+    const safe = JSON.stringify(url);
+    const overlay = clamp(Number(readerPrefs.overlayOpacity) || 0, 0, 0.9);
+    return {
+      backgroundColor: 'transparent',
+      backgroundImage: `linear-gradient(rgba(243,243,246,${overlay}), rgba(243,243,246,${overlay})), url(${safe})`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat',
+      backgroundAttachment: 'fixed',
+    };
+  });
 
   // Explore UI
   const searchQuery = ref('');
@@ -616,6 +767,10 @@ ${latestTail || '（无）'}
     replyInput.value = '';
     newCommentInput.value = '';
     view.value = 'explore';
+  };
+
+  const openSettings = () => {
+    view.value = 'settings';
   };
 
   const openWriterCreate = () => {
@@ -1282,7 +1437,15 @@ ${lengthHint.value}
     }
   };
 
+  loadReaderBackgroundFromStorage();
+  loadReaderPrefsFromStorage();
   onMounted(() => init());
+
+  watch(
+    () => [readerPrefs.fontSize, readerPrefs.lineHeight, readerPrefs.contentWidth, readerPrefs.overlayOpacity, readerPrefs.textColor, readerPrefs.fontFamily],
+    () => saveReaderPrefs(),
+    { deep: false },
+  );
 
   watch(works, (list) => {
     if (activeWorkId.value && !list.some((w) => String(w.id) === String(activeWorkId.value))) {
@@ -1310,6 +1473,18 @@ ${lengthHint.value}
     activeChapter,
     searchQuery,
 
+    readerBackgroundUrl,
+    readerPrefs,
+    readerFontOptions,
+    readerPreviewText,
+    saveReaderBackground,
+    resetReaderBackground,
+    saveReaderPrefs,
+    resetReaderPrefs,
+    readAppBackgroundStyle,
+    readerBodyStyle,
+    defaultReadBgUrl: DEFAULT_READ_BG_URL,
+
     // writer
     writerMode,
     writerForm,
@@ -1328,6 +1503,7 @@ ${lengthHint.value}
     goPrevChapter,
     goNextChapter,
     goExplore,
+    openSettings,
 
     // community
     isBookmarked,

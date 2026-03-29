@@ -13,7 +13,8 @@
     <title>简约手机</title>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@400;500;600&family=Caveat:wght@400;500;600&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Long+Cang&family=ZCOOL+XiaoWei&family=Playfair+Display:wght@400;600;700;800&family=Inter:wght@400;500;600&family=Caveat:wght@400;500;600&display=swap">
+    <link rel="stylesheet" href="assets/main.css">
     <link rel="stylesheet" href="style.css">
     
     <script type="importmap">
@@ -102,8 +103,8 @@
         
         <!-- 顶部状态栏 -->
         <div v-if="!enableHideStatusBar" class="status-bar">
-            <span :style="{ color: homeTextColorInput || homeTextColor || '#000000' }">{{ currentTime }}</span>
-            <div class="status-right" :style="{ color: homeTextColorInput || homeTextColor || '#000000' }">
+            <span>{{ currentTime }}</span>
+            <div class="status-right">
                 <i class="fa fa-signal"></i>
                 <i class="fa fa-wifi"></i>
                 <i class="fa fa-battery-full"></i>
@@ -152,6 +153,13 @@
                                     </div>
                                     <div v-else class="left-peek-phone-wrap">
                                         <div class="left-peek-phone-frame">
+                                            <div class="left-peek-side-buttons left">
+                                                <span class="side-btn volume-up"></span>
+                                                <span class="side-btn volume-down"></span>
+                                            </div>
+                                            <div class="left-peek-side-buttons right">
+                                                <span class="side-btn power"></span>
+                                            </div>
                                             <div class="left-peek-notch"></div>
                                             <div class="left-peek-screen peek-phone-screen" :class="{ dark: peek.peekDark }">
                                                 <div v-if="peek.peekLocked" class="peek-lockscreen" :style="{ backgroundImage: 'url(' + (peek.peekSelectedCharacter?.avatarUrl || 'https://placehold.co/400x800?text=Wallpaper') + ')' }" @click="peek.unlockPeek">
@@ -161,7 +169,7 @@
                                                     </div>
                                                     <div class="peek-lockscreen-time">{{ peek.peekStatusTime }}</div>
                                                     <div class="peek-lockscreen-date">{{ peek.peekWidgetDate }}</div>
-                                                    <div class="peek-lockscreen-hint"><i class="fas fa-lock-open"></i> 点击解锁</div>
+                                                    <div class="peek-lockscreen-hint"><i class="fas fa-chevron-up"></i> 上滑解锁</div>
                                                     <div class="peek-lockscreen-quick">
                                                         <div class="peek-lockscreen-quick-item"><i class="fas fa-flashlight"></i></div>
                                                         <div class="peek-lockscreen-quick-item"><i class="fas fa-camera"></i></div>
@@ -174,50 +182,45 @@
                                                     </div>
                                                     <template v-if="peek.peekInnerApp === 'home'">
                                                         <div class="peek-home-content">
-                                                            <div class="peek-widget-row peek-widget-top">
+                                                            <div class="peek-home-headline">
+                                                                <div class="peek-widget-date">{{ peek.peekWidgetDate }}</div>
                                                                 <div class="peek-widget-greeting">{{ peek.peekWidgetGreeting }}，{{ peek.peekSelectedCharacter?.nickname || peek.peekSelectedCharacter?.name || '你' }}</div>
-                                                                <div class="peek-widget-meta">
-                                                                    <span class="peek-widget-date">{{ peek.peekWidgetDate }}</span>
-                                                                    <span class="peek-widget-weather"><i class="fas fa-sun"></i> {{ peek.peekWidgetWeather }}</span>
-                                                                </div>
                                                             </div>
-                                                            <div class="peek-widget-row peek-widget-photos" @click="peek.openPeekInnerApp('album')">
-                                                                <div class="peek-widget-photo" v-for="(p, i) in peek.peekWidgetPhotos" :key="p.id || i">
-                                                                    <div
-                                                                        class="mock-image"
-                                                                        :style="{
-                                                                            width: '100%',
-                                                                            height: '100%',
-                                                                            borderRadius: '10px',
-                                                                            background: 'linear-gradient(135deg,' + (p.bgColor || '#dbeafe') + ',' + (p.bgColor2 || '#fce7f3') + ')'
-                                                                        }"
-                                                                    >
-                                                                        <div class="mock-image-desc">{{ p.description }}</div>
+                                                            <div class="peek-widget-board">
+                                                                <div class="peek-widget-card peek-widget-weather-card">
+                                                                    <div class="peek-widget-card-title">天气</div>
+                                                                    <div class="peek-widget-weather-value"><i class="fas fa-sun"></i> {{ peek.peekWidgetWeather }}</div>
+                                                                    <div class="peek-widget-card-sub">当前位置</div>
+                                                                </div>
+                                                                <div class="peek-widget-card peek-widget-note" v-if="peek.peekWidgetFirstNote" @click="peek.openPeekInnerApp('notes')">
+                                                                    <div class="peek-widget-card-title">日程</div>
+                                                                    <div class="peek-widget-note-content">
+                                                                        <span class="peek-widget-note-title">{{ peek.peekWidgetFirstNote.title }}</span>
+                                                                        <span class="peek-widget-note-preview">{{ peek.peekWidgetFirstNote.content.split('\n')[0] }}</span>
                                                                     </div>
                                                                 </div>
-                                                            </div>
-                                                            <div class="peek-widget-row peek-widget-note" v-if="peek.peekWidgetFirstNote" @click="peek.openPeekInnerApp('notes')">
-                                                                <i class="fas fa-note-sticky"></i>
-                                                                <div class="peek-widget-note-content">
-                                                                    <span class="peek-widget-note-title">{{ peek.peekWidgetFirstNote.title }}</span>
-                                                                    <span class="peek-widget-note-preview">{{ peek.peekWidgetFirstNote.content.split('\n')[0] }}</span>
+                                                                <div class="peek-widget-card peek-widget-note peek-widget-note-fallback" v-else @click="peek.openPeekInnerApp('messages')">
+                                                                    <div class="peek-widget-card-title">消息</div>
+                                                                    <div class="peek-widget-note-content">
+                                                                        <span class="peek-widget-note-title">收件箱</span>
+                                                                        <span class="peek-widget-note-preview">未读 {{ peek.peekWidgetUnreadCount || 0 }} 条</span>
+                                                                    </div>
                                                                 </div>
-                                                            </div>
-                                                            <div class="peek-home-search"><i class="fas fa-search"></i><span>搜索</span></div>
-                                                            <div class="peek-generate-tip" v-if="peek.peekAiLastGeneratedAt">
-                                                                联动更新：{{ peek.peekAiLastGeneratedAt }}
                                                             </div>
                                                             <div class="peek-home-grid">
                                                                 <button class="peek-app-icon" v-for="app in peek.filteredPeekApps" :key="app.id" @click="peek.openPeekInnerApp(app.id)">
                                                                     <i class="fas" :class="app.icon"></i>
-                                                                    <span>{{ app.name }}</span>
+                                                                    <span class="peek-app-label">{{ app.name }}</span>
                                                                     <span v-if="app.id === 'messages' && peek.peekWidgetUnreadCount > 0" class="peek-app-badge">{{ peek.peekWidgetUnreadCount }}</span>
                                                                 </button>
+                                                            </div>
+                                                            <div class="peek-generate-tip" v-if="peek.peekAiLastGeneratedAt">
+                                                                最近同步：{{ peek.peekAiLastGeneratedAt }}
                                                             </div>
                                                         </div>
                                                         <div class="peek-dock">
                                                             <button class="peek-dock-item" v-for="d in peek.DOCK_APPS" :key="d.id" @click="peek.openPeekInnerApp(d.id)">
-                                                                <i class="fas" :class="d.icon"></i><span>{{ d.name }}</span>
+                                                                <i class="fas" :class="d.icon"></i><span class="peek-dock-label">{{ d.name }}</span>
                                                             </button>
                                                         </div>
                                                         <div class="peek-home-indicator"></div>
@@ -229,8 +232,12 @@
                                                             <button class="peek-app-back peek-app-lock" @click="peek.lockPeek"><i class="fas fa-lock"></i></button>
                                                         </div>
                                                         <div class="peek-app-body">
-                                                            <div v-if="peek.peekInnerApp === 'messages'" class="peek-list">
-                                                                <div class="peek-list-item" v-for="m in peek.peekMessages" :key="m.id"><div><b>{{ m.app }}</b> · {{ m.text }}</div><span>{{ m.at }}</span></div>
+                                                            <div v-if="peek.peekInnerApp === 'messages'" class="peek-chat-stream">
+                                                                <div v-if="peek.peekMixedChatMessages.length === 0" class="peek-chat-empty">还没有聊天记录</div>
+                                                                <div v-for="m in peek.peekMixedChatMessages" :key="m.id" class="peek-chat-msg" :class="m.sender">
+                                                                    <div class="peek-chat-bubble">{{ m.text }}</div>
+                                                                    <span class="peek-chat-time">{{ m.at }}</span>
+                                                                </div>
                                                             </div>
                                                             <div v-else-if="peek.peekInnerApp === 'calls'" class="peek-list">
                                                                 <div class="peek-list-item" v-for="c in peek.peekCalls" :key="c.id"><div><b>{{ c.who }}</b> · {{ c.type === 'missed' ? '未接来电' : '已拨出' }}</div><span>{{ c.at }}</span></div>
@@ -836,6 +843,17 @@
                 <template v-else>
                     <div class="wechat-messages" :class="{ 'novel-mode': isOfflineMode, 'group-chat': soulLinkActiveChatType === 'group' }" ref="chatMessagesContainer" @click="onChatBackgroundClick">
                         <div v-for="(msg, index) in currentChatMessages" :key="index" class="message" :class="[msg.sender, { 'novel-message': isOfflineMode, 'call-message': msg.isCallMessage, 'special-card-message': msg.messageType === 'location' || msg.messageType === 'transfer' || msg.messageType === 'textImage' || msg.messageType === 'image' || msg.messageType === 'takeaway' || msg.messageType === 'tarot' || msg.messageType === 'pet' || msg.messageType === 'vote' || msg.messageType === 'order' || msg.messageType === 'helpBuy' || msg.messageType === 'share' || msg.messageType === 'voice' || msg.messageType === 'sticker', 'group-message': soulLinkActiveChatType === 'group', 'system-message': msg.isSystem }]" @contextmenu="onMessageContextMenu($event, msg)" @touchstart="onMessageTouchStart($event, msg)" @touchmove="onMessageTouchMove" @touchend="onMessageTouchEnd" @click.stop>
+                            <div
+                                v-if="!msg.isSystem && bubbleAvatarMode !== 'hide'"
+                                class="message-avatar"
+                                :class="{ 'is-hidden-avatar': bubbleAvatarMode === 'first' && !(index === 0 || currentChatMessages[index - 1].sender !== msg.sender || (soulLinkActiveChatType === 'group' && currentChatMessages[index - 1].senderName !== msg.senderName)) }"
+                            >
+                                <img
+                                    v-if="bubbleAvatarMode === 'all' || (bubbleAvatarMode === 'first' && (index === 0 || currentChatMessages[index - 1].sender !== msg.sender || (soulLinkActiveChatType === 'group' && currentChatMessages[index - 1].senderName !== msg.senderName)))"
+                                    :src="msg.senderAvatar || (msg.sender === 'ai' ? currentChatAvatar : userAvatar) || 'https://placehold.co/60x60?text=?'"
+                                    alt="avatar"
+                                >
+                            </div>
                             <div class="message-content-wrapper">
                                 <div v-if="soulLinkActiveChatType === 'group' && msg.senderName && !msg.isSystem" class="group-sender-name">{{ msg.senderName }}</div>
                                 <div v-if="!isOfflineMode" class="bubble">
@@ -1529,7 +1547,68 @@
                 </div>
 
                 <div class="art-settings-section">
-                    <h2 class="art-section-title">气泡美化（CSS）</h2>
+                    <h2 class="art-section-title">气泡美化（模块化）</h2>
+
+                    <!-- 模块 1：头像 -->
+                    <div class="art-settings-input-item">
+                        <div class="art-settings-icon-wrapper">
+                            <div class="art-settings-blob blob-color-6"></div>
+                            <svg class="art-settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <circle cx="12" cy="8" r="4"></circle>
+                                <path d="M4 21c1.5-4 5-6 8-6s6.5 2 8 6"></path>
+                            </svg>
+                        </div>
+                        <div class="art-input-wrapper">
+                            <label class="art-input-label">模块 1：头像</label>
+                            <select v-model="bubbleAvatarMode" class="art-settings-input">
+                                <option value="hide">隐藏头像</option>
+                                <option value="first">连续消息只显示第一个</option>
+                                <option value="all">头像全显</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- 模块 2：形状 -->
+                    <div class="art-settings-input-item">
+                        <div class="art-settings-icon-wrapper">
+                            <div class="art-settings-blob blob-color-6"></div>
+                            <svg class="art-settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M6 3h12v5H6z"></path>
+                                <path d="M6 8h12v13H6z"></path>
+                            </svg>
+                        </div>
+                        <div class="art-input-wrapper">
+                            <label class="art-input-label">模块 2：气泡形状</label>
+                            <select v-model="bubbleShapeMode" class="art-settings-input" @change="applyBubbleStyle">
+                                <option value="round">圆弧（圆角）</option>
+                                <option value="sharp">直角（锐角）</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- 模块 3：颜色预设 -->
+                    <div class="art-settings-input-item">
+                        <div class="art-settings-icon-wrapper">
+                            <div class="art-settings-blob blob-color-6"></div>
+                            <svg class="art-settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M12 3l9 4.5-9 4.5-9-4.5L12 3z"></path>
+                                <path d="M3 7.5V17l9 4.5 9-4.5V7.5"></path>
+                            </svg>
+                        </div>
+                        <div class="art-input-wrapper">
+                            <label class="art-input-label">模块 3：气泡颜色（对比色）</label>
+                            <select v-model="bubbleColorPreset" class="art-settings-input" @change="applyBubbleStyle">
+                                <option value="default">对比色 1（黑 + 浅灰）</option>
+                                <option value="blue">对比色 2（黑 + 蓝调）</option>
+                                <option value="orange">对比色 3（黑 + 橙暖）</option>
+                                <option value="plum">对比色 4（黑 + 薰紫）</option>
+                                <option value="sage">对比色 5（黑 + 仙绿）</option>
+                                <option value="steel">对比色 6（深钢 + 浅钢）</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- 模块 4：自定义 -->
                     <div class="art-settings-input-item">
                         <div class="art-settings-icon-wrapper">
                             <div class="art-settings-blob blob-color-6"></div>
@@ -1537,18 +1616,12 @@
                                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
                             </svg>
                         </div>
-                        <div class="art-input-wrapper">
-                            <label class="art-input-label">样式方案</label>
-                            <select v-model="bubbleStyle" class="art-settings-input" @change="setBubbleStyle(bubbleStyle)">
-                                <option value="default">默认</option>
-                                <option value="blue">蓝色</option>
-                                <option value="orange">橙色</option>
-                                <option value="round">圆角</option>
-                                <option value="sharp">锐角</option>
-                                <option value="custom">自定义 CSS</option>
-                            </select>
-                            <textarea v-if="bubbleStyle === 'custom'" v-model="customBubbleCSS" class="art-settings-input" rows="4" placeholder="例如：background:#111;color:#fff;border-radius:16px;" style="margin-top:8px; resize: vertical;"></textarea>
-                            <div v-if="bubbleStyle === 'custom'" style="margin-top:8px;">
+                        <div class="art-input-wrapper" style="width: 100%;">
+                            <label class="art-input-label">模块 4：自定义 CSS</label>
+                            <textarea v-model="customBubbleCSS" class="art-settings-input" rows="4"
+                                placeholder="例如：background:#111;color:#fff;border-radius:16px; box-shadow:none;"
+                                style="margin-top:8px; resize: vertical;"></textarea>
+                            <div style="margin-top:8px;">
                                 <button class="btn-small" @click="applyCustomCSS">应用CSS</button>
                             </div>
                         </div>
@@ -2190,16 +2263,21 @@
             </div>
         </div>
 
-        <!-- Feed App - Art Zine Style -->
-        <div v-else-if="openedApp === 'feed'" class="app-view feed-app">
-            <!-- Header - Art Magazine Style -->
+        <!-- Feed App - Moments Style -->
+        <div
+            v-else-if="openedApp === 'feed'"
+            class="app-view feed-app"
+            :style="feed.momentsBgStyle"
+        >
+            <div class="feed-moments-bg-mask"></div>
+            <!-- Header -->
             <div class="journal-header">
                 <button class="journal-back" @click="goBack">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M19 12H5M12 19l-7-7 7-7"/>
                     </svg>
                 </button>
-                <h1 class="journal-title">JOURNAL</h1>
+                <h1 class="journal-title">FEED</h1>
                 <div class="journal-line">
                     <span class="line-dot"></span>
                 </div>
@@ -2211,7 +2289,7 @@
                 </button>
             </div>
             
-            <div class="app-content journal-content" @scroll="feed.handleScroll">
+            <div class="app-content journal-content" @scroll="feed.handleScroll" @click="feed.closeActionMenu()">
                 <!-- 加载状态 -->
                 <div v-if="feed.loading" class="journal-loading">
                     <div class="journal-spinner"></div>
@@ -2236,11 +2314,6 @@
                                 <div class="entry-author" @click="feed.openProfile(post.author)">
                                     <img :src="post.avatar || 'https://placehold.co/60x60?text=?'" class="author-avatar">
                                     <span class="author-name">{{ post.author }}</span>
-                                    <button v-if="post.author === feed.userProfile.name" class="delete-post-btn" @click.stop="feed.deletePost(post.id)">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                                        </svg>
-                                    </button>
                                 </div>
                                 
                                 <!-- Content -->
@@ -2249,9 +2322,8 @@
                                     
                                     <!-- Images - Stacked Style -->
                                     <div v-if="post.images && post.images.length" class="entry-images" :class="{ 'single': post.images.length === 1, 'stacked': post.images.length > 1 }">
-                                        <div v-for="(img, idx) in post.images.slice(0, 4)" :key="idx" 
-                                             class="entry-image-wrap" 
-                                             :style="{ transform: 'translate(' + (idx * 4) + 'px, ' + (idx * 2) + 'px)' }"
+                                        <div v-for="(img, idx) in post.images.slice(0, 4)" :key="idx"
+                                             class="entry-image-wrap"
                                              @click="feed.openImageViewer(img, post.imageDescriptions && post.imageDescriptions[idx])">
                                             <div class="tape" v-if="idx === 0"></div>
                                             <!-- 文字图 -->
@@ -2269,25 +2341,24 @@
                                     </div>
                                 </div>
                                 
-                                <!-- Minimal Actions -->
-                                <div class="entry-actions">
-                                    <button class="action-icon" :class="{ active: post.isLiked }" @click="feed.toggleLike(post.id)">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-                                        </svg>
-                                    </button>
-                                    <button class="action-icon" @click="feed.toggleCommentInput(post.id)">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <circle cx="12" cy="12" r="10"/>
-                                            <path d="M8 12h8M12 8v8"/>
-                                        </svg>
-                                    </button>
-                                    <button class="action-icon ai-comment" @click="feed.openRoleCommentModal(post)">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <rect x="3" y="3" width="18" height="18" rx="2"/>
-                                            <path d="M9 9h6v6H9z"/>
-                                        </svg>
-                                    </button>
+                                <div class="entry-meta-row">
+                                    <span class="entry-time">{{ new Date(post.id).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) }}</span>
+                                    <button v-if="post.author === feed.userProfile.name" class="delete-post-text" @click.stop="feed.deletePost(post.id)">删除</button>
+                                    <div class="entry-actions" @click.stop>
+                                        <button class="entry-action-trigger" @click="feed.toggleActionMenu(post.id)">
+                                            <i class="fas fa-ellipsis-h"></i>
+                                        </button>
+                                        <div v-if="feed.activeActionPostId === post.id" class="entry-action-pop">
+                                            <button class="action-icon" :class="{ active: post.isLiked }" @click="feed.toggleLike(post.id); feed.closeActionMenu()">赞</button>
+                                            <button class="action-icon" @click="feed.toggleCommentInput(post.id); feed.closeActionMenu()">评论</button>
+                                            <button class="action-icon ai-comment" @click="feed.openRoleCommentModal(post); feed.closeActionMenu()">Ta评</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div v-if="(post.likes && post.likes.length) || (post.comments && post.comments.length)" class="entry-stats">
+                                    <span v-if="post.likes && post.likes.length">{{ post.likes.length }} 人觉得很赞</span>
+                                    <span v-if="post.comments && post.comments.length">{{ post.comments.length }} 条评论</span>
                                 </div>
                                 
                                 <!-- Comments -->
@@ -2316,16 +2387,16 @@
                                         
                                         <!-- Reply Input -->
                                         <div v-if="feed.activeReplyCommentId === comment.id" class="reply-input">
-                                            <input type="text" v-model="feed.replyInput" placeholder="Write a reply..." @keyup.enter="feed.submitComment(post.id, comment.id)">
+                                            <input type="text" v-model="feed.replyInput" placeholder="回复一下..." @keyup.enter="feed.submitComment(post.id, comment.id)">
                                             <button @click="feed.submitComment(post.id, comment.id)">→</button>
                                         </div>
                                     </div>
-                                    <span v-if="post.comments.length > 3" class="more-comments">+{{ post.comments.length - 3 }} more</span>
+                                    <span v-if="post.comments.length > 3" class="more-comments">查看剩余 {{ post.comments.length - 3 }} 条评论</span>
                                 </div>
                                 
                                 <!-- Comment Input -->
                                 <div v-if="feed.activeCommentPostId === post.id" class="entry-comment-input">
-                                    <input type="text" v-model="feed.commentInput" placeholder="Write a note..." @keyup.enter="feed.submitComment(post.id)">
+                                    <input type="text" v-model="feed.commentInput" placeholder="说点什么..." @keyup.enter="feed.submitComment(post.id)">
                                     <button @click="feed.submitComment(post.id)">→</button>
                                 </div>
                             </div>
@@ -2347,7 +2418,7 @@
                                 <line x1="30" y1="65" x2="50" y2="65"/>
                             </svg>
                         </div>
-                        <p>Your journal is empty.<br>Start writing your story.</p>
+                        <p>还没有朋友圈动态。<br>发一条开始记录吧。</p>
                     </div>
                 </div>
             </div>
@@ -2379,15 +2450,140 @@
             <div v-if="feed.showCreatePost" class="create-post-overlay" @click.self="feed.closeCreatePost">
                 <div class="create-post-panel">
                     <div class="create-post-header">
-                        <button class="back-btn-small" @click="feed.closeCreatePost"><i class="fas fa-arrow-left"></i></button>
-                        <span>发布动态</span>
-                        <button class="publish-btn" @click="feed.publishPost()" :disabled="!feed.newPostText.trim() && feed.newPostImages.length === 0">发布</button>
+                        <button class="create-post-cancel" @click="feed.closeCreatePost">取消</button>
+                        <span>发表</span>
+                        <button class="publish-btn wechat" @click="feed.publishPost()" :disabled="!feed.newPostText.trim() && feed.newPostImages.length === 0">发表</button>
                     </div>
                     <div class="create-post-content">
-                        <textarea v-model="feed.newPostText" placeholder="分享你的想法..."></textarea>
-                        
-                        <!-- 图片预览 -->
-                        <div v-if="feed.newPostImages.length" class="create-post-images">
+                        <div class="create-post-input-row">
+                            <img :src="feed.userProfile.avatar || 'https://placehold.co/100x100/333/fff?text=Me'" class="create-post-avatar">
+                            <textarea v-model="feed.newPostText" placeholder="这一刻的想法..."></textarea>
+                        </div>
+                        <div class="create-post-light-options">
+                            <button class="light-option-item" type="button" @click="feed.openLocationSheet()">
+                                <span class="left"><i class="fas fa-location-dot"></i> 所在位置</span>
+                                <span class="right">{{ feed.locationLabel() }} <i class="fas fa-chevron-right"></i></span>
+                            </button>
+                            <button class="light-option-item" type="button" @click="feed.openVisibilitySheet()">
+                                <span class="left"><i class="fas fa-eye"></i> 谁可以看</span>
+                                <span class="right">{{ feed.visibilityLabel(characters) }} <i class="fas fa-chevron-right"></i></span>
+                            </button>
+                            <button class="light-option-item" type="button" @click="feed.openMentionSheet()">
+                                <span class="left"><i class="fas fa-at"></i> 提醒谁看</span>
+                                <span class="right">{{ feed.mentionLabel(characters) }} <i class="fas fa-chevron-right"></i></span>
+                            </button>
+                        </div>
+
+                        <!-- location sheet -->
+                        <div v-if="feed.showLocationSheet" class="wechat-sheet-overlay" @click.self="feed.closeSheets()">
+                            <div class="wechat-sheet" @click.stop>
+                                <div class="wechat-sheet-head">
+                                    <button class="wechat-sheet-cancel" @click="feed.closeSheets()">取消</button>
+                                    <div class="wechat-sheet-title">所在位置</div>
+                                    <button class="wechat-sheet-ok" @click="feed.closeSheets()">确定</button>
+                                </div>
+                                <div class="wechat-sheet-body">
+                                    <div class="wechat-field">
+                                        <input v-model="feed.locationText" placeholder="输入位置（可留空）" />
+                                    </div>
+                                    <button class="wechat-row" @click="feed.locationText=''">
+                                        <span>不显示位置</span>
+                                        <span class="muted">已选</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- visibility sheet -->
+                        <div v-if="feed.showVisibilitySheet" class="wechat-sheet-overlay" @click.self="feed.closeSheets()">
+                            <div class="wechat-sheet" @click.stop>
+                                <div class="wechat-sheet-head">
+                                    <button class="wechat-sheet-cancel" @click="feed.closeSheets()">取消</button>
+                                    <div class="wechat-sheet-title">谁可以看</div>
+                                    <button class="wechat-sheet-ok" @click="feed.closeSheets()">确定</button>
+                                </div>
+                                <div class="wechat-sheet-body">
+                                    <button class="wechat-row" @click="feed.visibilityMode='public'">
+                                        <span>公开</span>
+                                        <i v-if="feed.visibilityMode==='public'" class="fas fa-check"></i>
+                                    </button>
+                                    <button class="wechat-row" @click="feed.visibilityMode='private'">
+                                        <span>私密</span>
+                                        <i v-if="feed.visibilityMode==='private'" class="fas fa-check"></i>
+                                    </button>
+                                    <button class="wechat-row" @click="feed.visibilityMode='partial'">
+                                        <span>部分可见（选择角色）</span>
+                                        <i v-if="feed.visibilityMode==='partial'" class="fas fa-check"></i>
+                                    </button>
+
+                                    <div v-if="feed.visibilityMode==='partial'" class="wechat-sub">
+                                        <div class="wechat-subtitle">选择可见的角色</div>
+                                        <div class="wechat-chip-wrap">
+                                            <button
+                                                v-for="c in characters"
+                                                :key="'vis_'+c.id"
+                                                class="wechat-chip"
+                                                :class="{ active: feed.visibilityAllowRoleIds.includes(String(c.id)) }"
+                                                @click="feed.toggleVisibilityRole(String(c.id))"
+                                                type="button"
+                                            >
+                                                {{ c.nickname || c.name || '未命名' }}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- mention sheet -->
+                        <div v-if="feed.showMentionSheet" class="wechat-sheet-overlay" @click.self="feed.closeSheets()">
+                            <div class="wechat-sheet" @click.stop>
+                                <div class="wechat-sheet-head">
+                                    <button class="wechat-sheet-cancel" @click="feed.closeSheets()">取消</button>
+                                    <div class="wechat-sheet-title">提醒谁看</div>
+                                    <button class="wechat-sheet-ok" @click="feed.closeSheets()">确定</button>
+                                </div>
+                                <div class="wechat-sheet-body">
+                                    <div class="wechat-subtitle">按标签选择（来自workshop）</div>
+                                    <div class="wechat-chip-wrap">
+                                        <button
+                                            v-for="t in feed.allCharacterTags(characters)"
+                                            :key="'tag_'+t"
+                                            class="wechat-chip"
+                                            :class="{ active: feed.mentionTagNames.includes(t) }"
+                                            @click="feed.toggleMentionTag(t)"
+                                            type="button"
+                                        >
+                                            #{{ t }}
+                                        </button>
+                                    </div>
+
+                                    <div class="wechat-subtitle" style="margin-top:10px;">按角色选择</div>
+                                    <div class="wechat-chip-wrap">
+                                        <button
+                                            v-for="c in characters"
+                                            :key="'men_'+c.id"
+                                            class="wechat-chip"
+                                            :class="{ active: feed.mentionRoleIds.includes(String(c.id)) }"
+                                            @click="feed.toggleMentionRole(String(c.id))"
+                                            type="button"
+                                        >
+                                            {{ c.nickname || c.name || '未命名' }}
+                                        </button>
+                                    </div>
+
+                                    <button class="wechat-row danger" style="margin-top:10px;" @click="feed.clearMentions()">
+                                        <span>清空提醒</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 图片九宫格（朋友圈样式：第一个是“+”） -->
+                        <div class="create-post-images">
+                            <button class="create-post-add-tile" type="button" @click="feed.openMediaSheet()" :disabled="feed.newPostImages.length >= 9">
+                                <i class="fas fa-plus"></i>
+                            </button>
                             <div v-for="(img, idx) in feed.newPostImages" :key="idx" class="create-post-image-wrapper">
                                 <!-- 文字图预览 -->
                                 <div v-if="typeof img === 'object' && img.type === 'textImage'" class="text-image-preview" :style="{ background: img.bgColor, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }">
@@ -2398,12 +2594,37 @@
                                 <button class="remove-image-btn" @click="feed.newPostImages.splice(idx, 1)"><i class="fas fa-times"></i></button>
                             </div>
                         </div>
+                        <!-- Media picker sheet (Moments-like) -->
+                        <div v-if="feed.showMediaSheet" class="wechat-sheet-overlay" @click.self="feed.closeSheets()">
+                            <div class="wechat-sheet" @click.stop>
+                                <div class="wechat-sheet-head">
+                                    <button class="wechat-sheet-cancel" @click="feed.closeSheets()">取消</button>
+                                    <div class="wechat-sheet-title">选择</div>
+                                    <button class="wechat-sheet-ok" @click="feed.closeSheets()">完成</button>
+                                </div>
+                                <div class="wechat-sheet-body">
+                                    <button class="wechat-row" @click="feed.triggerCameraUpload(); feed.closeSheets()">
+                                        <span><i class="fas fa-camera"></i> 拍摄</span>
+                                        <i class="fas fa-chevron-right" style="opacity:.5;"></i>
+                                    </button>
+                                    <button class="wechat-row" @click="feed.triggerImageUpload(); feed.closeSheets()">
+                                        <span><i class="far fa-image"></i> 从相册选择</span>
+                                        <i class="fas fa-chevron-right" style="opacity:.5;"></i>
+                                    </button>
+                                    <button class="wechat-row" @click="feed.openTextImageCreator(); feed.closeSheets()">
+                                        <span><i class="fas fa-font"></i> 文字</span>
+                                        <i class="fas fa-chevron-right" style="opacity:.5;"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <!-- 文字图创建区域 -->
                     <div v-if="feed.showTextImageCreator" class="text-image-creator">
                         <div class="text-image-creator-header">
-                            <h4>创建文字图</h4>
-                            <button class="close-text-image-btn" @click="feed.closeTextImageCreator"><i class="fas fa-times"></i></button>
+                            <button class="text-image-nav-btn" @click="feed.closeTextImageCreator">取消</button>
+                            <h4>文字</h4>
+                            <button class="text-image-nav-btn primary" @click="feed.addTextImageToPost()" :disabled="!feed.feedTextImageText.trim()">完成</button>
                         </div>
                         <div class="text-image-creator-content">
                             <div class="text-image-preview">
@@ -2425,23 +2646,10 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="text-image-actions">
-                                <button class="cancel-text-image-btn" @click="feed.closeTextImageCreator">取消</button>
-                                <button class="add-text-image-btn" @click="feed.addTextImageToPost()" :disabled="!feed.feedTextImageText.trim()">添加到动态</button>
-                            </div>
                         </div>
                     </div>
-                    <div class="create-post-actions">
-                        <button class="action-btn" @click="feed.triggerImageUpload">
-                            <i class="fas fa-image"></i>
-                            <span>图片</span>
-                        </button>
-                        <button class="action-btn" @click="feed.openTextImageCreator">
-                            <i class="fas fa-font"></i>
-                            <span>文字图</span>
-                        </button>
-                    </div>
                     <input type="file" id="feed-image-input" accept="image/*" multiple style="display: none;" @change="feed.handleImageUpload">
+                    <input type="file" id="feed-camera-input" accept="image/*" capture="environment" style="display: none;" @change="feed.handleImageUpload">
                 </div>
             </div>
             
@@ -2455,6 +2663,7 @@
                     </div>
                     <div class="profile-content">
                         <div class="profile-bg" :style="{ backgroundImage: 'url(' + feed.viewingUserProfile.bgImage + ')' }">
+                            <div class="profile-bg-mask"></div>
                             <div class="profile-avatar-large">
                                 <img :src="feed.viewingUserProfile.avatar">
                             </div>
@@ -2462,6 +2671,15 @@
                         <div class="profile-info">
                             <h3>{{ feed.viewingUserProfile.name }}</h3>
                             <p class="profile-bio">{{ feed.viewingUserProfile.bio }}</p>
+                            <div class="profile-mini-meta">
+                                <span>IP属地 未知</span>
+                                <span>朋友圈仅展示最近内容</span>
+                            </div>
+                            <div class="profile-stats">
+                                <span><b>{{ feed.viewingUserPosts.length }}</b> 动态</span>
+                                <span><b>{{ feed.viewingUserPosts.reduce((sum, p) => sum + ((p.likes && p.likes.length) || 0), 0) }}</b> 获赞</span>
+                                <span><b>{{ feed.viewingUserPosts.reduce((sum, p) => sum + ((p.comments && p.comments.length) || 0), 0) }}</b> 评论</span>
+                            </div>
                             <button v-if="feed.viewingUserProfile.isCurrentUser" class="edit-profile-btn" @click="feed.isEditingProfile = true">编辑资料</button>
                         </div>
                         
@@ -2540,16 +2758,28 @@
                             <label>个性签名</label>
                             <textarea v-model="feed.userProfile.bio" placeholder="输入个性签名"></textarea>
                         </div>
+                        <div class="edit-input-group">
+                            <label>朋友圈背景（全面屏）</label>
+                            <input
+                                type="text"
+                                :value="feed.momentsBgUrl"
+                                @input="feed.setMomentsBgUrl($event.target.value)"
+                                placeholder="粘贴背景图片链接"
+                            >
+                            <div style="font-size:12px; color:#8a8a8a; margin-top:6px;">
+                                留空将恢复默认背景
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
             
-            <!-- AI评论面板 -->
+            <!-- Ta评论面板 -->
             <div v-if="feed.showRoleCommentModal" class="role-comment-overlay" @click.self="feed.closeRoleCommentModal">
                 <div class="role-comment-panel">
                     <div class="role-comment-header">
                         <button class="back-btn-small" @click="feed.closeRoleCommentModal"><i class="fas fa-arrow-left"></i></button>
-                        <span>选择角色评论</span>
+                        <span>选择Ta来评论</span>
                         <div style="width: 40px;"></div>
                     </div>
                     <div class="role-comment-content">
@@ -2560,7 +2790,7 @@
                             </div>
                         </div>
                         <button class="generate-btn" @click="feed.generateAndSubmitComment(characters, activeProfile)" :disabled="!feed.selectedRoleId || feed.isGeneratingComment">
-                            {{ feed.isGeneratingComment ? '生成中...' : '生成评论' }}
+                            {{ feed.isGeneratingComment ? '生成中...' : '发布Ta评' }}
                         </button>
                     </div>
                 </div>
@@ -3556,22 +3786,23 @@
         </div>
 
         <!-- Read App -->
-        <div v-else-if="openedApp === 'read'" class="app-view read-app">
+        <div v-else-if="openedApp === 'read'" class="app-view read-app" :style="read.readAppBackgroundStyle">
             <div class="app-header read-header">
-                <button class="back-btn" @click="read.view === 'explore' ? closeApp() : read.goExplore()"><i class="fas fa-chevron-left"></i></button>
-                <div class="read-header-center">
-                    <span class="app-title">Read</span>
-                    <div class="read-top-tabs">
-                        <button class="read-top-tab" :class="{ active: read.view === 'explore' }" @click="read.goExplore()">探索</button>
-                        <button class="read-top-tab" :class="{ active: read.view === 'detail' }" @click="read.activeWorkId && (read.view = 'detail')" :disabled="!read.activeWorkId">作品</button>
-                        <button class="read-top-tab" :class="{ active: read.view === 'writer' }" @click="read.openWriterCreate()">创作</button>
+                <div class="read-header-row read-header-row-top">
+                    <button class="back-btn read-nav-btn" @click="read.view === 'explore' ? closeApp() : read.goExplore()" :title="read.view === 'explore' ? '返回桌面' : '返回探索'"><i class="fas fa-chevron-left"></i></button>
+                    <div class="read-header-center">
+                        <span class="app-title">Read</span>
+                        <span class="read-subtitle">
+                            {{ read.view === 'explore' ? '探索书库' : read.view === 'detail' ? '作品详情' : read.view === 'reader' ? '沉浸阅读' : read.view === 'writer' ? '创作中' : '阅读设置' }}
+                        </span>
                     </div>
                 </div>
-                <div class="read-header-right">
-                    <div class="read-api-status" :title="activeProfile && activeProfile.endpoint && activeProfile.key ? 'AI 已配置' : 'AI 未配置'">
-                        <span :class="['read-api-dot', activeProfile && activeProfile.endpoint && activeProfile.key ? 'ok' : 'bad']"></span>
+                <div class="read-header-row read-header-row-bottom">
+                    <div class="read-top-tabs" role="tablist" aria-label="Read 导航">
+                        <button class="read-top-tab" :class="{ active: read.view === 'explore' }" @click="read.goExplore()"><i class="fas fa-compass"></i><span>探索</span></button>
+                        <button class="read-top-tab" :class="{ active: read.view === 'writer' }" @click="read.openWriterCreate()"><i class="fas fa-pen-nib"></i><span>创作</span></button>
+                        <button class="read-top-tab" :class="{ active: read.view === 'settings' }" @click="read.openSettings()"><i class="fas fa-sliders-h"></i><span>设置</span></button>
                     </div>
-                    <button class="btn-small" @click="read.openWriterCreate" title="生成新作品"><i class="fas fa-pen-nib"></i></button>
                 </div>
             </div>
 
@@ -3874,7 +4105,7 @@
                         <div v-if="!read.activeChapter" style="font-size:13px; color:rgba(0,0,0,0.6);">
                             暂无内容。
                         </div>
-                        <div v-else class="read-body" style="white-space:pre-wrap; line-height:1.85; font-size:14px;">
+                        <div v-else class="read-body" :style="read.readerBodyStyle">
                             <div v-if="read.activeChapter.content && read.activeChapter.content.trim()">
                                 {{ read.activeChapter.content }}
                             </div>
@@ -4041,6 +4272,135 @@
 
                         <div v-if="read.genError" style="font-size:12px; color:#b00020;">
                             {{ read.genError }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settings -->
+                <div v-else-if="read.view === 'settings'" class="read-view read-view-settings">
+                    <div class="card read-card">
+                        <div style="font-weight:800; font-size:16px;">阅读设置</div>
+                        <div style="margin-top:6px; font-size:12px; color:rgba(0,0,0,0.6);">
+                            参考常见阅读 App：背景、字体、字号、行距、版心宽度均可调整。
+                        </div>
+                    </div>
+
+                    <div class="card read-card">
+                        <div style="font-weight:700; margin-bottom:10px;">背景</div>
+                        <div style="font-size:12px; color:rgba(0,0,0,0.62); margin-bottom:8px;">
+                            背景图片链接
+                        </div>
+                        <input
+                            v-model="read.readerBackgroundUrl"
+                            type="url"
+                            class="read-input"
+                            :placeholder="'默认：' + read.defaultReadBgUrl"
+                            @blur="read.saveReaderBackground"
+                        />
+                        <div style="margin-top:12px;">
+                            <div style="display:flex; justify-content:space-between; font-size:12px; color:rgba(0,0,0,0.62); margin-bottom:6px;">
+                                <span>背景遮罩</span>
+                                <span>{{ Math.round(read.readerPrefs.overlayOpacity * 100) }}%</span>
+                            </div>
+                            <input v-model.number="read.readerPrefs.overlayOpacity" type="range" min="0" max="0.9" step="0.05" style="width:100%;">
+                        </div>
+                        <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:10px;">
+                            <button type="button" class="btn-small" @click="read.resetReaderBackground">恢复默认背景</button>
+                            <button type="button" class="btn-small primary" @click="read.saveReaderBackground">应用背景</button>
+                        </div>
+                    </div>
+
+                    <div class="card read-card">
+                        <div style="font-weight:700; margin-bottom:10px;">文字排版</div>
+
+                        <div style="font-size:12px; color:rgba(0,0,0,0.62); margin-bottom:6px;">字体风格</div>
+                        <select v-model="read.readerPrefs.fontFamily" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;">
+                            <option v-for="f in read.readerFontOptions" :key="f.value" :value="f.value">{{ f.label }}</option>
+                        </select>
+
+                        <div style="margin-top:12px;">
+                            <div style="display:flex; justify-content:space-between; font-size:12px; color:rgba(0,0,0,0.62); margin-bottom:6px;">
+                                <span>字号</span>
+                                <span>{{ read.readerPrefs.fontSize }}px</span>
+                            </div>
+                            <input v-model.number="read.readerPrefs.fontSize" type="range" min="14" max="40" step="1" style="width:100%;">
+                        </div>
+
+                        <div style="margin-top:12px;">
+                            <div style="display:flex; justify-content:space-between; font-size:12px; color:rgba(0,0,0,0.62); margin-bottom:6px;">
+                                <span>行距</span>
+                                <span>{{ read.readerPrefs.lineHeight.toFixed(2) }}</span>
+                            </div>
+                            <input v-model.number="read.readerPrefs.lineHeight" type="range" min="1.3" max="2.6" step="0.05" style="width:100%;">
+                        </div>
+
+                        <div style="margin-top:12px;">
+                            <div style="display:flex; justify-content:space-between; font-size:12px; color:rgba(0,0,0,0.62); margin-bottom:6px;">
+                                <span>版心宽度</span>
+                                <span>{{ read.readerPrefs.contentWidth }}px</span>
+                            </div>
+                            <input v-model.number="read.readerPrefs.contentWidth" type="range" min="520" max="1100" step="10" style="width:100%;">
+                        </div>
+
+                        <div style="margin-top:12px;">
+                            <div style="display:flex; justify-content:space-between; font-size:12px; color:rgba(0,0,0,0.62); margin-bottom:6px;">
+                                <span>文字颜色</span>
+                                <span>{{ read.readerPrefs.textColor }}</span>
+                            </div>
+                            <div style="display:flex; gap:8px; align-items:center;">
+                                <input v-model="read.readerPrefs.textColor" type="color" style="width:44px; height:32px; border:1px solid rgba(0,0,0,0.12); border-radius:8px; padding:0;">
+                                <input v-model="read.readerPrefs.textColor" type="text" class="read-input" placeholder="#1f2933" style="flex:1; min-width:0;" @blur="read.saveReaderPrefs">
+                            </div>
+                        </div>
+
+                        <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px;">
+                            <button type="button" class="btn-small" @click="read.resetReaderPrefs">恢复默认排版</button>
+                            <button type="button" class="btn-small primary" @click="read.saveReaderPrefs">保存排版</button>
+                        </div>
+                    </div>
+
+                    <div class="card read-card">
+                        <div style="font-weight:700; margin-bottom:10px;">效果预览</div>
+                        <div style="display:flex; justify-content:center;">
+                            <div
+                                :style="[
+                                    read.readAppBackgroundStyle,
+                                    {
+                                        width: '260px',
+                                        height: '480px',
+                                        borderRadius: '26px',
+                                        boxShadow: '0 18px 40px rgba(15,23,42,0.35)',
+                                        border: '1px solid rgba(255,255,255,0.65)',
+                                        overflow: 'hidden',
+                                        position: 'relative',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                    }
+                                ]"
+                            >
+                                <div style="position:absolute; top:8px; left:50%; transform:translateX(-50%); width:72px; height:4px; border-radius:999px; background:rgba(255,255,255,0.72); opacity:0.9; z-index:2;"></div>
+                                <div class="read-header" style="padding:12px 10px 8px; border-radius:0; border-bottom:1px solid rgba(45,47,54,0.12);">
+                                    <div style="display:flex; align-items:center; justify-content:space-between;">
+                                        <i class="fas fa-chevron-left" style="font-size:11px; opacity:0.7;"></i>
+                                        <span style="font-size:11px; font-weight:700;">Read</span>
+                                        <i class="fas fa-ellipsis-h" style="font-size:11px; opacity:0.7;"></i>
+                                    </div>
+                                </div>
+                                <div class="read-content" style="flex:1; overflow:hidden; padding:8px;">
+                                    <div class="read-view read-view-reader" style="height:100%;">
+                                        <div class="card read-card" style="padding:8px 10px;">
+                                            <div style="font-size:11px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                                第118章 要账（八更）
+                                            </div>
+                                        </div>
+                                        <div class="card read-card read-reader-body-wrap" style="flex:1; min-height:0;">
+                                            <div class="read-body" :style="read.readerBodyStyle" style="padding:0 2px 12px; margin:0;">
+                                                {{ read.readerPreviewText }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

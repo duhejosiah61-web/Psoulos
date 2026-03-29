@@ -15,10 +15,10 @@ const APP_DEFS = [
 ];
 
 const DOCK_APPS = [
-    { id: 'diary', name: '日记', icon: 'fa-book' },
-    { id: 'bank', name: '银行卡', icon: 'fa-credit-card' },
-    { id: 'map', name: '地图', icon: 'fa-map-location-dot' },
-    { id: 'messages', name: '消息', icon: 'fa-comments' }
+    { id: 'calls', name: '通话', icon: 'fa-phone' },
+    { id: 'messages', name: '消息', icon: 'fa-comments' },
+    { id: 'browser', name: '浏览器', icon: 'fa-globe' },
+    { id: 'album', name: '相册', icon: 'fa-image' }
 ];
 
 const readState = () => {
@@ -244,7 +244,7 @@ export function usePeek(charactersRef, activeProfileRef, soulLinkMessagesRef, so
         return all.map((x) => x.line);
     };
 
-    const peekWidgetUnreadCount = computed(() => peekMessages.value.filter((m) => m.app !== '系统提醒').length);
+    const peekWidgetUnreadCount = computed(() => Math.min(peekMixedChatMessages.value.length, 99));
     const peekWidgetFirstNote = computed(() => peekNotes.value[0] || null);
     const peekWidgetPhotos = computed(() => peekPhotos.value.slice(0, 3));
 
@@ -265,6 +265,72 @@ export function usePeek(charactersRef, activeProfileRef, soulLinkMessagesRef, so
     const peekPhotos = ref([]);
     const peekFiles = ref([]);
     const peekBrowserHistory = ref([]);
+    const formatPeekMessageText = (m) => {
+        if (typeof m?.text === 'string' && m.text.trim()) return m.text.trim();
+        switch (m?.messageType) {
+            case 'image': return '[图片]';
+            case 'voice': return m?.transcription ? `[语音] ${m.transcription}` : '[语音]';
+            case 'transfer': return `[转账] ${m?.amount ?? ''}`.trim();
+            case 'order': return `[订单] ${m?.item ?? ''}`.trim();
+            case 'helpBuy': return `[帮买] ${m?.item ?? ''}`.trim();
+            case 'location': return '[位置]';
+            default: return '[消息]';
+        }
+    };
+    const formatPeekAt = (ts) => {
+        const n = Number(ts || 0);
+        if (!n) return '';
+        try {
+            return new Date(n).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+        } catch {
+            return '';
+        }
+    };
+    const peekSoulChatMessages = computed(() => {
+        const charId = String(peekSelectedCharacterId.value || '');
+        if (!charId) return [];
+        const source = soulLinkMessagesRef?.value || {};
+        const rows = Array.isArray(source[charId]) ? source[charId] : [];
+        return rows
+            .filter((m) => m && !m.isSystem && !m.isHidden && (m.sender === 'user' || m.sender === 'ai'))
+            .map((m, idx) => ({
+                id: m.id || m.timestamp || `peek_msg_${idx}`,
+                sender: m.sender,
+                text: formatPeekMessageText(m),
+                at: formatPeekAt(m.timestamp),
+                ts: Number(m.timestamp || 0) || 0
+            }))
+            .slice(-80);
+    });
+    const peekExternalChatMessages = computed(() => {
+        const rows = Array.isArray(peekMessages.value) ? peekMessages.value : [];
+        return rows
+            .filter((m) => m && String(m.app || '') !== '系统提醒')
+            .map((m, idx) => {
+                const rawAt = String(m.at || '');
+                const parsedTs = Number(m.ts || 0) || 0;
+                return {
+                    id: m.id || `peek_external_${idx}`,
+                    sender: m.sender === 'user' ? 'user' : 'ai',
+                    text: m.text ? `${m.app ? `【${m.app}】` : ''} ${m.text}`.trim() : (m.app || '[消息]'),
+                    at: rawAt,
+                    ts: parsedTs
+                };
+            })
+            .slice(-50);
+    });
+    const peekMixedChatMessages = computed(() => {
+        const all = [...peekSoulChatMessages.value, ...peekExternalChatMessages.value];
+        all.sort((a, b) => {
+            const ta = Number(a.ts || 0);
+            const tb = Number(b.ts || 0);
+            if (ta && tb) return ta - tb;
+            if (ta && !tb) return -1;
+            if (!ta && tb) return 1;
+            return 0;
+        });
+        return all.slice(-120);
+    });
 
     const collectLinkedSignals = (char) => {
         const charName = char?.nickname || char?.name || 'TA';
@@ -347,6 +413,7 @@ export function usePeek(charactersRef, activeProfileRef, soulLinkMessagesRef, so
                 const prompt = `你是角色手机数据生成器。请仅返回 JSON，不要 markdown。
 输出结构:
 {
+  "socialMessages":[{"id":"m1","app":"联系人或群名","text":"对话摘要","at":"HH:mm","ts":1710000000000}],
   "diaryEntries":[{"id":"d1","title":"...","mood":"...","content":"..."}],
   "bankAccount":{"balance":1234,"monthlySpend":456,"records":[{"id":"b1","item":"...","amount":-12,"at":"09:00"}]},
   "mapTracks":[{"id":"m1","place":"...","at":"08:30","note":"..."}]
@@ -417,6 +484,10 @@ ${chatTranscriptForPrompt || '（无增量聊天内容）'}
             }
 
                 // 追加/合并：不覆盖旧内容，生成后“在基础上变多”
+                const incomingSocial = Array.isArray(payload.socialMessages) ? payload.socialMessages : [];
+                if (incomingSocial.length > 0) {
+                    peekMessages.value = mergeById(peekMessages.value, incomingSocial);
+                }
                 const incomingDiary = Array.isArray(payload.diaryEntries) ? payload.diaryEntries : [];
                 peekDiaryEntries.value = mergeById(peekDiaryEntries.value, incomingDiary);
 
@@ -461,9 +532,9 @@ ${chatTranscriptForPrompt || '（无增量聊天内容）'}
 
         const charName = char?.nickname || char?.name || 'TA';
         peekMessages.value = [
-            { id: Date.now() + 1, app: 'SoulLink', text: `今晚见吗？`, at: '22:16' },
-            { id: Date.now() + 2, app: '系统提醒', text: `${charName} 设置了面容解锁`, at: '20:03' },
-            { id: Date.now() + 3, app: '群聊', text: `${charName}：我马上到`, at: '18:44' }
+            { id: Date.now() + 1, app: '林然', text: '今晚电影还去吗', at: '22:16' },
+            { id: Date.now() + 2, app: '设计组', text: `${charName}：我把初稿发群里了`, at: '20:03' },
+            { id: Date.now() + 3, app: '快递员', text: '放在驿站了，记得取件', at: '18:44' }
         ];
         peekCalls.value = [
             { id: Date.now() + 4, who: '未知号码', type: 'missed', at: '今天 21:30' },
@@ -585,6 +656,9 @@ ${chatTranscriptForPrompt || '（无增量聊天内容）'}
         filteredPeekApps,
         DOCK_APPS,
         peekMessages,
+        peekSoulChatMessages,
+        peekExternalChatMessages,
+        peekMixedChatMessages,
         peekCalls,
         peekNotes,
         peekPhotos,

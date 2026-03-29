@@ -7298,8 +7298,16 @@ ${osForPrompt || ''}`;
         const userRelation = ref('');
         const userPronoun = ref('unknown');
         // userAvatar moved to top-level init
-        const bubbleStyle = ref('default');
+        const bubbleStyle = ref('default'); // 兼容旧存档（不再用于展示主逻辑）
         const customBubbleCSS = ref('');
+
+        // 你要求的「气泡美化」模块化配置
+        // 模块1：头像显示模式（hide / first / all）
+        const bubbleAvatarMode = ref('first');
+        // 模块2：气泡形状（round / sharp）
+        const bubbleShapeMode = ref('round');
+        // 模块3：气泡颜色对比预设（多组对比色）
+        const bubbleColorPreset = ref('default');
         const showChatMenu = ref(false);
         const showProfile = ref(false);
         const profileChar = ref(null);
@@ -7338,16 +7346,46 @@ ${osForPrompt || ''}`;
         };
         
        
+        // 气泡美化预设（模块3：对比色）
+        const BUBBLE_COLOR_PRESETS = {
+            default: { userBg: '#000000', userColor: '#FFFFFF', aiBg: '#F2F2F2', aiColor: '#000000' },
+            blue: { userBg: '#000000', userColor: '#FFFFFF', aiBg: '#DBEAFE', aiColor: '#000000' },
+            orange: { userBg: '#000000', userColor: '#FFFFFF', aiBg: '#FFEDD5', aiColor: '#000000' },
+            plum: { userBg: '#000000', userColor: '#FFFFFF', aiBg: '#E9D5FF', aiColor: '#000000' },
+            sage: { userBg: '#000000', userColor: '#FFFFFF', aiBg: '#DCFCE7', aiColor: '#000000' },
+            steel: { userBg: '#0F172A', userColor: '#FFFFFF', aiBg: '#F3F4F6', aiColor: '#000000' },
+        };
 
+        // 兼容旧入口（保留 setBubbleStyle 以免其他地方调用失效）
         const setBubbleStyle = (style) => {
             bubbleStyle.value = style;
+            // 将旧样式映射到新模块
+            if (style === 'sharp') {
+                bubbleShapeMode.value = 'sharp';
+                bubbleColorPreset.value = 'default';
+            } else if (style === 'round') {
+                bubbleShapeMode.value = 'round';
+                bubbleColorPreset.value = 'default';
+            } else if (style === 'blue') {
+                bubbleShapeMode.value = 'round';
+                bubbleColorPreset.value = 'blue';
+            } else if (style === 'orange') {
+                bubbleShapeMode.value = 'round';
+                bubbleColorPreset.value = 'orange';
+            } else if (style === 'custom') {
+                // 自定义 CSS 不强制改形状/颜色
+                bubbleShapeMode.value = bubbleShapeMode.value || 'round';
+                bubbleColorPreset.value = bubbleColorPreset.value || 'default';
+            } else {
+                bubbleShapeMode.value = 'round';
+                bubbleColorPreset.value = 'default';
+            }
             applyBubbleStyle();
         };
+
+        // 模块4：自定义 CSS 应用
         const applyCustomCSS = () => {
-            if (customBubbleCSS.value) {
-                bubbleStyle.value = 'custom';
-                applyBubbleStyle();
-            }
+            applyBubbleStyle();
         };
 
         const saveAndCloseSettings = () => {
@@ -7355,7 +7393,6 @@ ${osForPrompt || ''}`;
             saveChatMenuSettings();
             closeAllPanels();
         };
-        const getBubbleStyleClass = () => `bubble-style-${bubbleStyle.value}`;
         const applyCustomBubbleStyle = () => {
             let styleTag = document.getElementById('custom-bubble-style');
             if (!styleTag) {
@@ -7365,20 +7402,42 @@ ${osForPrompt || ''}`;
             }
             const css = customBubbleCSS.value.trim();
             styleTag.textContent = css
-                ? `#app.bubble-style-custom .message.user .text-bubble { ${css} }`
+                ? `#app.bubble-style-custom .message.user .bubble,
+                   #app.bubble-style-custom .message.ai .bubble,
+                   #app.bubble-style-custom .voice-message-bubble { ${css} }`
                 : '';
         };
         const applyBubbleStyle = () => {
             const appElement = document.getElementById('app');
             if (appElement) {
-                appElement.classList.remove('bubble-style-default', 'bubble-style-blue', 'bubble-style-orange', 'bubble-style-custom', 'bubble-style-round', 'bubble-style-sharp');
-                appElement.classList.add(getBubbleStyleClass());
-            }
-            if (bubbleStyle.value === 'custom') {
+                // 移除旧类名，改用 CSS 变量驱动（模块化逻辑）
+                appElement.classList.remove(
+                    'bubble-style-default',
+                    'bubble-style-blue',
+                    'bubble-style-orange',
+                    'bubble-style-round',
+                    'bubble-style-sharp'
+                );
+
+                // 模块2：气泡形状（圆弧 / 直角）
+                const radius = bubbleShapeMode.value === 'sharp' ? '0px' : '18px';
+                appElement.style.setProperty('--chat-bubble-radius', radius);
+
+                // 模块3：气泡颜色预设（两方对比色）
+                const preset = BUBBLE_COLOR_PRESETS[bubbleColorPreset.value] || BUBBLE_COLOR_PRESETS.default;
+                appElement.style.setProperty('--chat-bubble-user-bg', preset.userBg);
+                appElement.style.setProperty('--chat-bubble-user-color', preset.userColor);
+                appElement.style.setProperty('--chat-bubble-ai-bg', preset.aiBg);
+                appElement.style.setProperty('--chat-bubble-ai-color', preset.aiColor);
+
+                // 模块4：自定义 CSS
+                if (customBubbleCSS.value && String(customBubbleCSS.value).trim()) {
+                    appElement.classList.add('bubble-style-custom');
+                } else {
+                    appElement.classList.remove('bubble-style-custom');
+                }
+
                 applyCustomBubbleStyle();
-            } else {
-                const styleTag = document.getElementById('custom-bubble-style');
-                if (styleTag) styleTag.textContent = '';
             }
         };
         const getUserPronounInstruction = () => {
@@ -7849,7 +7908,10 @@ ${JSON.stringify((newMessages || []).slice(-60).map((m) => ({
                 userIdentity: userIdentity.value,
                 userRelation: userRelation.value,
                 userPronoun: userPronoun.value,
-                bubbleStyle: bubbleStyle.value,
+                bubbleStyle: bubbleStyle.value, // legacy
+                bubbleAvatarMode: bubbleAvatarMode.value,
+                bubbleShapeMode: bubbleShapeMode.value,
+                bubbleColorPreset: bubbleColorPreset.value,
                 customBubbleCSS: customBubbleCSS.value,
                 chatBackgroundStyle: chatBackgroundStyle.value,
                 gradientStartColor: gradientStartColor.value,
@@ -7888,7 +7950,13 @@ ${JSON.stringify((newMessages || []).slice(-60).map((m) => ({
                 userIdentity.value = saved.userIdentity || '';
                 userRelation.value = saved.userRelation || '';
                 userPronoun.value = saved.userPronoun || 'unknown';
-                bubbleStyle.value = saved.bubbleStyle || 'default';
+                bubbleStyle.value = saved.bubbleStyle || 'default'; // legacy
+                bubbleAvatarMode.value = saved.bubbleAvatarMode || 'first';
+                bubbleShapeMode.value = saved.bubbleShapeMode || ((saved.bubbleStyle === 'sharp') ? 'sharp' : 'round');
+                bubbleColorPreset.value = saved.bubbleColorPreset
+                    || ((saved.bubbleStyle === 'blue') ? 'blue'
+                        : (saved.bubbleStyle === 'orange') ? 'orange'
+                            : 'default');
                 customBubbleCSS.value = saved.customBubbleCSS || '';
                 chatBackgroundStyle.value = saved.chatBackgroundStyle || 'default';
                 gradientStartColor.value = saved.gradientStartColor || '#f2f2f7';
@@ -7921,6 +7989,9 @@ ${JSON.stringify((newMessages || []).slice(-60).map((m) => ({
                 userRelation.value = '';
                 userPronoun.value = 'unknown';
                 bubbleStyle.value = 'default';
+                bubbleAvatarMode.value = 'first';
+                bubbleShapeMode.value = 'round';
+                bubbleColorPreset.value = 'default';
                 customBubbleCSS.value = '';
                 chatBackgroundStyle.value = 'default';
                 gradientStartColor.value = '#f2f2f7';
@@ -7955,9 +8026,10 @@ ${JSON.stringify((newMessages || []).slice(-60).map((m) => ({
             }
         };
         const confirmChatMenu = () => {
-            if (bubbleStyle.value === 'custom' && !customBubbleCSS.value.trim()) {
-                bubbleStyle.value = 'default';
-            }
+            // 模块4：自定义 CSS（最后一个模块）。用于兼容旧存档字段 bubbleStyle。
+            bubbleStyle.value = customBubbleCSS.value && customBubbleCSS.value.trim()
+                ? 'custom'
+                : 'default';
             saveChatMenuSettings();
             applyBubbleStyle();
             showChatMenu.value = false;
@@ -10507,7 +10579,11 @@ ${styleGuide}
             // Music Player
             isPlaying, togglePlayPause, playPrevious, playNext,
             // New Features (Chat Menu, Call, Virtual Camera, Panels)
-            userIdentity, userRelation, userPronoun, userAvatar, uploadUserAvatar, resetUserAvatar, bubbleStyle, customBubbleCSS, setBubbleStyle, applyCustomCSS, saveAndCloseSettings, confirmChatMenu, showArchiveDialog, showArchivedChats, archiveName, archiveDescription, archivedChats, filteredArchivedChats, sortedArchivedChats, archiveCurrentChat, restoreArchivedChat, deleteArchivedChat, saveChatMenuSettings, loadChatMenuSettings, clearChatHistory, exportChatHistory, showCreateGroupDialog, newGroupName, newGroupMembers, createNewGroup, newGroupAvatar, selectedGroupMembers, groupAvatarInput, triggerGroupAvatarUpload, handleGroupAvatarUpload, toggleGroupMember, showAddMemberDialog, selectedAddMembers, getAvailableCharactersForAdd, toggleAddMember, addMembersToGroup, removeGroupMember, addMemberMode, customMemberAvatar, customMemberName, customMemberPersona, customMemberAvatarInput, triggerCustomMemberAvatarUpload, handleCustomMemberAvatarUpload, addCustomMember, showRenameGroupDialog, newGroupNameInput, tempGroupAvatar, renameGroupAvatarInput, triggerRenameGroupAvatarUpload, handleRenameGroupAvatarUpload, renameGroup, shakeCharacter, shakeGroupMember,
+            userIdentity, userRelation, userPronoun, userAvatar, uploadUserAvatar, resetUserAvatar,
+            bubbleStyle, customBubbleCSS, bubbleAvatarMode, bubbleShapeMode, bubbleColorPreset,
+            setBubbleStyle, applyBubbleStyle, applyCustomCSS,
+            saveAndCloseSettings, confirmChatMenu, showArchiveDialog, showArchivedChats, archiveName, archiveDescription, archivedChats, filteredArchivedChats, sortedArchivedChats, archiveCurrentChat, restoreArchivedChat, deleteArchivedChat,
+            saveChatMenuSettings, loadChatMenuSettings, clearChatHistory, exportChatHistory, showCreateGroupDialog, newGroupName, newGroupMembers, createNewGroup, newGroupAvatar, selectedGroupMembers, groupAvatarInput, triggerGroupAvatarUpload, handleGroupAvatarUpload, toggleGroupMember, showAddMemberDialog, selectedAddMembers, getAvailableCharactersForAdd, toggleAddMember, addMembersToGroup, removeGroupMember, addMemberMode, customMemberAvatar, customMemberName, customMemberPersona, customMemberAvatarInput, triggerCustomMemberAvatarUpload, handleCustomMemberAvatarUpload, addCustomMember, showRenameGroupDialog, newGroupNameInput, tempGroupAvatar, renameGroupAvatarInput, triggerRenameGroupAvatarUpload, handleRenameGroupAvatarUpload, renameGroup, shakeCharacter, shakeGroupMember,
             callActive, callType, callTimer, callInput, callMessages, isCallAiTyping, isMuted, toggleMute, isSpeakerOn, toggleSpeaker, isCameraOn, toggleCamera, currentChatName, currentChatAvatar,
             showCallInput, callInputText, toggleCallInput, sendCallText, openCallDiary, closeCallDiaryModal, showCallDiaryModal, selectedCallDiary, callDiaryTitle,
             videoSelfPosition, isVideoAvatarSwapped, startDragVideoSelf, swapVideoAvatars,

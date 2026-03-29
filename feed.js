@@ -2,6 +2,7 @@
 import { ref } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
 
 const CURRENT_USER_NAME = '我';
+const DEFAULT_MOMENTS_BG_URL = 'https://img.heliar.top/file/1774802842396_1774802818159.png';
 
 // IndexedDB Setup
 let feedDB = null;
@@ -113,6 +114,7 @@ export function useFeed(profiles, activeProfile) {
     const scrollTop = ref(0);
     const activeCommentPostId = ref(null);
     const activeReplyCommentId = ref(null);
+    const activeActionPostId = ref(null);
     const commentInput = ref('');
     const replyInput = ref('');
     
@@ -125,6 +127,18 @@ export function useFeed(profiles, activeProfile) {
     const feedTextImageBgColor = ref('#ffffff');
     const feedTextImageColors = ['#ffffff', '#f8f5f0', '#fef3c7', '#dbeafe', '#f3e8ff', '#fce7f3', '#dcfce7'];
     const showFabMenu = ref(false);
+
+    // Create Post - WeChat-like light options
+    const showLocationSheet = ref(false);
+    const showVisibilitySheet = ref(false);
+    const showMentionSheet = ref(false);
+    const showMediaSheet = ref(false);
+
+    const locationText = ref('');
+    const visibilityMode = ref('public'); // public | private | partial
+    const visibilityAllowRoleIds = ref([]); // string ids
+    const mentionRoleIds = ref([]); // string ids
+    const mentionTagNames = ref([]); // string tags
     
     // User Profile State
     const userProfile = ref({
@@ -133,6 +147,30 @@ export function useFeed(profiles, activeProfile) {
         bio: '点击这里编辑个性签名',
         bgImage: 'https://images.unsplash.com/photo-1470770841072-f978cf4d019e?w=800&q=80'
     });
+
+    // Moments full-screen background
+    const momentsBgUrl = ref(DEFAULT_MOMENTS_BG_URL);
+    try {
+        const saved = localStorage.getItem('feed_moments_bg');
+        if (saved) momentsBgUrl.value = saved;
+    } catch (e) {
+        // ignore
+    }
+
+    const momentsBgStyle = ref({
+        backgroundImage: `url(${momentsBgUrl.value})`
+    });
+
+    function setMomentsBgUrl(url) {
+        const u = String(url || '').trim();
+        momentsBgUrl.value = u || DEFAULT_MOMENTS_BG_URL;
+        momentsBgStyle.value = { backgroundImage: `url(${momentsBgUrl.value})` };
+        try {
+            localStorage.setItem('feed_moments_bg', momentsBgUrl.value);
+        } catch (e) {
+            // ignore
+        }
+    }
 
     // Profile Viewer State
     const viewingUserProfile = ref(null); // null = main feed, object = showing profile
@@ -374,6 +412,7 @@ export function useFeed(profiles, activeProfile) {
 
     // Show/Hide Comment Input
     function toggleCommentInput(postId) {
+        activeActionPostId.value = null;
         if (activeCommentPostId.value === postId) {
             activeCommentPostId.value = null;
             commentInput.value = '';
@@ -394,6 +433,14 @@ export function useFeed(profiles, activeProfile) {
             activeReplyCommentId.value = commentId;
             replyInput.value = '';
         }
+    }
+
+    function toggleActionMenu(postId) {
+        activeActionPostId.value = activeActionPostId.value === postId ? null : postId;
+    }
+
+    function closeActionMenu() {
+        activeActionPostId.value = null;
     }
 
     // Submit Comment or Reply
@@ -701,6 +748,7 @@ ${postContext}
 
     function handleScroll(e) {
         scrollTop.value = e.target.scrollTop;
+        activeActionPostId.value = null;
     }
 
     // Create Post Logic
@@ -708,12 +756,114 @@ ${postContext}
         showCreatePost.value = true;
         newPostText.value = '';
         newPostImages.value = [];
+        showLocationSheet.value = false;
+        showVisibilitySheet.value = false;
+        showMentionSheet.value = false;
     }
 
     function closeCreatePost() {
         showCreatePost.value = false;
         newPostText.value = '';
         newPostImages.value = [];
+        showLocationSheet.value = false;
+        showVisibilitySheet.value = false;
+        showMentionSheet.value = false;
+    }
+
+    function closeSheets() {
+        showLocationSheet.value = false;
+        showVisibilitySheet.value = false;
+        showMentionSheet.value = false;
+        showMediaSheet.value = false;
+    }
+
+    function openLocationSheet() {
+        closeSheets();
+        showLocationSheet.value = true;
+    }
+
+    function openVisibilitySheet() {
+        closeSheets();
+        showVisibilitySheet.value = true;
+    }
+
+    function openMentionSheet() {
+        closeSheets();
+        showMentionSheet.value = true;
+    }
+
+    function openMediaSheet() {
+        closeSheets();
+        showMediaSheet.value = true;
+    }
+
+    function locationLabel() {
+        return locationText.value && locationText.value.trim() ? locationText.value.trim() : '不显示';
+    }
+
+    function visibilityLabel(characters) {
+        if (visibilityMode.value === 'public') return '公开';
+        if (visibilityMode.value === 'private') return '私密';
+        // partial
+        const charsArray = Array.isArray(characters) ? characters : (characters?.value || []);
+        const names = charsArray
+            .filter(c => visibilityAllowRoleIds.value.includes(String(c.id)))
+            .map(c => c.nickname || c.name || '未命名');
+        return names.length ? `部分可见(${names.length})` : '部分可见(未选)';
+    }
+
+    function mentionLabel(characters) {
+        const charsArray = Array.isArray(characters) ? characters : (characters?.value || []);
+        const tagCount = mentionTagNames.value.length;
+        const roleCount = mentionRoleIds.value.length;
+        const total = roleCount + tagCount;
+        if (!total) return '未选择';
+        if (total <= 2) {
+            const roleNames = charsArray
+                .filter(c => mentionRoleIds.value.includes(String(c.id)))
+                .map(c => c.nickname || c.name || '未命名');
+            const tags = mentionTagNames.value.map(t => `#${t}`);
+            return [...roleNames, ...tags].slice(0, 2).join('、');
+        }
+        return `已选 ${total} 项`;
+    }
+
+    function toggleVisibilityRole(roleId) {
+        const id = String(roleId);
+        const idx = visibilityAllowRoleIds.value.indexOf(id);
+        if (idx >= 0) visibilityAllowRoleIds.value.splice(idx, 1);
+        else visibilityAllowRoleIds.value.push(id);
+    }
+
+    function toggleMentionRole(roleId) {
+        const id = String(roleId);
+        const idx = mentionRoleIds.value.indexOf(id);
+        if (idx >= 0) mentionRoleIds.value.splice(idx, 1);
+        else mentionRoleIds.value.push(id);
+    }
+
+    function toggleMentionTag(tagName) {
+        const t = String(tagName || '').trim();
+        if (!t) return;
+        const idx = mentionTagNames.value.indexOf(t);
+        if (idx >= 0) mentionTagNames.value.splice(idx, 1);
+        else mentionTagNames.value.push(t);
+    }
+
+    function clearMentions() {
+        mentionRoleIds.value = [];
+        mentionTagNames.value = [];
+    }
+
+    function allCharacterTags(characters) {
+        const charsArray = Array.isArray(characters) ? characters : (characters?.value || []);
+        const set = new Set();
+        for (const c of charsArray) {
+            const tags = c?.tags;
+            if (Array.isArray(tags)) tags.forEach(t => set.add(String(t).trim()));
+            else if (typeof tags === 'string') tags.split(',').forEach(t => set.add(String(t).trim()));
+        }
+        return Array.from(set).filter(Boolean).sort((a, b) => a.localeCompare(b, 'zh-CN'));
     }
 
     function openTextImageCreator() {
@@ -769,6 +919,11 @@ ${postContext}
         if (input) input.click();
     }
 
+    function triggerCameraUpload() {
+        const input = document.getElementById('feed-camera-input');
+        if (input) input.click();
+    }
+
     async function publishPost() {
         if (!newPostText.value.trim() && newPostImages.value.length === 0) return;
 
@@ -789,7 +944,12 @@ ${postContext}
                 likes: [],
                 comments: [],
                 isLiked: false,
-                isFavorited: false
+                isFavorited: false,
+                location: locationText.value && locationText.value.trim() ? locationText.value.trim() : '',
+                visibility: visibilityMode.value,
+                visibilityAllowRoleIds: [...visibilityAllowRoleIds.value],
+                mentionRoleIds: [...mentionRoleIds.value],
+                mentionTagNames: [...mentionTagNames.value]
             };
             
             // Add to in-memory list (keep original images for display)
@@ -973,6 +1133,7 @@ ${character.persona || ''}
         scrollTop,
         activeCommentPostId,
         activeReplyCommentId,
+        activeActionPostId,
         commentInput,
         replyInput,
         showCreatePost,
@@ -983,6 +1144,15 @@ ${character.persona || ''}
         feedTextImageBgColor,
         feedTextImageColors,
         showFabMenu,
+        showLocationSheet,
+        showVisibilitySheet,
+        showMentionSheet,
+        showMediaSheet,
+        locationText,
+        visibilityMode,
+        visibilityAllowRoleIds,
+        mentionRoleIds,
+        mentionTagNames,
         loadPosts,
         toggleLike,
         toggleFavorite,
@@ -993,17 +1163,36 @@ ${character.persona || ''}
         handleScroll,
         openCreatePost,
         closeCreatePost,
+        closeSheets,
+        openLocationSheet,
+        openVisibilitySheet,
+        openMentionSheet,
+        openMediaSheet,
+        locationLabel,
+        visibilityLabel,
+        mentionLabel,
+        toggleVisibilityRole,
+        toggleMentionRole,
+        toggleMentionTag,
+        clearMentions,
+        allCharacterTags,
         openTextImageCreator,
         closeTextImageCreator,
         addTextImageToPost,
         toggleReplyInput,
+        toggleActionMenu,
+        closeActionMenu,
         publishPost,
         addImageToPost,
         handleImageUpload,
         triggerImageUpload,
+        triggerCameraUpload,
         roleAction,
         // Profile related exports
         userProfile,
+        momentsBgUrl,
+        momentsBgStyle,
+        setMomentsBgUrl,
         viewingUserProfile,
         viewingUserPosts,
         isEditingProfile,
