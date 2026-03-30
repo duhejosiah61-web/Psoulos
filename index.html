@@ -122,7 +122,7 @@
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
                 backgroundColor: 'transparent',
-                color: homeTextColorInput || homeTextColor || '#000000'
+                '--home-app-color': homeTextColorInput || homeTextColor || '#000000'
             }"
         >
             <!-- 内部手机有效区域：固定宽度但无明显边框 -->
@@ -162,17 +162,29 @@
                                             </div>
                                             <div class="left-peek-notch"></div>
                                             <div class="left-peek-screen peek-phone-screen" :class="{ dark: peek.peekDark }">
-                                                <div v-if="peek.peekLocked" class="peek-lockscreen" :style="{ backgroundImage: 'url(' + (peek.peekSelectedCharacter?.avatarUrl || 'https://placehold.co/400x800?text=Wallpaper') + ')' }" @click="peek.unlockPeek">
-                                                    <div class="peek-lockscreen-widget">
-                                                        <span class="peek-lockscreen-weather"><i class="fas fa-sun"></i> {{ peek.peekWidgetWeather }}</span>
-                                                        <span class="peek-lockscreen-location"><i class="fas fa-location-dot"></i> 当前定位</span>
+                                                <div v-if="peek.peekLocked" class="peek-lockscreen" :style="{ backgroundImage: 'url(' + (peek.peekSelectedCharacter?.avatarUrl || 'https://placehold.co/400x800?text=Wallpaper') + ')' }">
+                                                    <div class="peek-lock-time-wrap">
+                                                        <div class="lock-time">
+                                                            <div class="lock-clock">{{ peek.peekStatusTime }}</div>
+                                                            <div class="lock-date">{{ peek.peekWidgetDate }}</div>
+                                                            <div class="lock-signature">{{ lockSignature }}</div>
+                                                        </div>
                                                     </div>
-                                                    <div class="peek-lockscreen-time">{{ peek.peekStatusTime }}</div>
-                                                    <div class="peek-lockscreen-date">{{ peek.peekWidgetDate }}</div>
-                                                    <div class="peek-lockscreen-hint"><i class="fas fa-chevron-up"></i> 上滑解锁</div>
-                                                    <div class="peek-lockscreen-quick">
-                                                        <div class="peek-lockscreen-quick-item"><i class="fas fa-flashlight"></i></div>
-                                                        <div class="peek-lockscreen-quick-item"><i class="fas fa-camera"></i></div>
+                                                    <div class="peek-passcode-panel" @click.stop>
+                                                        <div class="peek-passcode-dots">
+                                                            <span v-for="i in 4" :key="i" class="peek-passcode-dot" :class="{ active: peek.peekPasscodeInput.length >= i }"></span>
+                                                        </div>
+                                                        <div class="peek-passcode-hint">
+                                                            <span v-if="peek.peekLockoutRemainSec > 0">已静止 {{ peek.peekLockoutRemainSec }} 秒</span>
+                                                            <span v-else>{{ peek.peekLockHint }}</span>
+                                                        </div>
+                                                        <div class="peek-passcode-expire"></div>
+                                                        <div class="peek-passcode-keypad">
+                                                            <button v-for="n in 9" :key="'num-' + n" class="peek-passcode-key" @click="peek.appendPeekPasscodeDigit(n)">{{ n }}</button>
+                                                            <button class="peek-passcode-key muted" @click="peek.clearPeekPasscodeInput">清空</button>
+                                                            <button class="peek-passcode-key" @click="peek.appendPeekPasscodeDigit(0)">0</button>
+                                                            <button class="peek-passcode-key muted" @click="peek.removePeekPasscodeDigit"><i class="fa fa-backspace"></i></button>
+                                                        </div>
                                                     </div>
                                                 </div>
                                                 <template v-else>
@@ -324,11 +336,11 @@
                                              @click="changePhotoWidgetImage(index)">
                                             <img :src="photo.url" :alt="'Photo ' + (index + 1)" class="photo-widget-img">
                                             <div class="photo-widget-overlay"></div>
+                                        </div>
                                     </div>
                                 </div>
                         </div>
                             </div>
-                        </div>
                         
                         <!-- 第5-6行：贴纸和app (2行×4格) -->
                         <div class="grid-cell grid-row-5-6">
@@ -510,7 +522,6 @@
                 <!-- 页面指示器和翻页箭头（固定在 homescreen-inner 内部） -->
                 <div
                     class="page-indicator-container"
-                    :style="{ color: homeTextColorInput || homeTextColor || '#000000' }"
                 >
                     <button 
                         class="page-nav-arrow left" 
@@ -541,7 +552,6 @@
                 <div
                     class="dock"
                     v-if="isHomeScreenVisible"
-                    :style="{ color: homeTextColorInput || homeTextColor || '#000000' }"
                 >
                     <div class="dock-icon" @click="openApp('workshop')">
                         <i class="fa fa-wrench"></i>
@@ -5180,8 +5190,214 @@
             </div>
         </div>
 
-        <!-- Announcement App -->
-        <div v-else-if="openedApp === 'announcement'" class="app-view">
+        <!-- Games App -->
+        <div v-else-if="openedApp === 'games'" class="app-view games-view">
+            <div class="app-header">
+                <button class="back-btn" @click="closeApp"><i class="fas fa-chevron-left"></i></button>
+                <span class="app-title">小游戏</span>
+                <div style="width: 40px;"></div>
+            </div>
+            <div class="app-content games-content">
+                <div v-if="!games.currentGame" class="card games-panel">
+                    <div class="card-title">游戏大厅</div>
+                    <div class="games-lobby-grid">
+                        <button
+                            v-for="game in games.games"
+                            :key="game.id"
+                            class="console-btn games-lobby-btn"
+                            :disabled="game.status !== 'available'"
+                            @click="openGame(game.id)"
+                        >
+                            <div class="games-lobby-name">{{ game.name }} <span v-if="game.status !== 'available'" class="games-badge-soon">(敬请期待)</span></div>
+                            <div class="games-lobby-desc">{{ game.description }}</div>
+                        </button>
+                    </div>
+                </div>
+
+                <div v-else class="card games-panel">
+                    <div class="card-title">{{ games.currentGame.name }}</div>
+                    <p class="games-rule">{{ games.currentGame.rules || games.currentGame.description }}</p>
+                    <div class="games-meta">
+                        人数：{{ games.currentGame.players || '-' }} ｜ 时长：{{ games.currentGame.duration || '-' }}
+                    </div>
+                    <div class="games-ai-picker">
+                        <div class="games-kicker">游戏搭子</div>
+                        <select v-model="gameAiCharacterId" class="console-select">
+                            <option :value="null">默认 AI 搭子</option>
+                            <option v-for="char in characters" :key="char.id" :value="char.id">
+                                {{ char.nickname || char.name || '未命名角色' }}
+                            </option>
+                        </select>
+                        <div class="games-ai-current">当前搭子：{{ getGameAiName() }}</div>
+                    </div>
+
+                    <div v-if="games.currentGame.id === 'werewolf'" class="games-mode-panel">
+                        <input v-model="playerName" type="text" placeholder="输入玩家名" class="lock-wallpaper-input">
+                        <div class="games-actions-row">
+                            <button class="console-btn console-btn-secondary" @click="joinGame">加入</button>
+                            <button class="console-btn console-btn-primary" @click="startGameSession">开始</button>
+                            <button class="console-btn console-btn-secondary" @click="endDay" v-if="games.gameState.phase === 'game'">结束白天</button>
+                        </div>
+                        <div class="games-status-line">当前阶段：{{ games.gameState.phase }} ｜ 天数：第 {{ games.gameState.day }} 天</div>
+                        <div class="games-status-line">
+                            <span v-if="games.gameState.players.length === 0">玩家：暂无</span>
+                            <span v-else>
+                                玩家：
+                                <span v-for="(p, idx) in games.gameState.players" :key="p.name + '_' + idx">
+                                    {{ p.name }}{{ p.isAlive ? '' : '(出局)' }}<span v-if="idx < games.gameState.players.length - 1">、</span>
+                                </span>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div v-else-if="games.currentGame.id === 'rock-paper-scissors'" class="games-rps-panel">
+                        <button class="console-btn console-btn-secondary" @click="playRPS('rock')">石头</button>
+                        <button class="console-btn console-btn-secondary" @click="playRPS('paper')">布</button>
+                        <button class="console-btn console-btn-secondary" @click="playRPS('scissors')">剪刀</button>
+                        <div class="games-status-line games-status-wide">
+                            结果：{{ games.gameState.rpsResult || '未开始' }} ｜ 比分 {{ games.gameState.rpsScore.player }}:{{ games.gameState.rpsScore.ai }}
+                        </div>
+                    </div>
+
+                    <div v-else-if="games.currentGame.id === 'truth-or-dare'" class="games-mode-panel">
+                        <button class="console-btn console-btn-primary" @click="spinTOD">开始转盘</button>
+                        <div class="games-prompt-text">{{ games.gameState.currentTruth || games.gameState.currentDare || '点击开始后生成题目' }}</div>
+                    </div>
+
+                    <div v-else-if="games.currentGame.id === 'uno'" class="games-mode-panel">
+                        <button class="console-btn console-btn-primary" @click="startUNOGame">开始 UNO</button>
+                        <div class="games-status-line">
+                            当前颜色：{{ games.gameState.currentColor || '-' }} ｜ 轮到：{{ games.gameState.unoCurrentTurn === 'player' ? '你' : 'AI' }}
+                        </div>
+                        <div class="games-status-line">
+                            你：{{ games.gameState.playerHand.length }} 张 ｜ AI：{{ (games.gameState.aiHands[0] || []).length }} 张
+                        </div>
+                        <div class="games-prompt-text" v-if="games.gameState.discardPile.length > 0">
+                            牌堆顶部：{{ games.gameState.discardPile[games.gameState.discardPile.length - 1].color }} - {{ games.gameState.discardPile[games.gameState.discardPile.length - 1].value }}
+                        </div>
+                        <div class="games-uno-hand">
+                            <button
+                                v-for="(card, idx) in games.gameState.playerHand"
+                                :key="idx"
+                                class="console-btn games-uno-card-btn"
+                                :disabled="games.gameState.unoCurrentTurn !== 'player' || !games.isUnoPlayableCard(card)"
+                                @click="playCard(idx)"
+                            >
+                                {{ card.color }}-{{ card.value }}
+                            </button>
+                        </div>
+                        <div class="games-actions-row">
+                            <button class="console-btn console-btn-secondary" :disabled="games.gameState.unoCurrentTurn !== 'player'" @click="drawCard">抽一张</button>
+                            <button class="console-btn console-btn-secondary" @click="sayUNO">喊 UNO</button>
+                        </div>
+                        <div class="games-status-line" v-if="games.gameState.unoWinner">
+                            胜者：{{ games.gameState.unoWinner === 'player' ? '你' : 'AI' }}
+                        </div>
+                    </div>
+
+                    <div v-else-if="games.currentGame.id === 'ludo'" class="games-mode-panel">
+                        <button class="console-btn console-btn-primary" @click="startLudoGame">开始飞行棋</button>
+                        <button class="console-btn console-btn-secondary" :disabled="games.gameState.ludoCurrentPlayer !== 0" @click="rollDice">掷骰子</button>
+                        <div class="games-status-line">
+                            回合：{{ games.gameState.ludoCurrentPlayer === 0 ? '你' : 'AI' }} ｜ 点数：{{ games.gameState.currentDice || '-' }}
+                        </div>
+                        <div class="games-ludo-board">
+                            <div
+                                v-for="cell in (games.gameState.ludoTrackLength + 1)"
+                                :key="'ludo_cell_' + (cell - 1)"
+                                class="games-ludo-cell"
+                                :style="{ order: getLudoSnakeOrder(cell - 1) }"
+                            >
+                                <span class="games-ludo-cell-index">{{ cell - 1 }}</span>
+                                <span class="games-ludo-cell-effect" v-if="getLudoEffectLabel(cell - 1)">{{ getLudoEffectLabel(cell - 1) }}</span>
+                                <div class="games-ludo-tokens">
+                                    <span
+                                        v-if="(games.gameState.ludoPlayers[0]?.planes || []).includes(cell - 1)"
+                                        class="games-ludo-token player flag-token"
+                                        title="你的棋子"
+                                    >你</span>
+                                    <span
+                                        v-if="(games.gameState.ludoPlayers[1]?.planes || []).includes(cell - 1)"
+                                        class="games-ludo-token ai flag-token"
+                                        :title="getGameAiName() + '棋子'"
+                                    >{{ getGameAiName().slice(0, 1) }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="games-status-line">起点：0 ｜ 终点：{{ games.gameState.ludoTrackLength }}</div>
+                        <div class="games-status-line">
+                            终点：{{ games.gameState.ludoTrackLength }} ｜ 你的棋子：{{ (games.gameState.ludoPlayers[0]?.planes || []).join(' / ') }}
+                        </div>
+                        <div class="games-status-line">
+                            AI棋子：{{ (games.gameState.ludoPlayers[1]?.planes || []).join(' / ') }}
+                        </div>
+                        <div class="games-actions-row">
+                            <button
+                                v-for="(p, idx) in (games.gameState.ludoPlayers[0]?.planes || [])"
+                                :key="'ludo_player_plane_' + idx"
+                                class="console-btn console-btn-secondary"
+                                :disabled="games.gameState.ludoCurrentPlayer !== 0 || !games.gameState.currentDice"
+                                @click="moveLudoPlane(idx)"
+                            >
+                                移动棋子{{ idx + 1 }}
+                            </button>
+                        </div>
+                        <div class="games-status-line" v-if="games.gameState.ludoWinner">
+                            胜者：{{ games.gameState.ludoWinner === 'player' ? '你' : 'AI' }}
+                        </div>
+                        <div class="games-prompt-text" v-if="ludoQuestionLoading">AI 正在现场生成问题...</div>
+                        <div class="games-ludo-question-card" v-if="ludoQuestionCard">
+                            <div class="games-kicker">问题格挑战</div>
+                            <div class="games-prompt-text">{{ ludoQuestionCard.question }}</div>
+                            <div class="games-chat-input-row">
+                                <input
+                                    v-model="ludoAnswerInput"
+                                    @keyup.enter="submitLudoAnswer"
+                                    type="text"
+                                    class="lock-wallpaper-input"
+                                    placeholder="输入你的答案"
+                                >
+                                <button class="console-btn console-btn-primary" @click="submitLudoAnswer">提交</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="games-back-wrap">
+                        <button class="console-btn console-btn-secondary console-btn-full" @click="closeGame">返回游戏大厅</button>
+                    </div>
+
+                    <div class="card games-chat-card">
+                        <div class="card-title">和 {{ getGameAiName() }} 聊聊</div>
+                        <div class="games-chat-list">
+                            <div v-if="chatMessages.length === 0" class="games-chat-empty">还没有对话，先聊一句试试。</div>
+                            <div v-if="isGameAiTyping" class="games-chat-msg"> {{ getGameAiName() }}：正在思考中...</div>
+                            <div
+                                v-for="(msg, idx) in chatMessages"
+                                :key="idx"
+                                class="games-chat-msg"
+                                :class="{ 'from-player': msg.type === 'player', 'from-system': msg.type === 'system' }"
+                            >
+                                <strong>{{ msg.sender }}：</strong>{{ msg.content }}
+                            </div>
+                        </div>
+                        <div class="games-chat-input-row">
+                            <input
+                                v-model="playerMessage"
+                                @keyup.enter="sendMessage"
+                                type="text"
+                                class="lock-wallpaper-input"
+                                :disabled="isGameAiTyping"
+                                placeholder="输入你想对搭子说的话"
+                            >
+                            <button class="console-btn console-btn-primary games-send-btn" :disabled="isGameAiTyping" @click="sendMessage">发送</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notice App -->
+        <div v-else-if="openedApp === 'notice'" class="app-view">
             <div class="app-header">
                 <button class="back-btn" @click="closeApp"><i class="fas fa-chevron-left"></i></button>
                 <span class="app-title">更新公告</span>
@@ -5190,21 +5406,21 @@
             <div class="app-content notice-content" style="padding: 16px;">
                 <div class="card">
                     <div class="card-title">最新更新</div>
-                    <div v-for="announcement in notice.announcements" :key="announcement.id" class="announcement-item">
-                        <div class="announcement-date">{{ announcement.date }}</div>
-                        <div class="announcement-title">{{ announcement.title }}</div>
-                        <div class="announcement-content">
+                    <div v-for="noticeItem in notice.notices" :key="noticeItem.id" class="notice-item">
+                        <div class="notice-date">{{ noticeItem.date }}</div>
+                        <div class="notice-title">{{ noticeItem.title }}</div>
+                        <div class="notice-content">
                             <ul>
-                                <li v-for="(item, index) in announcement.content" :key="index">{{ item }}</li>
+                                <li v-for="(item, index) in noticeItem.content" :key="index">{{ item }}</li>
                             </ul>
                         </div>
                     </div>
                 </div>
                 <div class="card">
                     <div class="card-title">功能介绍</div>
-                    <div v-for="feature in notice.features" :key="feature.id" class="announcement-item">
-                        <div class="announcement-title">{{ feature.title }}</div>
-                        <div class="announcement-content">
+                    <div v-for="feature in notice.features" :key="feature.id" class="notice-item">
+                        <div class="notice-title">{{ feature.title }}</div>
+                        <div class="notice-content">
                             <p>{{ feature.description }}</p>
                             <ul>
                                 <li v-for="(item, index) in feature.items" :key="index">
@@ -5216,8 +5432,8 @@
                 </div>
                 <div class="card">
                     <div class="card-title">使用提示</div>
-                    <div class="announcement-item">
-                        <div class="announcement-content">
+                    <div class="notice-item">
+                        <div class="notice-content">
                             <ul>
                                 <li v-for="(tip, index) in notice.tips" :key="index">{{ tip }}</li>
                             </ul>

@@ -172,10 +172,17 @@ export function useGames() {
         playerHand: [],
         aiHands: [],
         currentColor: null,
+        unoCurrentTurn: 'player',
+        unoWinner: null,
         // 飞行棋
         ludoBoard: [],
         ludoPlayers: [],
-        currentDice: 0
+        currentDice: 0,
+        ludoTrackLength: 20,
+        ludoCurrentPlayer: 0,
+        ludoWinner: null,
+        ludoEffects: {},
+        ludoPauseTurns: { player: 0, ai: 0 }
     });
 
     const startGame = (gameId) => {
@@ -204,10 +211,17 @@ export function useGames() {
                 playerHand: [],
                 aiHands: [],
                 currentColor: null,
+                unoCurrentTurn: 'player',
+                unoWinner: null,
                 // 飞行棋
                 ludoBoard: [],
                 ludoPlayers: [],
-                currentDice: 0
+                currentDice: 0,
+                ludoTrackLength: 20,
+                ludoCurrentPlayer: 0,
+                ludoWinner: null,
+                ludoEffects: {},
+                ludoPauseTurns: { player: 0, ai: 0 }
             });
             return game;
         }
@@ -401,6 +415,8 @@ export function useGames() {
         gameState.unoDeck = deck;
         gameState.discardPile = [deck.pop()];
         gameState.currentColor = gameState.discardPile[0].color;
+        gameState.unoCurrentTurn = 'player';
+        gameState.unoWinner = null;
         
         // 发牌
         gameState.playerHand = [];
@@ -422,17 +438,105 @@ export function useGames() {
         return true;
     };
 
+    const isUnoPlayableCard = (card) => {
+        if (!card || gameState.discardPile.length === 0) return false;
+        const top = gameState.discardPile[gameState.discardPile.length - 1];
+        return (
+            card.color === 'wild' ||
+            card.color === gameState.currentColor ||
+            card.value === top.value
+        );
+    };
+
+    const pickBestUnoColor = (hand) => {
+        const counts = { red: 0, blue: 0, green: 0, yellow: 0 };
+        (hand || []).forEach(c => {
+            if (counts[c.color] != null) counts[c.color]++;
+        });
+        return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0] || 'red';
+    };
+
+    const drawUnoCardForPlayer = () => {
+        if (gameState.unoCurrentTurn !== 'player' || gameState.unoDeck.length === 0) return null;
+        const card = gameState.unoDeck.pop();
+        gameState.playerHand.push(card);
+        gameState.unoCurrentTurn = 'ai';
+        return card;
+    };
+
+    const playUnoCard = (index) => {
+        if (gameState.unoCurrentTurn !== 'player') return { ok: false, reason: 'not_player_turn' };
+        const card = gameState.playerHand[index];
+        if (!card) return { ok: false, reason: 'invalid_card' };
+        if (!isUnoPlayableCard(card)) return { ok: false, reason: 'not_playable' };
+
+        gameState.playerHand.splice(index, 1);
+        gameState.discardPile.push(card);
+        gameState.currentColor = card.color === 'wild' ? pickBestUnoColor(gameState.playerHand) : card.color;
+
+        if (gameState.playerHand.length === 0) {
+            gameState.unoWinner = 'player';
+            gameState.phase = 'end';
+            return { ok: true, winner: 'player' };
+        }
+
+        gameState.unoCurrentTurn = 'ai';
+        return { ok: true };
+    };
+
+    const aiTurnUNO = () => {
+        if (gameState.unoCurrentTurn !== 'ai' || gameState.phase === 'end') return null;
+        const aiHand = gameState.aiHands[0] || [];
+        let action = 'draw';
+        let cardPlayed = null;
+
+        let playableIndex = aiHand.findIndex(isUnoPlayableCard);
+        if (playableIndex === -1 && gameState.unoDeck.length > 0) {
+            const drawn = gameState.unoDeck.pop();
+            aiHand.push(drawn);
+            playableIndex = aiHand.findIndex(isUnoPlayableCard);
+            action = 'draw_then_play';
+        }
+
+        if (playableIndex !== -1) {
+            cardPlayed = aiHand.splice(playableIndex, 1)[0];
+            gameState.discardPile.push(cardPlayed);
+            gameState.currentColor = cardPlayed.color === 'wild' ? pickBestUnoColor(aiHand) : cardPlayed.color;
+            action = action === 'draw_then_play' ? action : 'play';
+
+            if (aiHand.length === 0) {
+                gameState.unoWinner = 'ai';
+                gameState.phase = 'end';
+                return { action, card: cardPlayed, winner: 'ai' };
+            }
+        }
+
+        gameState.unoCurrentTurn = 'player';
+        return { action, card: cardPlayed, winner: null };
+    };
+
     // 飞行棋游戏逻辑
     const startLudoGame = () => {
         // 初始化游戏板和玩家
         gameState.ludoBoard = [];
         gameState.ludoPlayers = [
-            { color: 'red', planes: [0, 0, 0, 0], home: false },
-            { color: 'blue', planes: [0, 0, 0, 0], home: false },
-            { color: 'green', planes: [0, 0, 0, 0], home: false },
-            { color: 'yellow', planes: [0, 0, 0, 0], home: false }
+            { color: 'red', planes: [-1, -1, -1, -1], home: false },
+            { color: 'blue', planes: [-1, -1, -1, -1], home: false }
         ];
-        
+        gameState.ludoCurrentPlayer = 0;
+        gameState.ludoWinner = null;
+        gameState.currentDice = 0;
+        gameState.ludoPauseTurns = { player: 0, ai: 0 };
+        gameState.ludoEffects = {};
+        const effectTypes = ['forward', 'backward', 'pause', 'question'];
+        for (let i = 2; i < gameState.ludoTrackLength; i++) {
+            if (Math.random() < 0.3) {
+                const type = effectTypes[Math.floor(Math.random() * effectTypes.length)];
+                let value = 1;
+                if (type === 'forward' || type === 'backward') value = Math.random() < 0.5 ? 1 : 2;
+                gameState.ludoEffects[i] = { type, value };
+            }
+        }
         gameState.phase = 'game';
         return true;
     };
@@ -442,6 +546,118 @@ export function useGames() {
         const dice = Math.floor(Math.random() * 6) + 1;
         gameState.currentDice = dice;
         return dice;
+    };
+
+    const canMoveLudoPlane = (planePos, dice) => {
+        if (planePos < 0) return dice === 6;
+        return planePos + dice <= gameState.ludoTrackLength;
+    };
+
+    const applyLudoMove = (playerIndex, planeIndex, dice) => {
+        const player = gameState.ludoPlayers[playerIndex];
+        if (!player) return false;
+        const pos = player.planes[planeIndex];
+        if (!canMoveLudoPlane(pos, dice)) return false;
+        player.planes[planeIndex] = pos < 0 ? 0 : pos + dice;
+        const allHome = player.planes.every(p => p >= gameState.ludoTrackLength);
+        if (allHome) {
+            gameState.ludoWinner = playerIndex === 0 ? 'player' : 'ai';
+            gameState.phase = 'end';
+        }
+        return true;
+    };
+
+    const moveLudoPlane = (planeIndex) => {
+        if (gameState.ludoCurrentPlayer !== 0 || gameState.currentDice <= 0 || gameState.phase === 'end') {
+            return { ok: false };
+        }
+        if (gameState.ludoPauseTurns.player > 0) {
+            gameState.ludoPauseTurns.player--;
+            gameState.currentDice = 0;
+            gameState.ludoCurrentPlayer = 1;
+            return { ok: false, skipped: true };
+        }
+        const moved = applyLudoMove(0, planeIndex, gameState.currentDice);
+        if (!moved) return { ok: false };
+        const dice = gameState.currentDice;
+        const currentPos = gameState.ludoPlayers[0].planes[planeIndex];
+        const effect = gameState.ludoEffects[currentPos] || null;
+        gameState.currentDice = 0;
+        gameState.ludoCurrentPlayer = gameState.phase === 'end' ? 0 : 1;
+        return { ok: true, dice, planeIndex, pos: currentPos, effect, playerKind: 'player' };
+    };
+
+    const aiTurnLudo = () => {
+        if (gameState.ludoCurrentPlayer !== 1 || gameState.phase === 'end') return null;
+        if (gameState.ludoPauseTurns.ai > 0) {
+            gameState.ludoPauseTurns.ai--;
+            gameState.currentDice = 0;
+            gameState.ludoCurrentPlayer = 0;
+            return { skipped: true, winner: gameState.ludoWinner };
+        }
+        const dice = Math.floor(Math.random() * 6) + 1;
+        const ai = gameState.ludoPlayers[1];
+        let moved = false;
+        let movedPlaneIndex = -1;
+        let movedPos = -1;
+        for (let i = 0; i < ai.planes.length; i++) {
+            if (applyLudoMove(1, i, dice)) {
+                moved = true;
+                movedPlaneIndex = i;
+                movedPos = ai.planes[i];
+                break;
+            }
+        }
+        const effect = moved && movedPos >= 0 ? (gameState.ludoEffects[movedPos] || null) : null;
+        gameState.currentDice = 0;
+        if (gameState.phase !== 'end') {
+            gameState.ludoCurrentPlayer = 0;
+        }
+        return { dice, moved, movedPlaneIndex, movedPos, effect, winner: gameState.ludoWinner, playerKind: 'ai' };
+    };
+
+    const applyLudoEffect = (playerKind, effect, planeIndex = 0) => {
+        if (!effect) return { applied: false };
+        const playerIndex = playerKind === 'player' ? 0 : 1;
+        const planes = gameState.ludoPlayers[playerIndex]?.planes || [];
+        const pos = planes[planeIndex];
+        if (pos < 0) return { applied: false };
+
+        if (effect.type === 'forward') {
+            planes[planeIndex] = Math.min(gameState.ludoTrackLength, pos + (effect.value || 1));
+        } else if (effect.type === 'backward') {
+            planes[planeIndex] = Math.max(-1, pos - (effect.value || 1));
+        } else if (effect.type === 'pause') {
+            if (playerKind === 'player') gameState.ludoPauseTurns.player += effect.value || 1;
+            else gameState.ludoPauseTurns.ai += effect.value || 1;
+        } else if (effect.type === 'question') {
+            return { applied: true, needsQuestion: true };
+        }
+
+        const allHome = planes.every(p => p >= gameState.ludoTrackLength);
+        if (allHome) {
+            gameState.ludoWinner = playerKind;
+            gameState.phase = 'end';
+        }
+        return { applied: true, needsQuestion: false };
+    };
+
+    const applyLudoQuestionResult = (playerKind, planeIndex, isCorrect) => {
+        const playerIndex = playerKind === 'player' ? 0 : 1;
+        const planes = gameState.ludoPlayers[playerIndex]?.planes || [];
+        const pos = planes[planeIndex];
+        if (pos < 0) return false;
+        if (isCorrect) {
+            planes[planeIndex] = Math.min(gameState.ludoTrackLength, pos + 2);
+        } else {
+            planes[planeIndex] = Math.max(-1, pos - 1);
+        }
+        const allHome = planes.every(p => p >= gameState.ludoTrackLength);
+        if (allHome) {
+            gameState.ludoWinner = playerKind;
+            gameState.phase = 'end';
+        }
+        return true;
     };
 
     return {
@@ -459,7 +675,15 @@ export function useGames() {
         playRPS,
         spinTruthOrDare,
         startUNOGame,
+        isUnoPlayableCard,
+        drawUnoCardForPlayer,
+        playUnoCard,
+        aiTurnUNO,
         startLudoGame,
-        rollDice
+        rollDice,
+        moveLudoPlane,
+        aiTurnLudo,
+        applyLudoEffect,
+        applyLudoQuestionResult
     };
 }

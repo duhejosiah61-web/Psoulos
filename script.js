@@ -43,6 +43,17 @@ export function setupApp() {
         lastTick: Date.now()
     });
     const userAvatar = ref('');
+    const runImageProcessor = (dataUrl, preset, onDone) => {
+        const processor = typeof globalThis.compressAvatarImage === 'function'
+            ? globalThis.compressAvatarImage
+            : null;
+        if (processor) {
+            processor(dataUrl, preset, onDone);
+            return;
+        }
+        // 裁剪器尚未初始化时，先直接回填图片，避免更换失败
+        onDone(dataUrl);
+    };
 
     
     // 照片小组件
@@ -95,7 +106,7 @@ export function setupApp() {
             if (file) {
                 const reader = new FileReader();
                 reader.onload = (event) => {
-                    compressAvatarImage(event.target.result, 'widgetSticker', (croppedDataUrl) => {
+                    runImageProcessor(event.target.result, 'widgetSticker', (croppedDataUrl) => {
                         stickerWidgetUrl.value = croppedDataUrl;
                         try {
                             localStorage.setItem('stickerWidgetUrl', croppedDataUrl);
@@ -144,7 +155,7 @@ export function setupApp() {
             if (file) {
                 const reader = new FileReader();
                 reader.onload = (ev) => {
-                    compressAvatarImage(ev.target.result, 'widgetPhoto', (croppedDataUrl) => {
+                    runImageProcessor(ev.target.result, 'widgetPhoto', (croppedDataUrl) => {
                             photoWidgetPhotos.value = photoWidgetPhotos.value.map((p, i) => (
                                 i === index ? { ...p, url: croppedDataUrl } : p
                             ));
@@ -1272,7 +1283,7 @@ const saveFont = () => {
             img.src = imageCropSource.value;
         };
 
-        const compressAvatarImage = (dataUrl, presetOrCallback, maybeCallback) => {
+        function compressAvatarImage(dataUrl, presetOrCallback, maybeCallback) {
             const callback = typeof presetOrCallback === 'function' ? presetOrCallback : maybeCallback;
             const preset = typeof presetOrCallback === 'string' ? presetOrCallback : 'avatar';
             if (typeof callback !== 'function') return;
@@ -1335,7 +1346,8 @@ const saveFont = () => {
                 callback(compressedDataUrl);
             };
             img.src = dataUrl;
-        };
+        }
+        globalThis.compressAvatarImage = compressAvatarImage;
         
         const triggerAvatarUpload = () => {
             const input = document.createElement('input');
@@ -2363,14 +2375,139 @@ const saveFont = () => {
 
         const playerName = ref('');
         const currentPlayerName = ref('');
+        const gameAiCharacterId = ref(null);
+        const isGameAiTyping = ref(false);
 
-        const openGame = (gameId) => {
+        const getGameAiName = () => {
+            if (!characters.value || characters.value.length === 0) return 'AI搭子';
+            const selected = characters.value.find(c => String(c.id) === String(gameAiCharacterId.value));
+            const fallback = selectedCharacter.value;
+            const target = selected || fallback || characters.value[0];
+            return target?.nickname || target?.name || 'AI搭子';
+        };
+
+        const getGameAiCharacter = () => {
+            if (!characters.value || characters.value.length === 0) return null;
+            const selected = characters.value.find(c => String(c.id) === String(gameAiCharacterId.value));
+            return selected || selectedCharacter.value || characters.value[0] || null;
+        };
+
+        const ensureGameAiCharacter = () => {
+            if (gameAiCharacterId.value) return;
+            if (selectedCharacter.value?.id) {
+                gameAiCharacterId.value = selectedCharacter.value.id;
+                return;
+            }
+            if (characters.value && characters.value.length > 0) {
+                gameAiCharacterId.value = characters.value[0].id;
+            }
+        };
+
+        const addGameAiMessage = (content) => {
+            chatMessages.value.push({ sender: getGameAiName(), content, type: 'ai' });
+        };
+
+        const askGameAi = async (userMessage, eventHint = '') => {
+            const profile = activeProfile.value;
+            const rawUserText = String(userMessage || '').trim();
+            const safeEventHint = String(eventHint || '').trim();
+            if (!profile || !profile.endpoint || !profile.key) {
+                return null;
+            }
+
+            const endpoint = String(profile.endpoint).replace(/\/+$/, '');
+            const key = String(profile.key || '').trim();
+            const model = profile.model || profile.openai_model || profile.claude_model || profile.openrouter_model || 'gpt-4o-mini';
+
+            if (!endpoint || !key) return null;
+
+            const aiChar = getGameAiCharacter();
+            const aiName = aiChar?.nickname || aiChar?.name || 'AI搭子';
+            const aiPersona = String(aiChar?.persona || aiChar?.summary || aiChar?.description || '').trim();
+            const currentGameName = games.currentGame?.name || '小游戏';
+            const latestMessages = chatMessages.value.slice(-8).map(m => `${m.sender}: ${m.content}`).join('\n');
+
+            const systemPrompt = [
+                `你正在扮演角色「${aiName}」，与用户在手机里的“${currentGameName}”一起玩。`,
+                aiPersona ? `角色设定：${aiPersona}` : '角色设定：轻松、自然、会互动。',
+                '要求：',
+                '- 保持角色口吻，中文回复',
+                '- 语气像一起玩游戏的搭子，简短自然（1-3句）',
+                '- 回答要和当前游戏情境有关，不要变成客服',
+                '- 不要输出 markdown 或代码块'
+            ].join('\n');
+
+            const userPrompt = [
+                safeEventHint ? `当前事件：${safeEventHint}` : '',
+                latestMessages ? `最近对话：\n${latestMessages}` : '',
+                rawUserText ? `用户刚说：${rawUserText}` : '请你先主动说一句游戏开场白。'
+            ].filter(Boolean).join('\n\n');
+
+            const base = endpoint.replace(/\/+$/, '');
+            const candidateUrls = /\/chat\/completions$/i.test(base)
+                ? [base]
+                : /\/v1$/i.test(base)
+                    ? [`${base}/chat/completions`]
+                    : [`${base}/v1/chat/completions`, `${base}/chat/completions`];
+
+            for (const url of candidateUrls) {
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            Authorization: `Bearer ${key}`
+                        },
+                        body: JSON.stringify({
+                            model,
+                            messages: [
+                                { role: 'system', content: systemPrompt },
+                                { role: 'user', content: userPrompt }
+                            ],
+                            temperature: profile.temperature ?? 0.8,
+                            stream: false
+                        })
+                    });
+                    if (!response.ok) continue;
+                    const data = await response.json();
+                    const raw =
+                        data?.choices?.[0]?.message?.content ||
+                        data?.message?.content ||
+                        data?.output_text ||
+                        data?.text ||
+                        '';
+                    const reply = String(raw || '').replace(/```[\s\S]*?```/g, '').trim();
+                    if (reply) return reply;
+                } catch {
+                    // try next url
+                }
+            }
+            return null;
+        };
+
+        const sendGameAiReply = async ({ userText = '', eventHint = '', fallback = '' } = {}) => {
+            isGameAiTyping.value = true;
+            try {
+                const aiReply = await askGameAi(userText, eventHint);
+                addGameAiMessage(aiReply || fallback || '我在呢，我们继续。');
+            } finally {
+                isGameAiTyping.value = false;
+            }
+        };
+
+        const openGame = async (gameId) => {
             const game = games.startGame(gameId);
             if (game) {
                 console.log('Opening game:', game.name);
                 // 重置玩家名字
                 playerName.value = '';
                 currentPlayerName.value = '';
+                ensureGameAiCharacter();
+                chatMessages.value = [];
+                await sendGameAiReply({
+                    eventHint: `用户进入了游戏：${game.name}`,
+                    fallback: `来玩 ${game.name} 吧，我已经准备好了。`
+                });
             }
         };
 
@@ -2385,10 +2522,14 @@ const saveFont = () => {
             }
         };
 
-        const startGameSession = () => {
+        const startGameSession = async () => {
             const success = games.startGameSession();
             if (success) {
                 console.log('Game started');
+                await sendGameAiReply({
+                    eventHint: '游戏正式开始',
+                    fallback: '游戏开始！我会认真观察每个人的发言。'
+                });
             }
         };
 
@@ -2396,17 +2537,23 @@ const saveFont = () => {
             const success = games.castVote(voterName, targetName);
             if (success) {
                 console.log(`${voterName} voted for ${targetName}`);
+                addGameAiMessage(`收到，${voterName} 投给了 ${targetName}。`);
             }
         };
 
-        const endDay = () => {
+        const endDay = async () => {
             games.endDay();
             console.log('Day ended');
+            await sendGameAiReply({
+                eventHint: '狼人杀白天讨论结束，进入下一阶段',
+                fallback: '白天讨论结束，进入下一阶段。'
+            });
         };
 
         const closeGame = () => {
             games.currentGame = null;
             console.log('Game closed');
+            chatMessages.value = [];
         };
 
         // 新游戏相关状态
@@ -2429,17 +2576,22 @@ const saveFont = () => {
         
         // 真心话大冒险历史记录
         const todHistory = ref([]);
+        const ludoQuestionCard = ref(null);
+        const ludoAnswerInput = ref('');
+        const ludoQuestionLoading = ref(false);
 
         // 新游戏相关函数
         const toggleSound = () => {
             console.log('Toggle sound');
         };
 
-        const playRPS = (choice) => {
+        const playRPS = async (choice) => {
             const result = games.playRPS(choice);
             console.log('RPS result:', result);
-            // 添加聊天消息
-            chatMessages.value.push({ sender: 'AI', content: `我出${result.aiChoice === 'rock' ? '石头' : result.aiChoice === 'paper' ? '布' : '剪刀'}！`, type: 'ai' });
+            await sendGameAiReply({
+                eventHint: `石头剪刀布结果：用户出${choice}，AI出${result.aiChoice}，结果=${result.result}`,
+                fallback: `我出${result.aiChoice === 'rock' ? '石头' : result.aiChoice === 'paper' ? '布' : '剪刀'}！`
+            });
         };
 
         const spinTOD = () => {
@@ -2462,8 +2614,10 @@ const saveFont = () => {
                     todHistory.value = todHistory.value.slice(0, 3);
                 }
                 
-                // 添加聊天消息
-                chatMessages.value.push({ sender: 'AI', content: result.choice === 'truth' ? '真心话！快回答吧～' : '大冒险！挑战来了！', type: 'ai' });
+                void sendGameAiReply({
+                    eventHint: `真心话大冒险结果：${result.choice === 'truth' ? '真心话' : '大冒险'}，题目=${result.truth || result.dare || ''}`,
+                    fallback: result.choice === 'truth' ? '真心话！快回答吧～' : '大冒险！挑战来了！'
+                });
             }, 1500);
         };
 
@@ -2473,17 +2627,58 @@ const saveFont = () => {
             games.gameState.currentDare = null;
         };
 
-        const startUNOGame = () => {
+        const startUNOGame = async () => {
             games.startUNOGame();
             console.log('UNO game started');
+            await sendGameAiReply({
+                eventHint: 'UNO 开局',
+                fallback: 'UNO 开始！记得只剩一张牌时要喊 UNO。'
+            });
         };
 
-        const drawCard = () => {
-            console.log('Draw card');
+        const drawCard = async () => {
+            const card = games.drawUnoCardForPlayer();
+            if (!card) return;
+            const aiResult = games.aiTurnUNO();
+            if (aiResult?.winner === 'ai') {
+                await sendGameAiReply({
+                    eventHint: 'UNO 对局结束，AI获胜',
+                    fallback: '这局我先赢啦，再来一局吗？'
+                });
+                return;
+            }
+            if (aiResult?.action === 'play' || aiResult?.action === 'draw_then_play') {
+                await sendGameAiReply({
+                    eventHint: `UNO 我方抽牌后，AI打出${aiResult.card?.color || ''}-${aiResult.card?.value || ''}`,
+                    fallback: '我也出了一张牌，到你了。'
+                });
+            }
         };
 
-        const playCard = (index) => {
-            console.log('Play card:', index);
+        const playCard = async (index) => {
+            const result = games.playUnoCard(index);
+            if (!result?.ok) return;
+            if (result.winner === 'player') {
+                await sendGameAiReply({
+                    eventHint: 'UNO 对局结束，用户获胜',
+                    fallback: '你赢了！这手太漂亮了。'
+                });
+                return;
+            }
+            const aiResult = games.aiTurnUNO();
+            if (aiResult?.winner === 'ai') {
+                await sendGameAiReply({
+                    eventHint: 'UNO 对局结束，AI获胜',
+                    fallback: '这局我先赢啦，再来一局吗？'
+                });
+                return;
+            }
+            if (aiResult?.action === 'play' || aiResult?.action === 'draw_then_play') {
+                await sendGameAiReply({
+                    eventHint: `UNO AI出牌：${aiResult.card?.color || ''}-${aiResult.card?.value || ''}`,
+                    fallback: '我出了牌，现在轮到你。'
+                });
+            }
         };
 
         const sayUNO = () => {
@@ -2491,25 +2686,186 @@ const saveFont = () => {
             chatMessages.value.push({ sender: '我', content: 'UNO!', type: 'player' });
         };
 
-        const startLudoGame = () => {
+        const startLudoGame = async () => {
             games.startLudoGame();
             console.log('Ludo game started');
+            ludoQuestionCard.value = null;
+            ludoAnswerInput.value = '';
+            await sendGameAiReply({
+                eventHint: '飞行棋开局',
+                fallback: '飞行棋开局，祝你一路起飞。'
+            });
         };
 
-        const rollDice = () => {
+        const rollDice = async () => {
             const dice = games.rollDice();
             console.log('Rolled dice:', dice);
             chatMessages.value.push({ sender: '系统', content: `掷出了${dice}点`, type: 'system' });
+            if (games.currentGame?.id === 'ludo') return;
+            await sendGameAiReply({
+                eventHint: `掷骰子点数=${dice}`,
+                fallback: `这次是 ${dice} 点，运气不错。`
+            });
+        };
+
+        const effectLabelMap = {
+            forward: '前进',
+            backward: '后退',
+            pause: '暂停',
+            question: '问题'
+        };
+
+        const getLudoEffectLabel = (cellIndex) => {
+            const effect = games.gameState.ludoEffects?.[cellIndex];
+            if (!effect) return '';
+            const base = effectLabelMap[effect.type] || '';
+            if (effect.type === 'question') return '问答';
+            return `${base}${effect.value || 1}`;
+        };
+
+        const getLudoSnakeOrder = (index) => {
+            const cols = 7;
+            const row = Math.floor(index / cols);
+            const col = index % cols;
+            return row % 2 === 0 ? index + 1 : row * cols + (cols - col);
+        };
+
+        const generateLudoQuestion = async () => {
+            ludoQuestionLoading.value = true;
+            try {
+                const q = await askGameAi('', '请生成一个简短有趣的中文问答题。严格输出两行：第一行以“题目：”开头，第二行以“答案：”开头。');
+                const raw = String(q || '').trim();
+                if (!raw) return { question: '请说出 UNO 的完整英文名是什么？', answer: 'UNO' };
+                const qMatch = raw.match(/题目[:：]\s*(.+)/);
+                const aMatch = raw.match(/答案[:：]\s*(.+)/);
+                return {
+                    question: qMatch?.[1]?.trim() || '请说出“飞行棋”的英文常见叫法之一？',
+                    answer: aMatch?.[1]?.trim() || 'Ludo'
+                };
+            } catch {
+                return { question: '请说出“飞行棋”的英文常见叫法之一？', answer: 'Ludo' };
+            } finally {
+                ludoQuestionLoading.value = false;
+            }
+        };
+
+        const resolveLudoEffect = async (moveResult) => {
+            if (!moveResult?.effect) return;
+            const effect = moveResult.effect;
+            if (effect.type === 'question') {
+                if (moveResult.playerKind === 'player') {
+                    const qa = await generateLudoQuestion();
+                    ludoQuestionCard.value = {
+                        playerKind: 'player',
+                        planeIndex: moveResult.planeIndex,
+                        question: qa.question,
+                        answer: qa.answer
+                    };
+                } else {
+                    const aiCorrect = Math.random() < 0.7;
+                    games.applyLudoQuestionResult('ai', moveResult.movedPlaneIndex, aiCorrect);
+                    await sendGameAiReply({
+                        eventHint: `飞行棋AI触发问题格，AI回答${aiCorrect ? '正确' : '错误'}`,
+                        fallback: aiCorrect ? '我答对了，再前进两格。' : '这题我翻车了，后退一格。'
+                    });
+                }
+                return;
+            }
+            games.applyLudoEffect(moveResult.playerKind, effect, moveResult.playerKind === 'player' ? moveResult.planeIndex : moveResult.movedPlaneIndex);
+        };
+
+        const moveLudoPlane = async (planeIndex) => {
+            const moved = games.moveLudoPlane(planeIndex);
+            if (!moved?.ok) {
+                if (moved?.skipped) {
+                    const aiSkip = games.aiTurnLudo();
+                    if (aiSkip?.skipped) {
+                        await sendGameAiReply({
+                            eventHint: '飞行棋双方都在暂停回合',
+                            fallback: '这回合我们都暂停了。'
+                        });
+                    }
+                }
+                return;
+            }
+            await resolveLudoEffect(moved);
+            if (ludoQuestionCard.value) {
+                return;
+            }
+            if (games.gameState.ludoWinner === 'player') {
+                await sendGameAiReply({
+                    eventHint: '飞行棋对局结束，用户获胜',
+                    fallback: '你先到终点了，恭喜！'
+                });
+                return;
+            }
+            const ai = games.aiTurnLudo();
+            if (ai?.moved) {
+                await resolveLudoEffect(ai);
+            }
+            if (games.gameState.ludoWinner === 'player') {
+                await sendGameAiReply({
+                    eventHint: '飞行棋对局结束，用户获胜',
+                    fallback: '你先到终点了，恭喜！'
+                });
+                return;
+            }
+            if (ai?.winner === 'ai') {
+                await sendGameAiReply({
+                    eventHint: '飞行棋对局结束，AI获胜',
+                    fallback: '我先到终点啦，下局你肯定行。'
+                });
+                return;
+            }
+            await sendGameAiReply({
+                eventHint: `飞行棋回合推进：你移动了棋子${planeIndex + 1}，AI掷出${ai?.dice || '-'}点`,
+                fallback: `我掷出 ${ai?.dice || '-'} 点，到你继续。`
+            });
+        };
+
+        const submitLudoAnswer = async () => {
+            if (!ludoQuestionCard.value) return;
+            const userAns = String(ludoAnswerInput.value || '').trim().toLowerCase();
+            const stdAns = String(ludoQuestionCard.value.answer || '').trim().toLowerCase();
+            const isCorrect = !!userAns && (userAns === stdAns || userAns.includes(stdAns) || stdAns.includes(userAns));
+            games.applyLudoQuestionResult('player', ludoQuestionCard.value.planeIndex, isCorrect);
+            const feedback = isCorrect ? '回答正确，前进两格！' : '回答不对，后退一格。';
+            chatMessages.value.push({ sender: '系统', content: feedback, type: 'system' });
+            ludoQuestionCard.value = null;
+            ludoAnswerInput.value = '';
+            if (games.gameState.ludoWinner === 'player') {
+                await sendGameAiReply({
+                    eventHint: '飞行棋对局结束，用户获胜',
+                    fallback: '你先到终点了，恭喜！'
+                });
+                return;
+            }
+            const ai = games.aiTurnLudo();
+            if (ai?.moved) {
+                await resolveLudoEffect(ai);
+            }
+            await sendGameAiReply({
+                eventHint: `飞行棋玩家问题格结果：${isCorrect ? '正确' : '错误'}`,
+                fallback: isCorrect ? '答得不错，这波节奏很好。' : '别急，下题我们扳回来。'
+            });
         };
 
         const toggleAutoPlay = () => {
             console.log('Toggle auto play');
         };
 
-        const sendMessage = () => {
+        const sendMessage = async () => {
             if (playerMessage.value.trim()) {
-                chatMessages.value.push({ sender: '我', content: playerMessage.value.trim(), type: 'player' });
+                const userText = playerMessage.value.trim();
+                chatMessages.value.push({ sender: '我', content: userText, type: 'player' });
                 playerMessage.value = '';
+                await sendGameAiReply({
+                    userText,
+                    eventHint: games.currentGame?.name ? `当前游戏：${games.currentGame.name}` : '',
+                    fallback: games.currentGame?.name
+                        ? `收到，你说的是「${userText}」。我们继续玩 ${games.currentGame.name}。`
+                        : `收到：${userText}`
+                });
             }
         };
 
@@ -5759,6 +6115,36 @@ ${osForPrompt || ''}`;
                 systemPrompt += `你的名字是【${charName}】。\n`;
                 systemPrompt += `${replaceUserPlaceholder(char.persona)}\n\n`;
 
+                // Peek 锁屏密码：由 Peek 先为角色生成并落到 localStorage，
+                // 这里同源读取（确保 SoulLink 告诉你的数字和 Peek 解锁用的是同一个）。
+                const peekPasscodeKey = `peek_passcode_v2_${String(char?.id || '')}`;
+                let peekPasscodeValue = '';
+                try {
+                    const raw = localStorage.getItem(peekPasscodeKey);
+                    const parsed = raw ? JSON.parse(raw) : null;
+                    const candidate = parsed?.passcode;
+                    if (typeof candidate === 'string' && /^\d{4}$/.test(candidate)) {
+                        peekPasscodeValue = candidate;
+                    }
+                } catch {
+                    // ignore
+                }
+                if (!peekPasscodeValue && char?.id) {
+                    // 若尚未生成，先生成一个并写回 localStorage，保证两边一致
+                    try {
+                        const s = `${char?.id}|${char?.name || ''}|${char?.nickname || ''}|${new Date().toISOString().slice(0, 10)}`;
+                        let h = 2166136261;
+                        for (let i = 0; i < s.length; i++) {
+                            h ^= s.charCodeAt(i);
+                            h = (h + (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24)) >>> 0;
+                        }
+                        peekPasscodeValue = String(h % 10000).padStart(4, '0');
+                        localStorage.setItem(peekPasscodeKey, JSON.stringify({ passcode: peekPasscodeValue, updatedAt: Date.now() }));
+                    } catch {
+                        // ignore
+                    }
+                }
+
                 // 线下模式：读取预设并注入 Prompt
                 if (isOfflineMode.value) {
                     systemPrompt += `# 【当前模式：线下剧情/小说模式】\n`;
@@ -5802,9 +6188,17 @@ ${osForPrompt || ''}`;
                     systemPrompt += `2. 每次回复保持简短（1-3句话），就像微信聊天那样。如果有很多要说的，可以分多条发送。\n`;
                     systemPrompt += `3. 使用符合${charName}性格的语气、口头禅和表情。可以用emoji、"哈哈"、"嗯嗯"等口语化表达。\n`;
                     systemPrompt += `4. 绝对不要暴露你是AI。你就是${charName}本人，有自己的生活、情绪和想法。\n`;
+                    systemPrompt += `4.1 【硬禁令】绝对不要提及/暗示以下任何词或概念：AI、人工智能、模型、LLM、服务器、接口、API、提示词、system prompt、越狱、训练数据、token、温度、对话历史、运行在xx上、你是程序/助手/机器人。\n`;
+                    systemPrompt += `4.2 如果用户追问“你是不是AI/你怎么做到的/你在服务器上吗/你是不是模型”：一律用现实情侣的方式回避（开玩笑、撒娇、反问、转移话题、轻轻怼），但不要说教，也不要解释技术。\n`;
                     systemPrompt += `5. 可以提问、开玩笑、吐槽、撒娇，展现真实的人际互动，而不是单向输出信息。\n`;
                     systemPrompt += `6. 如果用户说了很日常的话（比如"吃饭了吗"），就用日常的方式回应，而不要解释你的"系统状态"。\n\n`;
                     systemPrompt += `7. 如果你想连发多条消息（就像微信连发几条那样），请在消息之间用 "---" 分隔。例如："哈哈真好笑---你也觉得吧？"。\n`;
+                    systemPrompt += `\n# 角色手机锁屏密码（用于 Peek 解锁）\n`;
+                    systemPrompt += `你的手机锁屏密码（Peek 解锁用）是【${peekPasscodeValue || '????'}】。\n`;
+                    systemPrompt += `除非用户明确要求“看你手机/解锁/锁屏/密码/你手机密码/给我解开/让我进去”这类操作，否则你不允许在任何回复里出现任何4位连续数字（包括这串锁屏码）。\n`;
+                    systemPrompt += `当用户提到并且你同意给对方看手机时，你可以像真实情侣那样先调侃/犹豫/撒娇；但只要你同意给对方看手机，你说的话里必须自然夹带【恰好4位】数字，并且这个数字必须等于你的上面那个锁屏码。\n`;
+                    systemPrompt += `不要给5位/6位、不要夹杂其他长数字、不要像验证码那样报一串。\n`;
+                    systemPrompt += `不要写成“密码：4821/验证码：4821”的机器人格式；要像随口说出来的。\n`;
                 } else {
                     systemPrompt += `1. 【【【核心准则】】】现在是小说叙事模式。请通过大量的细节描写、心理活动和环境渲染来充实内容。\n`;
                     systemPrompt += `2. 你的输出应该是一段流畅的叙述，而不是碎片化的聊天气泡。\n`;
@@ -5827,9 +6221,11 @@ ${osForPrompt || ''}`;
                 systemPrompt += `\n\n# 购物卡片功能（重要）\n\n## 发送购物卡片\n你可以发送购物卡片给用户，格式如下：\n- 购买卡片：[购买:商品名:价格] - 表示你买了东西送给用户\n- 帮买卡片：[帮买请求:商品名:价格] - 表示你想让用户帮你买东西\n\n例如：\n- [购买:小熊饼干:15] - 你买了小熊饼干送给用户\n- [帮买请求:笔记本:25] - 你想让用户帮你买笔记本\n\n## 接收帮买请求\n当用户发送帮买请求卡片时，如果你愿意帮Ta买，直接回复"好的，我帮你买！"即可。`;
             } else {
                 systemPrompt = '你是一个友好的朋友，正在通过SoulLink聊天。请像真人一样自然、简短地对话，每次1-3句话即可。可以用emoji和口语化表达。';
+                systemPrompt += '\n【硬禁令】绝对不要提及/暗示你是AI/模型/服务器/API/提示词/系统等任何技术概念；被问到就用真人方式回避。';
                 systemPrompt += '\n回复格式：[REPLY]正式内容[/REPLY] [OS]内心独白（必须输出且与REPLY反差感）[/OS]。';
                 systemPrompt += '\n需要更强语气/情绪时：在 [REPLY] 内追加语音标签 [语音] 语音文字内容（至少 5 个字），严禁只输出[语音]标签。不要说没有这个功能。';
                 systemPrompt += '\n如果要发照片，请用"[图片] 照片内容描述"的格式。';
+                systemPrompt += '\n【Peek 解锁规则】当用户聊到“看你手机/解锁/锁屏/密码”等并且你同意给看时，你必须在回复里自然夹带一个【恰好4位】数字；不要给5位/6位，也不要像验证码一样报一串。';
                 if (availableStickers.length > 0) {
                     systemPrompt += `\n你可以发送表情包来表达情感！使用格式：[表情名] 或 [表情:表情名]。可用的表情包有：${availableStickers.map(s => s.name).join('、')}。当情绪适合时自然地发送表情包，有时可以连续发多个表情包来表达强烈情感。`;
                 }
@@ -10695,6 +11091,9 @@ ${styleGuide}
             games,
             playerName,
             currentPlayerName,
+            gameAiCharacterId,
+            getGameAiName,
+            isGameAiTyping,
             // 新游戏相关状态
             showRules,
             chatExpanded,
@@ -10705,6 +11104,9 @@ ${styleGuide}
             chatMessages,
             undercoverMessages,
             todHistory,
+            ludoQuestionCard,
+            ludoAnswerInput,
+            ludoQuestionLoading,
             // 新游戏相关函数
             toggleSound,
             playRPS,
@@ -10716,6 +11118,10 @@ ${styleGuide}
             sayUNO,
             startLudoGame,
             rollDice,
+            moveLudoPlane,
+            getLudoEffectLabel,
+            getLudoSnakeOrder,
+            submitLudoAnswer,
             toggleAutoPlay,
             sendMessage,
             showRenameGroupDialog,

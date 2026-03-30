@@ -78,6 +78,59 @@ const makeMockPhoto = (seed, idx) => {
 };
 
 const samplePhotos = (seedName) => [0, 1, 2, 3].map((i) => makeMockPhoto(seedName, i));
+// 密码更像“角色自己会改”的：不固定每日轮换。
+// 1) 角色在 SoulLink 里明确给出新密码（4位）→ 立即生效并记住
+// 2) 没有明确给出时，仍有一个“本地持久密码”作为兜底，但不展示规则/到期时间
+const getPeekPasscodeStoreKey = (charId) => `peek_passcode_v2_${String(charId || '')}`;
+const readPeekPasscodeStore = (charId) => {
+    if (!charId) return null;
+    try {
+        const raw = localStorage.getItem(getPeekPasscodeStoreKey(charId));
+        return raw ? JSON.parse(raw) : null;
+    } catch {
+        return null;
+    }
+};
+const savePeekPasscodeStore = (charId, data) => {
+    if (!charId) return;
+    try {
+        localStorage.setItem(getPeekPasscodeStoreKey(charId), JSON.stringify(data || {}));
+    } catch {
+        // ignore
+    }
+};
+const randomInt = (min, max) => Math.floor(min + Math.random() * (max - min + 1));
+const make4Digit = (n) => String(Math.abs(Number(n || 0)) % 10000).padStart(4, '0');
+const hashU32 = (s) => {
+    const str = String(s || '');
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) {
+        h ^= str.charCodeAt(i);
+        h += (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24);
+    }
+    return h >>> 0;
+};
+const extractPeekPasscode = (text) => {
+    const t = String(text || '');
+    if (!t) return '';
+    // 1) 优先：连续 4 位数字
+    const hit4 = t.match(/(?<!\d)(\d{4})(?!\d)/);
+    if (hit4 && hit4[1]) return hit4[1];
+    // 2) 兼容：连续 5-6 位数字（有的人会顺嘴报多位），取最后 4 位做锁屏码
+    const hit56 = t.match(/(?<!\d)(\d{5,6})(?!\d)/);
+    if (hit56 && hit56[1]) return hit56[1].slice(-4);
+    // 3) 兼容：用空格/短横分隔的 4 位数字，例如“4 8 2 1”/“48-21”
+    const hitSep = t.match(/(?<!\d)(\d)[\s\-_.](\d)[\s\-_.](\d)[\s\-_.](\d)(?!\d)/);
+    if (hitSep) return `${hitSep[1]}${hitSep[2]}${hitSep[3]}${hitSep[4]}`;
+    return '';
+};
+const pickInitialPasscode = (char) => {
+    // 稍微有“人的随机感”：基于角色信息做一个稳定起点，再掺当前日期与少量随机盐
+    const d = new Date();
+    const dayKey = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+    const base = `${char?.id || ''}|${char?.name || ''}|${char?.nickname || ''}|${dayKey}|${Math.random()}`;
+    return make4Digit(hashU32(base));
+};
 
 export function usePeek(charactersRef, activeProfileRef, soulLinkMessagesRef, soulLinkGroupsRef) {
     const saved = readState();
@@ -94,6 +147,10 @@ export function usePeek(charactersRef, activeProfileRef, soulLinkMessagesRef, so
 
     const peekStatusTime = ref('');
     const peekLocked = ref(true);
+    const peekPasscodeInput = ref('');
+    const peekLockHint = ref(' ');
+    const peekWrongAttempts = ref(0);
+    const peekLockoutUntil = ref(0);
     let statusTick;
     const tickStatus = () => {
         const now = new Date();
@@ -110,6 +167,70 @@ export function usePeek(charactersRef, activeProfileRef, soulLinkMessagesRef, so
     const peekPhoneTitle = computed(() => {
         const name = peekSelectedCharacter.value?.nickname || peekSelectedCharacter.value?.name || '未选择角色';
         return `${name} 的手机`;
+    });
+    const peekEffectivePasscode = ref(''); // 当前生效密码（来自 SoulLink 或本地兜底）
+    const peekSharedPasscodeFromSoulLink = computed(() => {
+        const charId = String(peekSelectedCharacterId.value || '');
+        if (!charId) return '';
+        const rows = Array.isArray(soulLinkMessagesRef?.value?.[charId]) ? soulLinkMessagesRef.value[charId] : [];
+        // 更像真人聊天：允许各种说法，只要“上下文在聊密码”且出现4位数字
+        const keywordRe = /(密码|passcode|解锁|锁屏|手机|改了|换了|新密码|unlock|看你手机|看手机|给我看手机)/i;
+        const hasNearbyPasswordTopic = (fromIndex) => {
+            // 向前看最多 6 条，找到最近的用户消息里是否在聊密码/手机
+            for (let j = fromIndex; j >= 0 && j >= fromIndex - 6; j--) {
+                const p = rows[j];
+                if (!p) continue;
+                if (String(p.sender || '') !== 'user') continue;
+                const userText = String(p.text || p.reply || p.osContent || '');
+                if (keywordRe.test(userText)) return true;
+            }
+            return false;
+        };
+        for (let i = rows.length - 1; i >= 0; i--) {
+            const m = rows[i];
+            if (!m) continue;
+            const sender = String(m.sender || '');
+            const text = String(m.text || m.reply || m.osContent || '');
+            if (!text) continue;
+            const code = extractPeekPasscode(text);
+            if (!code) continue;
+
+            // 只认 AI 的数字，并且要求“同句关键词”或“附近用户在聊密码”
+            if (sender !== 'ai') continue;
+            if (keywordRe.test(text) || hasNearbyPasswordTopic(i - 1)) return code;
+        }
+        return '';
+    });
+    const ensureLocalPasscode = () => {
+        const charId = String(peekSelectedCharacterId.value || '');
+        const char = peekSelectedCharacter.value;
+        if (!charId || !char) return '';
+        const existing = readPeekPasscodeStore(charId);
+        if (existing && typeof existing.passcode === 'string' && /^\d{4}$/.test(existing.passcode)) {
+            return existing.passcode;
+        }
+        const next = pickInitialPasscode(char);
+        savePeekPasscodeStore(charId, { passcode: next, updatedAt: Date.now() });
+        return next;
+    };
+    const syncEffectivePasscode = () => {
+        const charId = String(peekSelectedCharacterId.value || '');
+        if (!charId) return;
+        const fromSoul = peekSharedPasscodeFromSoulLink.value;
+        if (fromSoul && /^\d{4}$/.test(fromSoul)) {
+            const prev = readPeekPasscodeStore(charId);
+            if (!prev || prev.passcode !== fromSoul) {
+                savePeekPasscodeStore(charId, { passcode: fromSoul, updatedAt: Date.now(), source: 'soulLink' });
+            }
+            peekEffectivePasscode.value = fromSoul;
+            return;
+        }
+        peekEffectivePasscode.value = ensureLocalPasscode();
+    };
+    const peekLockoutRemainSec = computed(() => {
+        peekStatusTime.value;
+        const remain = Math.max(0, Number(peekLockoutUntil.value || 0) - Date.now());
+        return Math.ceil(remain / 1000);
     });
 
     const peekWidgetGreeting = computed(() => {
@@ -580,16 +701,71 @@ ${chatTranscriptForPrompt || '（无增量聊天内容）'}
     };
 
     const unlockPeek = () => {
-        peekLocked.value = false;
+        if (peekLockoutRemainSec.value > 0) return false;
+        const input = String(peekPasscodeInput.value || '');
+        if (input.length !== 4) {
+            peekLockHint.value = ' ';
+            return false;
+        }
+        syncEffectivePasscode();
+        if (input === String(peekEffectivePasscode.value || '')) {
+            peekLocked.value = false;
+            peekPasscodeInput.value = '';
+            peekWrongAttempts.value = 0;
+            peekLockoutUntil.value = 0;
+            peekLockHint.value = ' ';
+            return true;
+        }
+        peekWrongAttempts.value += 1;
+        peekPasscodeInput.value = '';
+        const freezeSec = Math.min(90, 6 * (2 ** Math.max(0, peekWrongAttempts.value - 1)));
+        peekLockoutUntil.value = Date.now() + freezeSec * 1000;
+        // 不说教、不教用户怎么问，像真实锁屏一样“冷冰冰”
+        peekLockHint.value = `已静止 ${freezeSec} 秒`;
+        return false;
     };
     const lockPeek = () => {
         peekLocked.value = true;
+        peekPasscodeInput.value = '';
+        peekLockHint.value = ' ';
+    };
+    const appendPeekPasscodeDigit = (digit) => {
+        if (peekLockoutRemainSec.value > 0) return;
+        const d = String(digit ?? '').replace(/\D/g, '');
+        if (!d) return;
+        if (peekPasscodeInput.value.length >= 4) return;
+        peekPasscodeInput.value += d.slice(0, 1);
+        if (peekPasscodeInput.value.length === 4) unlockPeek();
+    };
+    const removePeekPasscodeDigit = () => {
+        if (peekLockoutRemainSec.value > 0) return;
+        peekPasscodeInput.value = peekPasscodeInput.value.slice(0, -1);
+    };
+    const clearPeekPasscodeInput = () => {
+        if (peekLockoutRemainSec.value > 0) return;
+        peekPasscodeInput.value = '';
     };
     const peekFormatAmount = (amount) => `${amount >= 0 ? '+' : ''}${amount}`;
 
     watch(peekSelectedCharacter, (char) => {
         if (char) rebuildCharacterData(char);
+        peekPasscodeInput.value = '';
+        peekWrongAttempts.value = 0;
+        peekLockoutUntil.value = 0;
+        peekLockHint.value = ' ';
+        syncEffectivePasscode();
     }, { immediate: true });
+
+    // SoulLink 有新消息时，同步“他刚改的密码”
+    watch(
+        () => {
+            const charId = String(peekSelectedCharacterId.value || '');
+            const rows = Array.isArray(soulLinkMessagesRef?.value?.[charId]) ? soulLinkMessagesRef.value[charId] : [];
+            const last = rows[rows.length - 1];
+            return `${charId}|${rows.length}|${last?.timestamp || last?.id || ''}`;
+        },
+        () => syncEffectivePasscode()
+    );
 
     watch(
         [
@@ -671,6 +847,14 @@ ${chatTranscriptForPrompt || '（无增量聊天内容）'}
         peekFormatAmount,
         generatePeekLinkedData,
         unlockPeek,
-        lockPeek
+        lockPeek,
+        peekPasscodeInput,
+        peekLockHint,
+        peekLockoutRemainSec,
+        peekSharedPasscodeFromSoulLink,
+        peekEffectivePasscode,
+        appendPeekPasscodeDigit,
+        removePeekPasscodeDigit,
+        clearPeekPasscodeInput
     };
 }

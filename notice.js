@@ -2,7 +2,7 @@
 // == NOTICE APP
 // =========================================================================
 export function useNotice() {
-    const announcements = [
+    const notices = [
         {
             id: 1,
             date: '2026-03-14',
@@ -101,7 +101,7 @@ export function useNotice() {
     ];
 
     return {
-        announcements,
+        notices,
         features,
         tips
     };
