@@ -4,6 +4,7 @@
 // =========================================================================
 
 import { ref, computed, onMounted, onUnmounted, watch } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
+import { callAI } from './api.js';
 
 export function useMate(soulLinkMessages, characters, activeProfile) {
     // --- 状态管理 ---
@@ -607,26 +608,16 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
 请根据你的性格，给ta说一句鼓励、吐槽、关心或者陪伴的话（不超过25字）。
 直接返回话语内容。`;
 
-            const response = await fetch(`${activeProfile.value.endpoint}/chat/completions`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${activeProfile.value.key}`
-                },
-                body: JSON.stringify({
-                    model: activeProfile.value.model,
-                    messages: [
-                        { role: 'system', content: `你正在扮演角色：${selectedCharacter.value.name}。` },
-                        { role: 'user', content: prompt }
-                    ],
-                    temperature: 0.9
-                })
-            });
-
-            const data = await response.json();
-            if (data.choices && data.choices[0]) {
-                mateAIVoice.value = data.choices[0].message.content.trim();
-                // 5秒后消失
+            const text = await callAI(
+                activeProfile.value,
+                [
+                    { role: 'system', content: `你正在扮演角色：${selectedCharacter.value.name}。` },
+                    { role: 'user', content: prompt }
+                ],
+                { temperature: 0.9 }
+            );
+            if (text) {
+                mateAIVoice.value = String(text).trim();
                 setTimeout(() => {
                     mateAIVoice.value = null;
                 }, 8000);
@@ -749,24 +740,16 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
 
 直接返回关心的话，不要有任何多余文字。`;
 
-            const response = await fetch(`${activeProfile.value.endpoint}/chat/completions`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${activeProfile.value.key}`
-                },
-                body: JSON.stringify({
-                    model: activeProfile.value.model,
-                    messages: [
+            periodCareMessage.value = (
+                await callAI(
+                    activeProfile.value,
+                    [
                         { role: 'system', content: `你正在扮演角色：${selectedCharacter.value.name}。你只返回关心的话。` },
                         { role: 'user', content: prompt }
                     ],
-                    temperature: 0.8
-                })
-            });
-
-            const data = await response.json();
-            periodCareMessage.value = data.choices[0].message.content.trim();
+                    { temperature: 0.8 }
+                )
+            ).trim();
             saveToLocal();
         } catch (error) {
             console.error('生成关心失败:', error);
@@ -808,24 +791,16 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
 
 直接返回鼓励的话，不要有任何多余文字。`;
 
-            const response = await fetch(`${activeProfile.value.endpoint}/chat/completions`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${activeProfile.value.key}`
-                },
-                body: JSON.stringify({
-                    model: activeProfile.value.model,
-                    messages: [
+            exerciseEncouragement.value = (
+                await callAI(
+                    activeProfile.value,
+                    [
                         { role: 'system', content: `你正在扮演角色：${selectedCharacter.value.name}。你只返回鼓励的话。` },
                         { role: 'user', content: prompt }
                     ],
-                    temperature: 0.8
-                })
-            });
-
-            const data = await response.json();
-            exerciseEncouragement.value = data.choices[0].message.content.trim();
+                    { temperature: 0.8 }
+                )
+            ).trim();
             saveToLocal();
         } catch (error) {
             console.error('生成鼓励失败:', error);
@@ -874,24 +849,16 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
 
 直接返回鼓励的话，不要有任何多余文字。`;
 
-            const response = await fetch(`${activeProfile.value.endpoint}/chat/completions`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${activeProfile.value.key}`
-                },
-                body: JSON.stringify({
-                    model: activeProfile.value.model,
-                    messages: [
+            studyEncouragement.value = (
+                await callAI(
+                    activeProfile.value,
+                    [
                         { role: 'system', content: `你正在扮演角色：${selectedCharacter.value.name}。你只返回鼓励的话。` },
                         { role: 'user', content: prompt }
                     ],
-                    temperature: 0.8
-                })
-            });
-
-            const data = await response.json();
-            studyEncouragement.value = data.choices[0].message.content.trim();
+                    { temperature: 0.8 }
+                )
+            ).trim();
             saveToLocal();
         } catch (error) {
             console.error('生成鼓励失败:', error);
@@ -931,24 +898,16 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
 
 直接返回晚安祝福或建议，不要有任何多余文字。`;
 
-            const response = await fetch(`${activeProfile.value.endpoint}/chat/completions`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${activeProfile.value.key}`
-                },
-                body: JSON.stringify({
-                    model: activeProfile.value.model,
-                    messages: [
+            sleepEncouragement.value = (
+                await callAI(
+                    activeProfile.value,
+                    [
                         { role: 'system', content: `你正在扮演角色：${selectedCharacter.value.name}。你只返回晚安祝福或建议。` },
                         { role: 'user', content: prompt }
                     ],
-                    temperature: 0.8
-                })
-            });
-
-            const data = await response.json();
-            sleepEncouragement.value = data.choices[0].message.content.trim();
+                    { temperature: 0.8 }
+                )
+            ).trim();
             saveToLocal();
         } catch (error) {
             console.error('生成晚安祝福失败:', error);
@@ -1020,24 +979,16 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
 
 直接返回回复内容，不要有任何多余文字。`;
 
-            const response = await fetch(`${activeProfile.value.endpoint}/chat/completions`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${activeProfile.value.key}`
-                },
-                body: JSON.stringify({
-                    model: activeProfile.value.model,
-                    messages: [
+            encouragementRef.value = (
+                await callAI(
+                    activeProfile.value,
+                    [
                         { role: 'system', content: `你正在扮演角色：${selectedCharacter.value.name}。你只返回简短的回复。` },
                         { role: 'user', content: prompt }
                     ],
-                    temperature: 0.8
-                })
-            });
-
-            const data = await response.json();
-            encouragementRef.value = data.choices[0].message.content.trim();
+                    { temperature: 0.8 }
+                )
+            ).trim();
             saveToLocal();
         } catch (error) {
             console.error('生成角色回复失败:', error);
@@ -1249,26 +1200,15 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
 直接返回评论内容，不要包含任何多余的文字。`;
 
         try {
-            const response = await fetch(`${activeProfileObj.endpoint}/chat/completions`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${activeProfileObj.key}`
-                },
-                body: JSON.stringify({
-                    model: activeProfileObj.model,
-                    messages: [
-                        { role: 'system', content: `你正在扮演角色：${character.name}。请保持人设。` },
-                        { role: 'user', content: prompt }
-                    ],
-                    temperature: 0.8
-                })
-            });
-
-            const data = await response.json();
-            if (data.choices && data.choices[0]) {
-                return data.choices[0].message.content.trim();
-            }
+            const text = await callAI(
+                activeProfileObj,
+                [
+                    { role: 'system', content: `你正在扮演角色：${character.name}。请保持人设。` },
+                    { role: 'user', content: prompt }
+                ],
+                { temperature: 0.8 }
+            );
+            if (text) return String(text).trim();
             return '（似乎在想别的事情...）';
         } catch (error) {
             console.error('AI 留言 API 调用失败:', error);
@@ -1283,24 +1223,16 @@ export function useMate(soulLinkMessages, characters, activeProfile) {
             const prompt = `你是一个财务助手。请从以下文本中提取支出信息，并以 JSON 格式返回：{"amount": 数字, "category": "餐饮/交通/购物/娱乐/其他", "description": "简短描述"}。
 文本内容："${text}"`;
 
-            const response = await fetch(`${activeProfileObj.endpoint}/chat/completions`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${activeProfileObj.key}`
-                },
-                body: JSON.stringify({
-                    model: activeProfileObj.model,
-                    messages: [
+            const content = String(
+                await callAI(
+                    activeProfileObj,
+                    [
                         { role: 'system', content: '你只返回 JSON。' },
                         { role: 'user', content: prompt }
                     ],
-                    temperature: 0.3
-                })
-            });
-
-            const data = await response.json();
-            const content = data.choices[0].message.content;
+                    { temperature: 0.3 }
+                ) || ''
+            );
             const match = content.match(/\{.*\}/s);
             if (match) {
                 const result = JSON.parse(match[0]);
@@ -1349,45 +1281,34 @@ ${recentMessages || '最近没有聊天。'}
 
 直接返回 JSON 对象，不要有任何多余文字。`;
 
-            const response = await fetch(`${activeProfile.value.endpoint}/chat/completions`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${activeProfile.value.key}`
-                },
-                body: JSON.stringify({
-                    model: activeProfile.value.model,
-                    messages: [
-                        { role: 'system', content: `你正在扮演角色：${selectedCharacter.value.name}。你只返回 JSON 数据。` },
-                        { role: 'user', content: prompt }
-                    ],
-                    temperature: 0.8
-                })
-            });
-
-            const data = await response.json();
-            if (data.choices && data.choices[0]) {
-                const content = data.choices[0].message.content.trim();
-                const match = content.match(/\{.*\}/s);
-                if (match) {
-                    const result = JSON.parse(match[0]);
-                    const diary = {
-                        id: Date.now(),
-                        date: new Date(),
-                        duration: duration,
-                        characterName: selectedCharacter.value.name,
-                        avatarUrl: selectedCharacter.value.avatarUrl,
-                        dream: result.dream,
-                        events: result.events || [],
-                        quality: result.quality || qualityLabel,
-                        message: result.message,
-                        score: sleepQualityScore
-                    };
-                    sleepDiaries.value.unshift(diary);
-                    currentSleepDiary.value = diary;
-                    showSleepDiaryModal.value = true;
-                    saveToLocal();
-                }
+            const raw = await callAI(
+                activeProfile.value,
+                [
+                    { role: 'system', content: `你正在扮演角色：${selectedCharacter.value.name}。你只返回 JSON 数据。` },
+                    { role: 'user', content: prompt }
+                ],
+                { temperature: 0.8 }
+            );
+            const content = String(raw || '').trim();
+            const match = content.match(/\{.*\}/s);
+            if (match) {
+                const result = JSON.parse(match[0]);
+                const diary = {
+                    id: Date.now(),
+                    date: new Date(),
+                    duration: duration,
+                    characterName: selectedCharacter.value.name,
+                    avatarUrl: selectedCharacter.value.avatarUrl,
+                    dream: result.dream,
+                    events: result.events || [],
+                    quality: result.quality || qualityLabel,
+                    message: result.message,
+                    score: sleepQualityScore
+                };
+                sleepDiaries.value.unshift(diary);
+                currentSleepDiary.value = diary;
+                showSleepDiaryModal.value = true;
+                saveToLocal();
             }
         } catch (error) {
             console.error('生成睡眠日记失败:', error);

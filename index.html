@@ -3,19 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <!-- 本地 Live Server 调试：减少浏览器强缓存导致「改了 index 仍看旧页」 -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     
     <!-- 苹果设备全屏支持 -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="简约手机">
+    <meta name="apple-mobile-web-app-title" content="SoulPocket">
     <meta name="mobile-web-app-capable" content="yes">
+    <meta name="application-name" content="SoulPocket">
     
-    <title>简约手机</title>
+    <title>SoulPocket</title>
+    <link rel="icon" href="图标.jpg" type="image/jpeg">
+    <link rel="apple-touch-icon" href="图标.jpg">
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Long+Cang&family=ZCOOL+XiaoWei&family=Playfair+Display:wght@400;600;700;800&family=Inter:wght@400;500;600&family=Caveat:wght@400;500;600&display=swap">
-    <link rel="stylesheet" href="assets/main.css">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="main.css?v=uno2026043">
+    <link rel="stylesheet" href="style.css?v=uno2026043">
     
     <script type="importmap">
         {
@@ -31,6 +38,32 @@
         v-cloak
         :class="{ 'home-notch-off': !enableNotchAdaptation }"
     >
+        <!-- SoulPocket Discord 登录 -->
+        <div class="login-screen" v-if="!isLoggedIn && !isGuest">
+            <div class="login-screen-aurora" aria-hidden="true"></div>
+            <div class="login-screen-grid" aria-hidden="true"></div>
+            <div class="login-container login-card">
+                <div class="login-brand-wrap">
+                    <h1 class="login-brand">SoulPocket</h1>
+                    <span class="login-brand-line" aria-hidden="true"></span>
+                </div>
+                <p class="login-welcome">欢迎回来</p>
+                <p class="login-hint">登录后使用完整功能；也可先以游客体验<span class="login-hint-accent">（仅 Chat 与 Dock）</span></p>
+                <button
+                    type="button"
+                    @click="loginWithDiscord"
+                    class="discord-btn"
+                    :disabled="isLoading"
+                >
+                    <i class="fab fa-discord" aria-hidden="true"></i>
+                    <span>{{ isLoading ? '登录中…' : '用 Discord 登录' }}</span>
+                </button>
+                <button type="button" class="guest-btn" @click="loginAsGuest">
+                    游客进入
+                </button>
+            </div>
+        </div>
+
         <!-- 锁屏毛玻璃背景 -->
         <div v-if="isLockScreenVisible" class="lock-screen-background-blur"></div>
         <!-- 锁屏界面 -->
@@ -44,8 +77,8 @@
                     <div class="lock-signature">{{ lockSignature }}</div>
                 </div>
             
-            <!-- 密码输入区域 -->
-            <div class="lock-password">
+            <!-- 密码输入区域（仅开启锁屏密码时显示） -->
+            <div v-if="enableLockScreen" class="lock-password">
                 <div class="lock-password-input">
                     <div v-for="(dot, index) in 4" :key="index" class="lock-password-dot" :class="{ active: password.length > index }"></div>
                 </div>
@@ -66,7 +99,7 @@
                         <div class="lock-password-key" @click="addPassword('9')">9</div>
                     </div>
                     <div class="lock-password-row">
-                        <div class="lock-password-key"></div>
+                        <div class="lock-password-key lock-password-key-confirm" @click.stop="tapUnlock">确认</div>
                         <div class="lock-password-key" @click="addPassword('0')">0</div>
                         <div class="lock-password-key" @click="removePassword"><i class="fa fa-backspace"></i></div>
                     </div>
@@ -78,7 +111,7 @@
                 <div class="lock-bottom-btn">
                     <i class="fa fa-phone"></i>
                 </div>
-                <div class="lock-unlock-btn">
+                <div class="lock-unlock-btn" @click="tapUnlock">
                     <div class="lock-unlock-circle"></div>
                 </div>
                 <div class="lock-bottom-btn">
@@ -131,6 +164,7 @@
                 <div class="home-pages" ref="homePages" style="cursor: grab;">
                     <!-- 最左页：角色手机模拟 -->
                     <div class="home-page home-page-left-peek" :class="{ 'active': currentPage === 0 }">
+                        <template v-if="!isGuest">
                         <div class="grid-6x4">
                             <div class="grid-cell grid-row-1-6 left-peek-cell">
                                 <div class="left-peek-container" :class="{ dark: peek.peekDark }">
@@ -310,6 +344,14 @@
                                 </div>
                             </div>
                         </div>
+                        </template>
+                        <div v-else class="grid-6x4 guest-peek-placeholder-wrap">
+                            <div class="grid-cell grid-row-1-6 left-peek-cell guest-peek-placeholder">
+                                <p class="guest-peek-title">游客模式</p>
+                                <p>此页（角色 Peek）不可用</p>
+                                <p class="guest-peek-hint">向右滑动进入主屏 · Discord 登录可解锁全部功能</p>
+                            </div>
+                        </div>
                     </div>
                     <!-- 第一页 -->
                     <div class="home-page" :class="{ 'active': currentPage === 1 }">
@@ -361,19 +403,19 @@
                                         </div>
                                         <div class="app-label">Chat</div>
                                     </div>
-                                    <div class="app-icon" @click="openApp('games')">
+                                    <div class="app-icon" :class="{ 'app-icon--guest-off': isGuest }" @click="openApp('games')">
                                         <div class="app-icon-wrapper">
                                             <i class="fa fa-gamepad app-icon-font"></i>
                                         </div>
                                         <div class="app-label">Games</div>
                                     </div>
-                                    <div class="app-icon" @click="openApp('live')">
+                                    <div class="app-icon" :class="{ 'app-icon--guest-off': isGuest }" @click="openApp('live')">
                                         <div class="app-icon-wrapper">
                                             <i class="fa fa-microphone app-icon-font"></i>
                                         </div>
                                         <div class="app-label">Live</div>
                                     </div>
-                                    <div class="app-icon" @click="openApp('ember')">
+                                    <div class="app-icon" :class="{ 'app-icon--guest-off': isGuest }" @click="openApp('ember')">
                                         <div class="app-icon-wrapper">
                                             <i class="fa fa-fire app-icon-font"></i>
                                         </div>
@@ -479,25 +521,25 @@
                         <!-- 第5-6行：app和胶囊框 (2行×4格) -->
                         <div class="grid-cell grid-row-5-6">
                             <div class="app-grid-bottom-left">
-                                <div class="app-icon" @click="openApp('mate')">
+                                <div class="app-icon" :class="{ 'app-icon--guest-off': isGuest }" @click="openApp('mate')">
                                     <div class="app-icon-wrapper">
                                         <i class="fa fa-user app-icon-font"></i>
                                     </div>
                                     <div class="app-label">Mate</div>
                                 </div>
-                                <div class="app-icon" @click="openApp('read')">
+                                <div class="app-icon" :class="{ 'app-icon--guest-off': isGuest }" @click="openApp('read')">
                                     <div class="app-icon-wrapper">
                                         <i class="fa fa-book-open app-icon-font"></i>
                                     </div>
                                     <div class="app-label">Read</div>
                                 </div>
-                                <div class="app-icon" @click="openApp('feed')">
+                                <div class="app-icon" :class="{ 'app-icon--guest-off': isGuest }" @click="openApp('feed')">
                                     <div class="app-icon-wrapper">
                                         <i class="fa fa-list app-icon-font"></i>
                                     </div>
                                     <div class="app-label">Feed</div>
                                 </div>
-                                <div class="app-icon" @click="openApp('nest')">
+                                <div class="app-icon" :class="{ 'app-icon--guest-off': isGuest }" @click="openApp('nest')">
                                     <div class="app-icon-wrapper">
                                         <i class="fa fa-home app-icon-font"></i>
                                     </div>
@@ -854,12 +896,12 @@
                     <div class="wechat-messages" :class="{ 'novel-mode': isOfflineMode, 'group-chat': soulLinkActiveChatType === 'group' }" ref="chatMessagesContainer" @click="onChatBackgroundClick">
                         <div v-for="(msg, index) in currentChatMessages" :key="index" class="message" :class="[msg.sender, { 'novel-message': isOfflineMode, 'call-message': msg.isCallMessage, 'special-card-message': msg.messageType === 'location' || msg.messageType === 'transfer' || msg.messageType === 'textImage' || msg.messageType === 'image' || msg.messageType === 'takeaway' || msg.messageType === 'tarot' || msg.messageType === 'pet' || msg.messageType === 'vote' || msg.messageType === 'order' || msg.messageType === 'helpBuy' || msg.messageType === 'share' || msg.messageType === 'voice' || msg.messageType === 'sticker', 'group-message': soulLinkActiveChatType === 'group', 'system-message': msg.isSystem }]" @contextmenu="onMessageContextMenu($event, msg)" @touchstart="onMessageTouchStart($event, msg)" @touchmove="onMessageTouchMove" @touchend="onMessageTouchEnd" @click.stop>
                             <div
-                                v-if="!msg.isSystem && bubbleAvatarMode !== 'hide'"
+                                v-if="!msg.isSystem && chatSettings.bubbleAvatarMode !== 'hide'"
                                 class="message-avatar"
-                                :class="{ 'is-hidden-avatar': bubbleAvatarMode === 'first' && !(index === 0 || currentChatMessages[index - 1].sender !== msg.sender || (soulLinkActiveChatType === 'group' && currentChatMessages[index - 1].senderName !== msg.senderName)) }"
+                                :class="{ 'is-hidden-avatar': chatSettings.bubbleAvatarMode === 'first' && !(index === 0 || currentChatMessages[index - 1].sender !== msg.sender || (soulLinkActiveChatType === 'group' && currentChatMessages[index - 1].senderName !== msg.senderName)) }"
                             >
                                 <img
-                                    v-if="bubbleAvatarMode === 'all' || (bubbleAvatarMode === 'first' && (index === 0 || currentChatMessages[index - 1].sender !== msg.sender || (soulLinkActiveChatType === 'group' && currentChatMessages[index - 1].senderName !== msg.senderName)))"
+                                    v-if="chatSettings.bubbleAvatarMode === 'all' || (chatSettings.bubbleAvatarMode === 'first' && (index === 0 || currentChatMessages[index - 1].sender !== msg.sender || (soulLinkActiveChatType === 'group' && currentChatMessages[index - 1].senderName !== msg.senderName)))"
                                     :src="msg.senderAvatar || (msg.sender === 'ai' ? currentChatAvatar : userAvatar) || 'https://placehold.co/60x60?text=?'"
                                     alt="avatar"
                                 >
@@ -1023,10 +1065,7 @@
                                         <span>{{ msg.requestDirection === 'incoming' ? '好友申请' : '申请已发送' }}</span>
                                     </div>
                                     <div class="share-content">{{ msg.text || '好友申请' }}</div>
-                                    <div v-if="msg.requestDirection === 'incoming' && socialPendingRoleRequest" style="margin-top:8px; display:flex; gap:8px;">
-                                        <button class="btn-small" @click="acceptRoleFriendRequest">同意</button>
-                                        <button class="btn-small" @click="rejectRoleFriendRequest">拒绝</button>
-                                    </div>
+                                    <div v-if="msg.requestDirection === 'incoming'" style="font-size:12px;color:rgba(0,0,0,.45);margin-top:8px;">历史记录：好友申请功能已下线，可忽略此条。</div>
                                 </div>
                                 <div v-else-if="msg.messageType === 'voice'" class="voice-message-bubble" :class="{ 'playing': msg.isPlaying }" @click="toggleVoicePlayback(msg)">
                                     <div class="voice-waveform">
@@ -1037,7 +1076,7 @@
                                     <div v-if="msg.showTranslation" class="voice-translation">
                                         <div class="translation-label">转文字</div>
                                         <div class="translation-text">{{ msg.transcription || msg.voiceText || msg.text }}</div>
-                                        <div v-if="soulLinkForeignTranslationEnabled && msg.voiceTranslation" class="reply-translation">
+                                        <div v-if="chatSettings.soulLinkForeignTranslationEnabled && msg.voiceTranslation" class="reply-translation">
                                             <div class="translation-divider"></div>
                                             <div class="translation-text">{{ msg.voiceTranslation }}</div>
                                         </div>
@@ -1049,7 +1088,7 @@
                                 </div>
                                 <template v-else>
                                     <div class="message-text">{{ msg.text }}</div>
-                                    <div v-if="soulLinkForeignTranslationEnabled && msg.replyTranslation" class="reply-translation">
+                                    <div v-if="chatSettings.soulLinkForeignTranslationEnabled && msg.replyTranslation" class="reply-translation">
                                         <div class="translation-divider"></div>
                                         <div class="translation-text">{{ msg.replyTranslation }}</div>
                                     </div>
@@ -1059,7 +1098,7 @@
                                 <span v-if="msg.sender === 'ai'" class="novel-char-name">{{ currentChatName }}：</span>
                                 <span v-else class="novel-char-name">我：</span>
                                 <div class="message-text">{{ msg.text }}</div>
-                                <div v-if="soulLinkForeignTranslationEnabled && msg.replyTranslation" class="reply-translation">
+                                <div v-if="chatSettings.soulLinkForeignTranslationEnabled && msg.replyTranslation" class="reply-translation">
                                     <div class="translation-divider"></div>
                                     <div class="translation-text">{{ msg.replyTranslation }}</div>
                                 </div>
@@ -1070,8 +1109,8 @@
                                     <span v-if="msg.isReplied" class="status-check double">✓</span>
                                 </template>
                             </div>
-                            <div v-if="!isOfflineMode && timeSenseEnabled && !msg.isSystem && shouldShowTimeDivider(index) && msg.timestamp" class="message-time">
-                                {{ formatTime(msg.timestamp, messageTimeNow) }}
+                            <div v-if="!isOfflineMode && chatSettings.timeSenseEnabled && !msg.isSystem && shouldShowTimeDivider(index) && msg.timestamp" class="message-time">
+                                {{ formatTime(msg.timestamp, chatSettings.messageTimeNow) }}
                             </div>
                             </div>
                             <div v-if="msg.sender === 'ai' && msg.osContent && !msg.isSystem" 
@@ -1080,7 +1119,7 @@
                                  @click.stop="focusedOsMessageId = focusedOsMessageId === msg.id ? null : msg.id">
                                 <div class="os-index">内心：</div>
                                 <div class="os-content">{{ msg.osContent }}</div>
-                                <div v-if="soulLinkForeignTranslationEnabled && msg.osTranslation" class="os-translation">
+                                <div v-if="chatSettings.soulLinkForeignTranslationEnabled && msg.osTranslation" class="os-translation">
                                     <div class="translation-divider"></div>
                                     <div class="translation-text">{{ msg.osTranslation }}</div>
                                 </div>
@@ -1286,7 +1325,7 @@
 
         <!-- 聊天设置面板 -->
         <div v-if="showChatSettings" class="art-settings-overlay" @click.self="showChatSettings = false">
-            <div class="art-settings-panel" :style="chatSettingsPanelStyle">
+            <div class="art-settings-panel" :style="chatSettings.chatSettingsPanelStyle">
                 <button class="art-settings-close" @click="showChatSettings = false">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -1331,7 +1370,7 @@
                         </div>
                         <div class="art-input-wrapper">
                             <label class="art-input-label">我的身份</label>
-                            <input type="text" v-model="userIdentity" class="art-settings-input" placeholder="向ta介绍一下我自己....">
+                            <input type="text" v-model="chatSettings.userIdentity" class="art-settings-input" placeholder="向ta介绍一下我自己....">
                         </div>
                     </div>
 
@@ -1347,7 +1386,7 @@
                         </div>
                         <div class="art-input-wrapper">
                             <label class="art-input-label">我的人称代词</label>
-                            <select v-model="userPronoun" class="art-settings-input">
+                            <select v-model="chatSettings.userPronoun" class="art-settings-input">
                                 <option value="unknown">保密/中性（TA）</option>
                                 <option value="female">女性（她）</option>
                                 <option value="male">男性（他）</option>
@@ -1368,19 +1407,23 @@
                         </div>
                         <div class="art-input-wrapper">
                             <label class="art-input-label">和TA的关系</label>
-                            <input type="text" v-model="userRelation" class="art-settings-input" placeholder="例如：闺蜜、死党...">
+                            <input type="text" v-model="chatSettings.userRelation" class="art-settings-input" placeholder="例如：闺蜜、死党...">
                         </div>
                     </div>
                     
                     <!-- 群聊成员关系 -->
                     <div v-if="soulLinkActiveChatType === 'group' && activeGroupChat" class="group-members-settings">
-                        <div class="group-member-item" v-for="(member, index) in activeGroupChat.members" :key="index">
+                        <div class="group-member-item" v-for="(member, index) in activeGroupChat.members" :key="member.id || ('m-' + index)">
                             <img :src="member.avatarUrl || 'https://placehold.co/100x100?text=No+Avatar'" class="group-member-small-avatar">
                             <div class="group-member-info">
                                 <div class="group-member-name">{{ member.name }}</div>
                                 <input type="text" v-model="member.relation" class="group-member-relation-input" :placeholder="'与' + member.name + '的关系'">
                             </div>
-                            <button class="remove-member-btn" @click="removeGroupMember(index)">
+                            <button type="button" class="edit-member-btn" @click="openMemberEditor(member)" title="编辑人设与世界书">
+                                <i class="fas fa-pen"></i>
+                            </button>
+                            <button v-if="member.id && String(member.id).indexOf('custom_') !== 0" type="button" class="btn-small" style="margin-right:4px;" @click="toggleUserBlockRoleForCharacter(member.id)">{{ isCharacterBlockedByUser(member.id) ? '取消拉黑' : '拉黑' }}</button>
+                            <button type="button" class="remove-member-btn" @click="removeGroupMember(index)">
                                 <i class="fas fa-times"></i>
                             </button>
                         </div>
@@ -1406,7 +1449,7 @@
                         <div class="art-input-wrapper">
                             <label class="art-input-label">外语功能</label>
                             <div style="display: flex; align-items: center; gap: 10px; padding-top: 6px;">
-                                <input id="soulLinkForeignTranslationEnabled" type="checkbox" v-model="soulLinkForeignTranslationEnabled">
+                                <input id="soulLinkForeignTranslationEnabled" type="checkbox" v-model="chatSettings.soulLinkForeignTranslationEnabled">
                                 <label for="soulLinkForeignTranslationEnabled" style="font-family: 'Inter', sans-serif; font-size: 14px; color: #000000;">开启外语翻译</label>
                             </div>
                         </div>
@@ -1424,7 +1467,7 @@
                         <div class="art-input-wrapper">
                             <label class="art-input-label">输出语言(A) / 翻译语言(B)</label>
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                                <select v-model="soulLinkForeignPrimaryLang" class="art-settings-input">
+                                <select v-model="chatSettings.soulLinkForeignPrimaryLang" class="art-settings-input">
                                     <option value="zh-CN">中文(简体)</option>
                                     <option value="zh-TW">中文(繁體)</option>
                                     <option value="en">English</option>
@@ -1443,7 +1486,7 @@
                                     <option value="id">Bahasa Indonesia</option>
                                     <option value="tr">Türkçe</option>
                                 </select>
-                                <select v-model="soulLinkForeignSecondaryLang" class="art-settings-input">
+                                <select v-model="chatSettings.soulLinkForeignSecondaryLang" class="art-settings-input">
                                     <option value="zh-CN">中文(简体)</option>
                                     <option value="zh-TW">中文(繁體)</option>
                                     <option value="en">English</option>
@@ -1464,7 +1507,7 @@
                                 </select>
                             </div>
                             <div style="font-size: 12px; color: rgba(0, 0, 0, 0.55); margin-top: 6px;">
-                                {{ soulLinkForeignTranslationDirectionText }}
+                                {{ chatSettings.soulLinkForeignTranslationDirectionText }}
                             </div>
                         </div>
                     </div>
@@ -1483,7 +1526,7 @@
                         </div>
                         <div class="art-input-wrapper">
                             <label class="art-input-label">背景样式</label>
-                            <select v-model="chatBackgroundStyle" class="art-settings-input" @change="updateChatBackground">
+                            <select v-model="chatSettings.chatBackgroundStyle" class="art-settings-input" @change="updateChatBackground">
                                 <option value="default">默认</option>
                                 <option value="gradient">渐变</option>
                                 <option value="color">纯色</option>
@@ -1491,7 +1534,7 @@
                             </select>
                         </div>
                     </div>
-                    <div v-if="chatBackgroundStyle === 'gradient'" class="art-settings-input-item">
+                    <div v-if="chatSettings.chatBackgroundStyle === 'gradient'" class="art-settings-input-item">
                         <div class="art-settings-icon-wrapper">
                             <div class="art-settings-blob blob-color-4"></div>
                             <svg class="art-settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -1503,12 +1546,12 @@
                         <div class="art-input-wrapper">
                             <label class="art-input-label">渐变颜色</label>
                             <div style="display:flex; gap:10px; align-items:center;">
-                                <input type="color" v-model="gradientStartColor" class="art-settings-input" @input="updateChatBackground" style="padding:6px; height:40px;">
-                                <input type="color" v-model="gradientEndColor" class="art-settings-input" @input="updateChatBackground" style="padding:6px; height:40px;">
+                                <input type="color" v-model="chatSettings.gradientStartColor" class="art-settings-input" @input="updateChatBackground" style="padding:6px; height:40px;">
+                                <input type="color" v-model="chatSettings.gradientEndColor" class="art-settings-input" @input="updateChatBackground" style="padding:6px; height:40px;">
                             </div>
                         </div>
                     </div>
-                    <div v-if="chatBackgroundStyle === 'color'" class="art-settings-input-item">
+                    <div v-if="chatSettings.chatBackgroundStyle === 'color'" class="art-settings-input-item">
                         <div class="art-settings-icon-wrapper">
                             <div class="art-settings-blob blob-color-2"></div>
                             <svg class="art-settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -1517,10 +1560,10 @@
                         </div>
                         <div class="art-input-wrapper">
                             <label class="art-input-label">纯色</label>
-                            <input type="color" v-model="solidBackgroundColor" class="art-settings-input" @input="updateChatBackground" style="padding:6px; height:40px;">
+                            <input type="color" v-model="chatSettings.solidBackgroundColor" class="art-settings-input" @input="updateChatBackground" style="padding:6px; height:40px;">
                         </div>
                     </div>
-                    <div v-if="chatBackgroundStyle === 'image'" class="art-settings-input-item">
+                    <div v-if="chatSettings.chatBackgroundStyle === 'image'" class="art-settings-input-item">
                         <div class="art-settings-icon-wrapper">
                             <div class="art-settings-blob blob-color-5"></div>
                             <svg class="art-settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -1530,7 +1573,7 @@
                         </div>
                         <div class="art-input-wrapper">
                             <label class="art-input-label">图片链接 / 相册</label>
-                            <input type="text" v-model="chatBackgroundImageInput" class="art-settings-input" placeholder="https://... 或 data:image/...">
+                            <input type="text" v-model="chatSettings.chatBackgroundImageInput" class="art-settings-input" placeholder="https://... 或 data:image/...">
                             <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
                                 <button class="btn-small" @click="applyBackgroundImageLink">应用链接</button>
                                 <button class="btn-small" @click="selectBackgroundImage">从相册选择</button>
@@ -1549,8 +1592,8 @@
                         <div class="art-input-wrapper">
                             <label class="art-input-label">手动裁剪图片</label>
                             <div style="display:flex; align-items:center; gap:10px; padding-top:6px;">
-                                <input id="enableManualImageCrop" type="checkbox" v-model="enableManualImageCrop">
-                                <label for="enableManualImageCrop" style="font-family:'Inter',sans-serif; font-size:14px; color:#000;">上传后手动选框</label>
+                                <input id="enableManualImageCropCb" type="checkbox" v-model="chatSettings.enableManualImageCrop">
+                                <label for="enableManualImageCropCb" style="font-family:'Inter',sans-serif; font-size:14px; color:#000;">上传后手动选框</label>
                             </div>
                         </div>
                     </div>
@@ -1570,7 +1613,7 @@
                         </div>
                         <div class="art-input-wrapper">
                             <label class="art-input-label">模块 1：头像</label>
-                            <select v-model="bubbleAvatarMode" class="art-settings-input">
+                            <select v-model="chatSettings.bubbleAvatarMode" class="art-settings-input">
                                 <option value="hide">隐藏头像</option>
                                 <option value="first">连续消息只显示第一个</option>
                                 <option value="all">头像全显</option>
@@ -1589,7 +1632,7 @@
                         </div>
                         <div class="art-input-wrapper">
                             <label class="art-input-label">模块 2：气泡形状</label>
-                            <select v-model="bubbleShapeMode" class="art-settings-input" @change="applyBubbleStyle">
+                            <select v-model="chatSettings.bubbleShapeMode" class="art-settings-input" @change="applyBubbleStyle">
                                 <option value="round">圆弧（圆角）</option>
                                 <option value="sharp">直角（锐角）</option>
                             </select>
@@ -1607,7 +1650,7 @@
                         </div>
                         <div class="art-input-wrapper">
                             <label class="art-input-label">模块 3：气泡颜色（对比色）</label>
-                            <select v-model="bubbleColorPreset" class="art-settings-input" @change="applyBubbleStyle">
+                            <select v-model="chatSettings.bubbleColorPreset" class="art-settings-input" @change="applyBubbleStyle">
                                 <option value="default">对比色 1（黑 + 浅灰）</option>
                                 <option value="blue">对比色 2（黑 + 蓝调）</option>
                                 <option value="orange">对比色 3（黑 + 橙暖）</option>
@@ -1628,7 +1671,7 @@
                         </div>
                         <div class="art-input-wrapper" style="width: 100%;">
                             <label class="art-input-label">模块 4：自定义 CSS</label>
-                            <textarea v-model="customBubbleCSS" class="art-settings-input" rows="4"
+                            <textarea v-model="chatSettings.customBubbleCSS" class="art-settings-input" rows="4"
                                 placeholder="例如：background:#111;color:#fff;border-radius:16px; box-shadow:none;"
                                 style="margin-top:8px; resize: vertical;"></textarea>
                             <div style="margin-top:8px;">
@@ -1653,19 +1696,19 @@
                         <div class="art-input-wrapper">
                             <label class="art-input-label">自动总结</label>
                             <div style="display: flex; align-items: center; gap: 10px; padding-top: 6px;">
-                                <input id="chatSummaryEnabled" type="checkbox" v-model="chatSummaryEnabled">
+                                <input id="chatSummaryEnabled" type="checkbox" v-model="chatSettings.chatSummaryEnabled">
                                 <label for="chatSummaryEnabled" style="font-family: 'Inter', sans-serif; font-size: 14px; color: #000000;">开启聊天总结</label>
                             </div>
-                            <div v-if="chatSummaryEnabled" style="margin-top: 10px; display: flex; align-items: center; gap: 10px;">
+                            <div v-if="chatSettings.chatSummaryEnabled" style="margin-top: 10px; display: flex; align-items: center; gap: 10px;">
                                 <span style="font-size: 13px; color: rgba(0,0,0,.65);">每</span>
-                                <input type="number" v-model.number="chatSummaryEveryN" min="1" step="1" class="art-settings-input" style="max-width: 110px;">
+                                <input type="number" v-model.number="chatSettings.chatSummaryEveryN" min="1" step="1" class="art-settings-input" style="max-width: 110px;">
                                 <span style="font-size: 13px; color: rgba(0,0,0,.65);">次对话自动总结一次</span>
                             </div>
                             <div style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap;">
-                                <button class="btn-small" @click="manualSummarizeChat" :disabled="chatSummaryGenerating">
-                                    {{ chatSummaryGenerating ? '总结中...' : '立即总结' }}
+                                <button class="btn-small" @click="manualSummarizeChat" :disabled="chatSettings.chatSummaryGenerating">
+                                    {{ chatSettings.chatSummaryGenerating ? '总结中...' : '立即总结' }}
                                 </button>
-                                <button class="btn-small" @click="clearChatSummaryBoard" :disabled="chatSummaryGenerating || (chatSummaryBoard && chatSummaryBoard.length===0)">
+                                <button class="btn-small" @click="clearChatSummaryBoard" :disabled="chatSettings.chatSummaryGenerating || chatSummaryBoardList.length === 0">
                                     清空留言板
                                 </button>
                             </div>
@@ -1684,11 +1727,11 @@
                         </div>
                         <div class="art-input-wrapper" style="width: 100%;">
                             <label class="art-input-label">留言板（总结区）</label>
-                            <div v-if="!chatSummaryBoard || chatSummaryBoard.length === 0" style="font-size: 13px; color: rgba(0,0,0,.55); padding-top: 6px;">
+                            <div v-if="chatSummaryBoardList.length === 0" style="font-size: 13px; color: rgba(0,0,0,.55); padding-top: 6px;">
                                 还没有总结。你可以点“立即总结”生成第一条。
                             </div>
                             <div v-else style="display: flex; flex-direction: column; gap: 10px; margin-top: 8px;">
-                                <div v-for="item in chatSummaryBoard.slice(0, 6)" :key="item.id" style="border: 1px solid rgba(0,0,0,.12); border-radius: 12px; padding: 10px; background: #fff;">
+                                <div v-for="item in chatSummaryBoardList.slice(0, 6)" :key="item.id" style="border: 1px solid rgba(0,0,0,.12); border-radius: 12px; padding: 10px; background: #fff;">
                                     <div style="display: flex; justify-content: space-between; gap: 10px;">
                                         <div style="font-weight: 600; font-size: 13px; color: #111;">{{ item.title || '聊天总结' }}</div>
                                         <div style="font-size: 12px; color: rgba(0,0,0,.55); white-space: nowrap;">{{ item.createdAtText }}</div>
@@ -1697,7 +1740,7 @@
                                         {{ item.body }}
                                     </div>
                                 </div>
-                                <div v-if="chatSummaryBoard.length > 6" style="font-size: 12px; color: rgba(0,0,0,.55);">
+                                <div v-if="chatSummaryBoardList.length > 6" style="font-size: 12px; color: rgba(0,0,0,.55);">
                                     仅展示最近 6 条（其余已保存在本地）。
                                 </div>
                             </div>
@@ -1718,7 +1761,7 @@
                         <div class="art-input-wrapper">
                             <label class="art-input-label">时差感知</label>
                             <div style="display: flex; align-items: center; gap: 10px; padding-top: 6px;">
-                                <input id="timeZoneSystemEnabled" type="checkbox" v-model="timeZoneSystemEnabled">
+                                <input id="timeZoneSystemEnabled" type="checkbox" v-model="chatSettings.timeZoneSystemEnabled">
                                 <label for="timeZoneSystemEnabled" style="font-family: 'Inter', sans-serif; font-size: 14px; color: #000000;">开启时差系统</label>
                             </div>
                             <div style="font-size: 12px; color: rgba(0, 0, 0, 0.55); margin-top: 8px;">
@@ -1726,7 +1769,7 @@
                             </div>
                         </div>
                     </div>
-                    <div v-if="timeZoneSystemEnabled" class="art-settings-input-item">
+                    <div v-if="chatSettings.timeZoneSystemEnabled" class="art-settings-input-item">
                         <div class="art-settings-icon-wrapper">
                             <div class="art-settings-blob blob-color-4"></div>
                             <svg class="art-settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -1736,10 +1779,10 @@
                         </div>
                         <div class="art-input-wrapper">
                             <label class="art-input-label">用户时区</label>
-                            <input type="text" v-model="userTimeZone" class="art-settings-input" placeholder="例如：Asia/Shanghai 或 UTC+8">
+                            <input type="text" v-model="chatSettings.userTimeZone" class="art-settings-input" placeholder="例如：Asia/Shanghai 或 UTC+8">
                         </div>
                     </div>
-                    <div v-if="timeZoneSystemEnabled" class="art-settings-input-item">
+                    <div v-if="chatSettings.timeZoneSystemEnabled" class="art-settings-input-item">
                         <div class="art-settings-icon-wrapper">
                             <div class="art-settings-blob blob-color-5"></div>
                             <svg class="art-settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -1751,7 +1794,7 @@
                         </div>
                         <div class="art-input-wrapper">
                             <label class="art-input-label">角色时区</label>
-                            <input type="text" v-model="roleTimeZone" class="art-settings-input" placeholder="例如：Asia/Tokyo 或 UTC+9">
+                            <input type="text" v-model="chatSettings.roleTimeZone" class="art-settings-input" placeholder="例如：Asia/Tokyo 或 UTC+9">
                         </div>
                     </div>
                 </div>
@@ -1768,21 +1811,22 @@
                         <div class="art-input-wrapper">
                             <label class="art-input-label">启用主动消息</label>
                             <div style="display:flex; align-items:center; gap:10px; padding-top:6px;">
-                                <input id="activeMessageEnabled" type="checkbox" v-model="activeMessageEnabled">
+                                <input id="activeMessageEnabled" type="checkbox" v-model="chatSettings.activeMessageEnabled">
                                 <label for="activeMessageEnabled" style="font-family:'Inter',sans-serif; font-size:14px; color:#000;">开启</label>
                             </div>
-                            <div v-if="activeMessageEnabled" style="display:flex; gap:10px; margin-top:8px; align-items:center;">
+                            <div v-if="chatSettings.activeMessageEnabled" style="display:flex; gap:10px; margin-top:8px; align-items:center;">
                                 <span style="font-size:13px; color:#666;">频率(分钟)</span>
-                                <input type="number" min="1" step="1" v-model.number="activeMessageFrequencyMin" class="art-settings-input" style="max-width:110px;">
+                                <input type="number" min="1" step="1" v-model.number="chatSettings.activeMessageFrequencyMin" class="art-settings-input" style="max-width:110px;">
                                 <span style="font-size:13px; color:#666;">回复延迟(秒)</span>
-                                <input type="number" min="1" step="1" v-model.number="activeReplyDelaySec" class="art-settings-input" style="max-width:110px;">
+                                <input type="number" min="1" step="1" v-model.number="chatSettings.activeReplyDelaySec" class="art-settings-input" style="max-width:110px;">
                             </div>
+                            <p style="font-size:12px; color:rgba(0,0,0,.5); margin-top:8px; line-height:1.45;">按当前会话保存：每个单聊、每个群聊的主动消息开关与频率各自独立。群聊仅在已配置有效 API 且模型返回内容时，才会随机选一名未拉黑成员发送一条主动消息。</p>
                         </div>
                     </div>
                 </div>
 
-                <div class="art-settings-section">
-                    <h2 class="art-section-title">拉黑与好友申请</h2>
+                <div v-if="soulLinkActiveChatType === 'character'" class="art-settings-section">
+                    <h2 class="art-section-title">拉黑（按角色）</h2>
                     <div class="art-settings-input-item">
                         <div class="art-settings-icon-wrapper">
                             <div class="art-settings-blob blob-color-6"></div>
@@ -1792,17 +1836,21 @@
                             </svg>
                         </div>
                         <div class="art-input-wrapper">
-                            <label class="art-input-label">关系状态</label>
+                            <label class="art-input-label">当前角色</label>
                             <div style="font-size:13px; color:#555; margin-bottom:8px;">
-                                你拉黑对方：{{ socialUserBlockedRole ? '是' : '否' }} ｜ 对方拉黑你：{{ socialRoleBlockedUser ? '是' : '否' }}
+                                状态：{{ userBlockedRoleUi ? '你已拉黑该角色' : '未拉黑' }}
                             </div>
                             <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                                <button class="btn-small" @click="toggleUserBlockRole">{{ socialUserBlockedRole ? '取消拉黑' : '拉黑对方' }}</button>
-                                <button class="btn-small" @click="sendFriendRequestToRole" :disabled="!socialRoleBlockedUser">发送好友申请</button>
+                                <button type="button" class="btn-small" @click="toggleUserBlockRole">{{ userBlockedRoleUi ? '取消拉黑' : '拉黑对方' }}</button>
                             </div>
                         </div>
                     </div>
                 </div>
+                <div v-else-if="soulLinkActiveChatType === 'group'" class="art-settings-section">
+                    <h2 class="art-section-title">拉黑</h2>
+                    <p style="font-size:13px; color:#666; line-height:1.5; margin:0;">群聊请在上方「身份与关系」中的群成员列表里，对对应角色使用「拉黑 / 取消拉黑」（自定义成员无此选项）。</p>
+                </div>
+
                 
                 <div class="art-settings-section">
                     <h2 class="art-section-title">聊天记录</h2>
@@ -2098,12 +2146,82 @@
                         <label class="art-savearchive-label">成员人设</label>
                         <textarea v-model="customMemberPersona" class="art-savearchive-input" placeholder="简单描述一下这位成员的性格特点..." style="min-height: 100px; resize: vertical;"></textarea>
                     </div>
+                    <div class="art-savearchive-input-group">
+                        <label class="art-savearchive-label">绑定世界书（可多选）</label>
+                        <div v-if="!worldbooks || worldbooks.length === 0" class="profile-meta" style="padding:8px 0;">暂无世界书，请先在工作室创建</div>
+                        <div v-else class="custom-member-worldbook-list">
+                            <label v-for="wb in worldbooks" :key="wb.id" class="custom-member-wb-row">
+                                <span>{{ wb.name }}</span>
+                                <input type="checkbox" v-model="customMemberWorldbookIds" :value="wb.id">
+                            </label>
+                        </div>
+                    </div>
+                    <div class="art-savearchive-input-group">
+                        <label class="art-savearchive-label">绑定预设</label>
+                        <select v-model="customMemberPresetId" class="art-savearchive-input">
+                            <option :value="null">不绑定预设</option>
+                            <option v-for="p in presets" :key="p.id" :value="p.id">{{ p.name }}</option>
+                        </select>
+                    </div>
+                    <div v-if="addMemberMode === 'custom'" class="art-savearchive-input-group">
+                        <label class="art-savearchive-label">时区（群聊时差）</label>
+                        <select v-model="customMemberTimeZone" class="art-savearchive-input">
+                            <option value="Asia/Shanghai">上海/北京 (UTC+8)</option>
+                            <option value="Asia/Tokyo">东京 (UTC+9)</option>
+                            <option value="America/New_York">纽约 (UTC-5/UTC-4)</option>
+                            <option value="Europe/London">伦敦 (UTC+0/UTC+1)</option>
+                            <option value="Australia/Sydney">悉尼 (UTC+10/UTC+11)</option>
+                        </select>
+                    </div>
                 </div>
                 
                 <div class="art-savearchive-buttons">
                     <button class="art-savearchive-btn art-savearchive-btn-cancel" @click="showAddMemberDialog = false">取消</button>
                     <button v-if="addMemberMode === 'existing'" class="art-savearchive-btn art-savearchive-btn-save" @click="addMembersToGroup" :disabled="selectedAddMembers.length === 0">添加</button>
                     <button v-if="addMemberMode === 'custom'" class="art-savearchive-btn art-savearchive-btn-save" @click="addCustomMember" :disabled="!customMemberName">添加</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 编辑群成员（人设 / 世界书 / 预设） -->
+        <div v-if="showMemberEditor && editingMember" class="modal-overlay" @click.self="closeMemberEditor">
+            <div class="modal-content member-editor-modal" style="max-width: 480px;">
+                <div class="modal-header">
+                    <span>编辑成员 — {{ editingMember.name }}</span>
+                    <button type="button" class="close-btn" @click="closeMemberEditor"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="modal-body member-editor-modal-body">
+                    <label class="member-editor-label">人设</label>
+                    <textarea v-model="editingMember.persona" class="art-settings-input" rows="3" placeholder="成员的性格描述..."></textarea>
+
+                    <label class="member-editor-label mt-2">绑定世界书</label>
+                    <div v-if="!worldbooks || worldbooks.length === 0" class="profile-meta">暂无世界书，请先在工作室创建</div>
+                    <div v-else class="member-editor-wb-list">
+                        <div v-for="wb in worldbooks" :key="wb.id" class="member-editor-wb-row">
+                            <span>{{ wb.name }}</span>
+                            <input type="checkbox" v-model="editingMember.worldbookIds" :value="wb.id">
+                        </div>
+                    </div>
+
+                    <label class="member-editor-label mt-2">绑定预设</label>
+                    <select v-model="editingMember.selectedPresetId" class="art-settings-input">
+                        <option :value="null">不绑定预设</option>
+                        <option v-for="p in presets" :key="p.id" :value="p.id">{{ p.name }}</option>
+                    </select>
+
+                    <label class="member-editor-label mt-2">时区（群聊时差）</label>
+                    <select v-model="editingMember.timeZone" class="art-settings-input">
+                        <option value="Asia/Shanghai">上海/北京 (UTC+8)</option>
+                        <option value="Asia/Tokyo">东京 (UTC+9)</option>
+                        <option value="America/New_York">纽约 (UTC-5/UTC-4)</option>
+                        <option value="Europe/London">伦敦 (UTC+0/UTC+1)</option>
+                        <option value="Australia/Sydney">悉尼 (UTC+10/UTC+11)</option>
+                    </select>
+
+                    <div class="member-editor-actions">
+                        <button type="button" class="btn" @click="closeMemberEditor">取消</button>
+                        <button type="button" class="btn btn-primary" @click="saveMemberEditor">保存</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -4498,6 +4616,33 @@
                     </div>
                 </div>
             </div>
+
+            <div v-if="showImportPasswordModal" class="modal-overlay import-password-overlay" @click.self="cancelImportPassword">
+                <div class="modal-content import-password-modal" role="dialog" aria-modal="true" aria-labelledby="import-password-title">
+                    <div class="import-password-header">
+                        <h2 id="import-password-title" class="import-password-title">导入验证</h2>
+                        <p class="import-password-hint">请输入导入密码后继续选择文件</p>
+                    </div>
+                    <div class="import-password-body">
+                        <label class="import-password-label" for="import-password-field">密码</label>
+                        <input
+                            id="import-password-field"
+                            ref="importPasswordFocusEl"
+                            v-model="importPasswordDraft"
+                            type="password"
+                            class="import-password-field"
+                            autocomplete="off"
+                            placeholder="输入导入密码"
+                            @keyup.enter="confirmImportPassword"
+                        />
+                        <p v-if="importPasswordError" class="import-password-error">{{ importPasswordError }}</p>
+                    </div>
+                    <div class="import-password-footer">
+                        <button type="button" class="import-password-btn import-password-btn--ghost" @click="cancelImportPassword">取消</button>
+                        <button type="button" class="import-password-btn import-password-btn--primary" @click="confirmImportPassword">确认</button>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- 批量删除模态框 -->
@@ -4904,6 +5049,26 @@
                 <div style="width: 40px;"></div>
             </div>
             <div class="app-content theme-content">
+                <!-- SoulPocket 账号 -->
+                <div class="card theme-card theme-account-card">
+                    <div class="theme-card-header">
+                        <i class="fas fa-user-circle"></i>
+                        <span>SoulPocket 账号</span>
+                    </div>
+                    <div class="theme-account-body">
+                        <p v-if="isLoggedIn && discordUser" class="theme-account-status">
+                            已登录 Discord：<strong>{{ discordUser.global_name || discordUser.username || '用户' }}</strong>
+                            <span v-if="discordUser.discriminator && discordUser.discriminator !== '0'" class="theme-account-disc">#{{ discordUser.discriminator }}</span>
+                        </p>
+                        <p v-else-if="isGuest" class="theme-account-status">当前为<strong>游客模式</strong>（仅 Chat 与 Dock 可用）</p>
+                        <p v-else class="theme-account-status">未登录</p>
+                        <button type="button" class="theme-account-exit-btn" @click="onSoulPocketAccountExit">
+                            切换账号 / 退出
+                        </button>
+                        <p class="theme-account-hint">退出后将返回登录页，可使用 Discord 登录或再次游客进入</p>
+                    </div>
+                </div>
+
                 <!-- 锁屏设置卡片 -->
                 <div class="card theme-card">
                     <div class="theme-card-header">
@@ -4932,7 +5097,7 @@
                                 <button class="password-save-btn" @click="savePassword" :disabled="!isPasswordValid">保存</button>
                             </div>
                         </div>
-                        <div class="setting-item setting-item-full" v-if="enableLockScreen">
+                        <div class="setting-item setting-item-full">
                             <div class="setting-info">
                                 <div class="setting-label">字体</div>
                                 <div class="setting-desc">设置锁屏界面的字体</div>
@@ -4982,7 +5147,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="setting-item" v-if="enableLockScreen">
+                        <div class="setting-item">
                             <div class="setting-info">
                                 <div class="setting-label">个性签名</div>
                                 <div class="setting-desc">设置锁屏界面的个性签名</div>
@@ -4992,7 +5157,7 @@
                                 <button class="signature-save-btn" @click="saveSignature">保存</button>
                             </div>
                         </div>
-                        <div class="setting-item" v-if="enableLockScreen">
+                        <div class="setting-item">
                             <div class="setting-info">
                                 <div class="setting-label">锁屏壁纸</div>
                                 <div class="setting-desc">设置锁屏界面的背景图片</div>
@@ -5002,7 +5167,7 @@
                                 <button class="lock-wallpaper-save-btn" @click="saveLockWallpaper">保存</button>
                             </div>
                         </div>
-                        <div class="setting-item" v-if="enableLockScreen">
+                        <div class="setting-item">
                             <div class="setting-info">
                                 <div class="setting-label">日期时间颜色</div>
                                 <div class="setting-desc">设置锁屏界面的日期时间颜色</div>
@@ -5012,8 +5177,8 @@
                                 <button class="lock-color-save-btn" @click="saveLockDateTimeColor">保存</button>
                             </div>
                         </div>
-                        <!-- 锁屏预览 -->
-                        <div class="lock-screen-preview" v-if="enableLockScreen">
+                        <!-- 锁屏预览（美化项关闭密码时仍可预览时间/签名/壁纸） -->
+                        <div class="lock-screen-preview">
                             <div class="lock-preview-header">预览</div>
                             <div class="lock-preview-container" :style="{ backgroundImage: `url(${lockWallpaper})` }">
                                 <div class="lock-preview-time" :style="{ color: lockDateTimeColor }">
@@ -5021,7 +5186,7 @@
                                 <div class="lock-preview-date">2026年3月17日</div>
                                 <div class="lock-preview-signature">{{ lockSignature }}</div>
                             </div>
-                                <div class="lock-preview-password">
+                                <div v-if="enableLockScreen" class="lock-preview-password">
                                     <div class="lock-preview-dots">
                                         <div class="lock-preview-dot"></div>
                                         <div class="lock-preview-dot"></div>
@@ -5214,22 +5379,133 @@
                     </div>
                 </div>
 
-                <div v-else class="card games-panel">
+                <div v-else class="games-ingame-stack">
+                    <!-- UNO 单独一张卡：绝不经过「规则说明 + 搭子选择」那一套 DOM -->
+                    <!-- 内联样式优先级最高，避免被全局 .card 黑边框盖住；不用开开发者工具也能看出是新界面 -->
+                    <div
+                        v-if="String(games.currentGame?.id || '') === 'uno'"
+                        class="card games-panel games-panel-uno-dedicated"
+                        style="border:3px solid #16a34a !important;border-radius:18px;background:linear-gradient(165deg,#f8fafc,#ecfdf5,#f8fafc);box-shadow:0 10px 28px rgba(22,163,74,0.2);"
+                    >
+                        <div class="card-title">UNO</div>
+                        <div class="games-mode-panel" style="padding:20px 15px; text-align:center; min-height:75vh; background:#f8fafc;">
+
+                            <button
+                                v-if="!games.gameState?.players?.length || games.gameState.gameOver"
+                                @click="startUNOGame"
+                                class="console-btn console-btn-primary"
+                                style="width:100%; padding:18px; font-size:19px; margin:20px 0 35px; border-radius:16px;">
+                                🎮 开始新 UNO 游戏
+                            </button>
+
+                            <div v-if="games.gameState && games.gameState.players && games.gameState.players.length > 0 && !games.gameState.gameOver">
+
+                                <div style="display:flex; justify-content:space-between; margin-bottom:25px; font-size:16px; padding:0 10px;">
+                                    <div>
+                                        当前颜色：
+                                        <span :style="{ color: games.getUnoColor ? games.getUnoColor(games.gameState.currentColor) : '#000', fontWeight:'bold' }">
+                                            {{ games.gameState.currentColor || '无' }}
+                                        </span>
+                                    </div>
+                                    <div>轮到：<strong>{{ games.gameState.currentPlayer === 0 ? '你' : '李寻野' }}</strong></div>
+                                </div>
+
+                                <div style="margin-bottom:30px;">
+                                    <div style="font-size:14px; color:#666; margin-bottom:8px;">牌堆顶部</div>
+                                    <div v-if="games.gameState.discardPile && games.gameState.discardPile.length > 0"
+                                         :style="{
+                                            backgroundColor: games.getUnoColor ? games.getUnoColor(games.gameState.discardPile[games.gameState.discardPile.length-1].color) : '#333',
+                                            color:'#fff',
+                                            padding:'18px 32px',
+                                            borderRadius:'16px',
+                                            fontSize:'19px',
+                                            boxShadow:'0 8px 20px rgba(0,0,0,0.3)',
+                                            display:'inline-block',
+                                            minWidth:'160px'
+                                         }">
+                                        {{ games.gameState.discardPile[games.gameState.discardPile.length-1].color }}
+                                        {{ games.gameState.discardPile[games.gameState.discardPile.length-1].value }}
+                                    </div>
+                                </div>
+
+                                <div style="margin-bottom:35px;">
+                                    <div style="margin-bottom:15px; font-size:15px; color:#444;">
+                                        你的手牌（{{ games.gameState.players[0]?.hand?.length || 0 }} 张）
+                                    </div>
+                                    <div style="display:flex; flex-wrap:wrap; gap:12px; justify-content:center;">
+                                        <button
+                                            v-for="(card, idx) in (games.gameState.players[0] ? games.gameState.players[0].hand : [])"
+                                            :key="idx"
+                                            @click="playUnoCard(idx)"
+                                            :disabled="games.gameState.currentPlayer !== 0 || games.gameState.isThinking"
+                                            style="padding:18px 26px; font-size:17px; border-radius:14px; min-width:96px; box-shadow:0 6px 18px rgba(0,0,0,0.25); border:none; transition:all 0.2s;"
+                                            :style="{
+                                                backgroundColor: games.getUnoColor ? games.getUnoColor(card.color) : '#333',
+                                                color: '#fff',
+                                                opacity: (games.gameState.currentPlayer !== 0 || games.gameState.isThinking) ? 0.65 : 1
+                                            }"
+                                        >
+                                            {{ card.color }}<br>{{ card.value }}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div style="display:flex; gap:15px; margin-bottom:30px;">
+                                    <button
+                                        class="console-btn console-btn-secondary"
+                                        :disabled="games.gameState.currentPlayer !== 0 || games.gameState.isThinking"
+                                        @click="drawUnoCardForPlayer"
+                                        style="flex:1; padding:16px;">
+                                        抽一张牌
+                                    </button>
+                                    <button
+                                        class="console-btn console-btn-secondary"
+                                        @click="sayUNO"
+                                        style="flex:1; padding:16px;">
+                                        喊 UNO！
+                                    </button>
+                                </div>
+
+                                <div v-if="games.gameState.isThinking" style="color:#666; font-size:15px;">
+                                    ⏳ 李寻野 正在思考...
+                                </div>
+                            </div>
+
+                            <div v-if="games.gameState && games.gameState.gameOver" style="margin-top:80px; padding:60px 20px; background:linear-gradient(135deg,#f0fdf4,#ecfdf5); border-radius:24px; text-align:center;">
+                                <div style="font-size:48px; margin-bottom:20px;">🎉</div>
+                                <div style="font-size:32px; font-weight:bold; color:#22c55e;">
+                                    {{ games.gameState.winnerName }} 获胜！
+                                </div>
+                                <p style="margin-top:25px; color:#555; font-size:17px;">
+                                    {{ games.gameState.winnerName === '你' ? '太强了！你打败了李寻野！' : '李寻野赢了，下次再战！' }}
+                                </p>
+                            </div>
+
+                            <button
+                                @click="closeGame"
+                                class="console-btn console-btn-secondary"
+                                style="margin-top:50px; width:100%; padding:16px; border-radius:16px;">
+                                返回游戏大厅
+                            </button>
+                        </div>
+                    </div>
+
+                    <div v-else class="card games-panel">
                     <div class="card-title">{{ games.currentGame.name }}</div>
-                    <p class="games-rule">{{ games.currentGame.rules || games.currentGame.description }}</p>
-                    <div class="games-meta">
-                        人数：{{ games.currentGame.players || '-' }} ｜ 时长：{{ games.currentGame.duration || '-' }}
-                    </div>
-                    <div class="games-ai-picker">
-                        <div class="games-kicker">游戏搭子</div>
-                        <select v-model="gameAiCharacterId" class="console-select">
-                            <option :value="null">默认 AI 搭子</option>
-                            <option v-for="char in characters" :key="char.id" :value="char.id">
-                                {{ char.nickname || char.name || '未命名角色' }}
-                            </option>
-                        </select>
-                        <div class="games-ai-current">当前搭子：{{ getGameAiName() }}</div>
-                    </div>
+                        <p class="games-rule">{{ games.currentGame.rules || games.currentGame.description }}</p>
+                        <div class="games-meta">
+                            人数：{{ games.currentGame.players || '-' }} ｜ 时长：{{ games.currentGame.duration || '-' }}
+                        </div>
+                        <div class="games-ai-picker">
+                            <div class="games-kicker">游戏搭子</div>
+                            <select v-model="gameAiCharacterId" class="console-select">
+                                <option :value="null">默认 AI 搭子</option>
+                                <option v-for="char in characters" :key="char.id" :value="char.id">
+                                    {{ char.nickname || char.name || '未命名角色' }}
+                                </option>
+                            </select>
+                            <div class="games-ai-current">当前搭子：{{ getGameAiName() }}</div>
+                        </div>
 
                     <div v-if="games.currentGame.id === 'werewolf'" class="games-mode-panel">
                         <input v-model="playerName" type="text" placeholder="输入玩家名" class="lock-wallpaper-input">
@@ -5262,37 +5538,6 @@
                     <div v-else-if="games.currentGame.id === 'truth-or-dare'" class="games-mode-panel">
                         <button class="console-btn console-btn-primary" @click="spinTOD">开始转盘</button>
                         <div class="games-prompt-text">{{ games.gameState.currentTruth || games.gameState.currentDare || '点击开始后生成题目' }}</div>
-                    </div>
-
-                    <div v-else-if="games.currentGame.id === 'uno'" class="games-mode-panel">
-                        <button class="console-btn console-btn-primary" @click="startUNOGame">开始 UNO</button>
-                        <div class="games-status-line">
-                            当前颜色：{{ games.gameState.currentColor || '-' }} ｜ 轮到：{{ games.gameState.unoCurrentTurn === 'player' ? '你' : 'AI' }}
-                        </div>
-                        <div class="games-status-line">
-                            你：{{ games.gameState.playerHand.length }} 张 ｜ AI：{{ (games.gameState.aiHands[0] || []).length }} 张
-                        </div>
-                        <div class="games-prompt-text" v-if="games.gameState.discardPile.length > 0">
-                            牌堆顶部：{{ games.gameState.discardPile[games.gameState.discardPile.length - 1].color }} - {{ games.gameState.discardPile[games.gameState.discardPile.length - 1].value }}
-                        </div>
-                        <div class="games-uno-hand">
-                            <button
-                                v-for="(card, idx) in games.gameState.playerHand"
-                                :key="idx"
-                                class="console-btn games-uno-card-btn"
-                                :disabled="games.gameState.unoCurrentTurn !== 'player' || !games.isUnoPlayableCard(card)"
-                                @click="playCard(idx)"
-                            >
-                                {{ card.color }}-{{ card.value }}
-                            </button>
-                        </div>
-                        <div class="games-actions-row">
-                            <button class="console-btn console-btn-secondary" :disabled="games.gameState.unoCurrentTurn !== 'player'" @click="drawCard">抽一张</button>
-                            <button class="console-btn console-btn-secondary" @click="sayUNO">喊 UNO</button>
-                        </div>
-                        <div class="games-status-line" v-if="games.gameState.unoWinner">
-                            胜者：{{ games.gameState.unoWinner === 'player' ? '你' : 'AI' }}
-                        </div>
                     </div>
 
                     <div v-else-if="games.currentGame.id === 'ludo'" class="games-mode-panel">
@@ -5364,6 +5609,7 @@
 
                     <div class="games-back-wrap">
                         <button class="console-btn console-btn-secondary console-btn-full" @click="closeGame">返回游戏大厅</button>
+                    </div>
                     </div>
 
                     <div class="card games-chat-card">
@@ -5438,6 +5684,75 @@
                                 <li v-for="(tip, index) in notice.tips" :key="index">{{ tip }}</li>
                             </ul>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Nest App -->
+        <div v-else-if="openedApp === 'nest'" class="app-view">
+            <div class="app-header">
+                <button class="back-btn" @click="closeApp"><i class="fas fa-chevron-left"></i></button>
+                <span class="app-title">Nest</span>
+                <div style="width: 40px;"></div>
+            </div>
+            <div class="app-content" style="padding: 16px; display:flex; flex-direction:column; gap:12px;">
+                <div class="card">
+                    <div class="card-title">情侣空间</div>
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                        <input v-model="nest.nestTitle" class="lock-wallpaper-input" placeholder="空间名称">
+                        <input v-model="nest.anniversaryDate" type="date" class="lock-wallpaper-input">
+                        <textarea v-model="nest.dailyNote" class="lock-wallpaper-input" style="min-height:64px;" placeholder="今日想对Ta说..."></textarea>
+                    </div>
+                    <div style="margin-top:10px; font-size:13px; color:#666;">
+                        和 {{ nest.partnerName }} 在一起第 {{ nest.daysTogether }} 天 · Love Score {{ nest.loveScore }}
+                    </div>
+                    <div style="margin-top:8px; display:flex; gap:8px;">
+                        <button class="console-btn console-btn-primary" @click="nest.sendLovePulse">+1 心动值</button>
+                        <button class="console-btn console-btn-secondary" @click="nest.addMemoryFromChat" :disabled="!nest.latestChatLine">从最近聊天摘录</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">回忆相册</div>
+                    <div style="display:flex; gap:8px;">
+                        <input v-model="nest.memoryInput" @keyup.enter="nest.addMemory(nest.memoryInput)" class="lock-wallpaper-input" placeholder="记录一个瞬间...">
+                        <button class="console-btn console-btn-primary" @click="nest.addMemory(nest.memoryInput)">添加</button>
+                    </div>
+                    <div style="margin-top:10px; display:flex; flex-direction:column; gap:8px; max-height:180px; overflow:auto;">
+                        <div v-for="m in nest.memories" :key="m.id" style="display:flex; justify-content:space-between; gap:8px; padding:8px 10px; border-radius:10px; background:#f6f6f7;">
+                            <span style="font-size:13px; color:#333;">{{ m.text }}</span>
+                            <button class="console-btn console-btn-secondary" style="padding:4px 8px;" @click="nest.removeMemory(m.id)">删</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">愿望清单（{{ nest.completedWishCount }}/{{ nest.wishes.length }}）</div>
+                    <div style="display:flex; gap:8px;">
+                        <input v-model="nest.wishInput" @keyup.enter="nest.addWish" class="lock-wallpaper-input" placeholder="比如：一起看海">
+                        <button class="console-btn console-btn-primary" @click="nest.addWish">添加</button>
+                    </div>
+                    <div style="margin-top:10px; display:flex; flex-direction:column; gap:8px; max-height:160px; overflow:auto;">
+                        <label v-for="w in nest.wishes" :key="w.id" style="display:flex; align-items:center; gap:8px; font-size:13px; color:#333;">
+                            <input type="checkbox" :checked="w.done" @change="nest.toggleWish(w.id)">
+                            <span :style="{ textDecoration: w.done ? 'line-through' : 'none', opacity: w.done ? 0.6 : 1 }">{{ w.text }}</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">约会计划（{{ nest.completedPlanCount }}/{{ nest.plans.length }}）</div>
+                    <div style="display:flex; gap:8px;">
+                        <input v-model="nest.planInput" class="lock-wallpaper-input" placeholder="计划内容">
+                        <input v-model="nest.planDateInput" type="date" class="lock-wallpaper-input" style="max-width:140px;">
+                        <button class="console-btn console-btn-primary" @click="nest.addPlan">加</button>
+                    </div>
+                    <div style="margin-top:10px; display:flex; flex-direction:column; gap:8px; max-height:180px; overflow:auto;">
+                        <label v-for="p in nest.plans" :key="p.id" style="display:flex; align-items:center; gap:8px; font-size:13px; color:#333; padding:6px 0;">
+                            <input type="checkbox" :checked="p.done" @change="nest.togglePlan(p.id)">
+                            <span :style="{ textDecoration: p.done ? 'line-through' : 'none', opacity: p.done ? 0.6 : 1 }">{{ p.date }} · {{ p.text }}</span>
+                        </label>
                     </div>
                 </div>
             </div>
@@ -5609,6 +5924,6 @@
         </div>
     </div>
 
-    <script type="module" src="main.js"></script>
+    <script type="module" src="main.js?v=uno202604"></script>
 </body>
 </html>

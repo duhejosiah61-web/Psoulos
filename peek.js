@@ -1,4 +1,5 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
+import { buildChatCompletionUrlCandidates, callAI } from './api.js';
 
 const STORAGE_KEY = 'peek_app_state_v1';
 
@@ -523,14 +524,6 @@ export function usePeek(charactersRef, activeProfileRef, soulLinkMessagesRef, so
 
             let payload = null;
             try {
-                const base = endpoint.replace(/\/+$/, '');
-                const model = profile.model || profile.openai_model || profile.claude_model || profile.openrouter_model || 'gpt-4o-mini';
-                const triedUrls = [];
-                const candidateUrls = (() => {
-                    if (/\/chat\/completions$/i.test(base)) return [base];
-                    if (/\/v1$/i.test(base)) return [`${base}/chat/completions`];
-                    return [`${base}/v1/chat/completions`, `${base}/chat/completions`];
-                })();
                 const prompt = `你是角色手机数据生成器。请仅返回 JSON，不要 markdown。
 输出结构:
 {
@@ -552,43 +545,25 @@ ${chatTranscriptForPrompt || '（无增量聊天内容）'}
 3) 日记内容必须基于上面的聊天增量记录生成。
 `;
                 const finalPrompt = prompt + diaryPromptBlock;
-                let completion = null;
-                let lastNon404 = null;
-                for (const url of candidateUrls) {
-                    triedUrls.push(url);
-                    const resp = await fetch(url, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            Authorization: `Bearer ${key}`
-                        },
-                        body: JSON.stringify({
-                            model,
-                            temperature: 0.7,
-                            messages: [
-                                { role: 'system', content: '只输出合法 JSON。' },
-                                { role: 'user', content: finalPrompt }
-                            ]
-                        })
-                    });
-                    if (resp.ok) {
-                        completion = await resp.json();
-                        break;
-                    }
-                    if (resp.status !== 404) {
-                        lastNon404 = `${resp.status} ${resp.statusText}`;
-                        break;
-                    }
-                }
-                if (!completion) {
-                    if (lastNon404) {
-                        alert(`生成失败：API 返回 ${lastNon404}`);
-                    } else {
+                let content;
+                try {
+                    content = await callAI(
+                        profile,
+                        [
+                            { role: 'system', content: '只输出合法 JSON。' },
+                            { role: 'user', content: finalPrompt }
+                        ],
+                        { temperature: 0.7, max_tokens: 4000 }
+                    );
+                } catch (err) {
+                    const triedUrls = buildChatCompletionUrlCandidates(endpoint);
+                    if (String(err?.message || '').includes('404') && triedUrls.length) {
                         alert(`生成失败：接口 404。\n请检查 Console 的 endpoint。\n已尝试：\n${triedUrls.join('\n')}`);
+                    } else {
+                        alert(`生成失败：${err?.message || '网络错误'}`);
                     }
                     return;
                 }
-                const content = completion?.choices?.[0]?.message?.content;
                 if (!content) {
                     alert('生成失败：API 返回内容为空。');
                     return;

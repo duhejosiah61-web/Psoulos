@@ -1,4 +1,5 @@
 import { ref, computed, reactive, onMounted, watch } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
+import { callAI } from './api.js';
 
 const CURRENT_USER_NAME = '我';
 const ME_ID = '__me__';
@@ -37,38 +38,6 @@ function parseTags(tagsText) {
     .slice(0, 12);
 }
 
-function getChatCompletionsCandidateUrls(endpoint) {
-  const base = String(endpoint || '').trim().replace(/\/+$/, '');
-  if (!base) return [];
-  if (/\/chat\/completions$/i.test(base)) return [base];
-  if (/\/v1$/i.test(base)) return [`${base}/chat/completions`];
-  return [`${base}/v1/chat/completions`, `${base}/chat/completions`];
-}
-
-async function fetchJson(url, body, headers) {
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body),
-  });
-  if (!resp.ok) {
-    const ct = resp.headers.get('content-type') || '';
-    let sample = '';
-    try {
-      if (ct.includes('application/json')) {
-        const j = await resp.json();
-        sample = JSON.stringify(j).slice(0, 500);
-      } else {
-        sample = await resp.text();
-      }
-    } catch {
-      sample = '';
-    }
-    throw new Error(`API Error ${resp.status} ${resp.statusText}${sample ? `: ${sample.slice(0, 500)}` : ''}`);
-  }
-  return resp.json();
-}
-
 async function callChatCompletions(activeProfileRef, systemPrompt, userPrompt, extra = {}) {
   const profile = activeProfileRef?.value || null;
   if (!profile) throw new Error('未检测到可用的 API 配置');
@@ -76,57 +45,25 @@ async function callChatCompletions(activeProfileRef, systemPrompt, userPrompt, e
   const key = String(profile.key || '').trim();
   if (!endpoint || !key) throw new Error('API 配置不完整：请先在 Console 填写 endpoint 和 key。');
 
-  const modelId =
-    profile.model ||
-    profile.openai_model ||
-    profile.claude_model ||
-    profile.openrouter_model ||
-    'gpt-4o-mini';
+  const maxTokens =
+    typeof extra.max_tokens === 'number'
+      ? extra.max_tokens
+      : typeof profile.max_tokens === 'number'
+        ? profile.max_tokens
+        : 2200;
 
-  const candidateUrls = getChatCompletionsCandidateUrls(endpoint);
-  if (!candidateUrls.length) throw new Error('API endpoint 格式不正确');
-
-  const headers = {
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${key}`,
-  };
-
-  const body = {
-    model: modelId,
-    temperature: typeof extra.temperature === 'number' ? extra.temperature : 0.8,
-    // 避免兼容接口默认输出过短，导致 chapter.content 为空/过短
-    max_tokens:
-      typeof extra.max_tokens === 'number'
-        ? extra.max_tokens
-        : typeof profile.max_tokens === 'number'
-          ? profile.max_tokens
-          : 2200,
-    stream: false,
-    messages: [
+  return callAI(
+    profile,
+    [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },
     ],
-  };
-
-  let lastErr = null;
-  for (const url of candidateUrls) {
-    try {
-      const data = await fetchJson(url, body, headers);
-      const msgContent = data?.choices?.[0]?.message?.content;
-      const content =
-        (typeof msgContent === 'string' ? msgContent : Array.isArray(msgContent) ? msgContent.map((x) => x?.text || '').join('') : '') ||
-        data?.choices?.[0]?.delta?.content ||
-        data?.message?.content ||
-        data?.output_text ||
-        data?.text ||
-        '';
-      return String(content || '');
-    } catch (e) {
-      lastErr = e;
+    {
+      temperature: typeof extra.temperature === 'number' ? extra.temperature : 0.8,
+      max_tokens: maxTokens,
+      extraBody: { stream: false },
     }
-  }
-
-  throw lastErr || new Error('无法连接到 AI 接口');
+  );
 }
 
 function openReadDB() {

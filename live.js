@@ -2,6 +2,7 @@
 // == LIVE APP
 // =========================================================================
 import { ref, computed, onMounted, onUnmounted, watch } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
+import { callAI } from './api.js';
 
 export function useLive(characters, activeProfile, profiles, availableModels, worldbooks) {
     // --- 状态管理 ---
@@ -740,38 +741,6 @@ export function useLive(characters, activeProfile, profiles, availableModels, wo
         return null;
     };
 
-    const normalizeChatApiReplyBody = (data) => {
-        if (!data || typeof data !== 'object') return '';
-        if (data.error && (data.error.message || data.error.code)) {
-            console.warn('[LIVE] API error:', data.error.message || data.error.code || data.error);
-        }
-        const ch = data.choices?.[0];
-        if (ch) {
-            const msg = ch.message || ch.delta;
-            if (msg?.content != null) {
-                if (typeof msg.content === 'string') return msg.content;
-                if (Array.isArray(msg.content)) {
-                    return msg.content
-                        .map((c) => (typeof c === 'string' ? c : (c && (c.text || c.content)) || ''))
-                        .join('');
-                }
-            }
-        }
-        if (data.message?.content && typeof data.message.content === 'string') {
-            return data.message.content;
-        }
-        const parts = data.candidates?.[0]?.content?.parts;
-        if (Array.isArray(parts) && parts.length) {
-            return parts.map((p) => (p && p.text) || '').join('');
-        }
-        if (typeof data.output_text === 'string') return data.output_text;
-        if (data.data && typeof data.data === 'object') {
-            const nested = normalizeChatApiReplyBody(data.data);
-            if (nested) return nested;
-        }
-        return '';
-    };
-
     const callLiveChatApi = async (messages) => {
         const profile = activeProfile.value;
         if (!profile || !profile.endpoint || !profile.key) return null;
@@ -780,39 +749,15 @@ export function useLive(characters, activeProfile, profiles, availableModels, wo
             modelId = availableModels.value[0].id;
             profile.model = modelId;
         }
-        const endpoint = String(profile.endpoint).replace(/\/+$/, '');
         try {
-            const response = await fetch(`${endpoint}/chat/completions`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${profile.key}`
-                },
-                body: JSON.stringify({
-                    model: modelId || '',
-                    messages,
+            const reply = (
+                await callAI(profile, messages, {
                     temperature: profile.temperature ?? 0.85,
-                    stream: false
+                    max_tokens: typeof profile.max_tokens === 'number' ? profile.max_tokens : undefined
                 })
-            });
-            const rawText = await response.text();
-            let data = null;
-            try {
-                data = rawText ? JSON.parse(rawText) : null;
-            } catch {
-                if (!response.ok) {
-                    console.warn('[LIVE] HTTP', response.status, rawText.slice(0, 400));
-                }
-                return null;
-            }
-            if (!response.ok) {
-                const hint = data?.error?.message || rawText.slice(0, 400);
-                console.warn('[LIVE] HTTP', response.status, hint);
-                return null;
-            }
-            const reply = normalizeChatApiReplyBody(data).trim();
+            ).trim();
             if (!reply) {
-                console.warn('[LIVE] 无法从响应中解析正文，请确认反代为 OpenAI 兼容 /chat/completions。响应键:', data ? Object.keys(data).join(',') : '(空)');
+                console.warn('[LIVE] 无法从响应中解析正文，请确认反代为 OpenAI 兼容 /chat/completions。');
             }
             return reply || null;
         } catch (e) {
@@ -1345,6 +1290,10 @@ ${bgmBatchRule ? bgmBatchRule + '\n' : ''}
         }, 1000);
     });
 
+    const cleanup = () => {
+        clearLivePlaybackAndBatch();
+    };
+
     onUnmounted(() => {
         clearInterval(waveInterval);
         clearInterval(onlineCountInterval);
@@ -1429,6 +1378,7 @@ ${bgmBatchRule ? bgmBatchRule + '\n' : ''}
         onLiveBgmPause,
         startBatchFetch,
         clearLivePlaybackAndBatch,
+        cleanup,
         toggleLiveHostHistory,
         closeLiveHostHistory,
         formatLiveHostHistoryTime,

@@ -1,10 +1,370 @@
 // =========================================================================
-// == GAMES APP
+// == GAMES APP（通用工具 + UNO 引擎 + 其它小游戏兼容层）
 // =========================================================================
 import { ref, reactive } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
+import { callAI } from './api.js';
 
-export function useGames() {
-    const games = [
+const DB_NAME = 'SoulOS_DB';
+const DB_VERSION = 2;
+const GAME_STORE = 'gameStates';
+const AI_TIMEOUT = 8000;
+
+// ==================== 通用工具 ====================
+
+/**
+ * @param {Object} profile
+ * @param {Object} _character
+ * @param {string} systemPrompt
+ * @param {string} userPrompt
+ * @returns {Promise<string>}
+ */
+async function aiDecision(profile, _character, systemPrompt, userPrompt) {
+    if (!profile || !profile.endpoint || !profile.key) {
+        throw new Error('未配置 API');
+    }
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT);
+    try {
+        const result = await callAI(profile, [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+        ], { signal: controller.signal, temperature: 0.35, max_tokens: 64 });
+        clearTimeout(timeoutId);
+        if (!result || !String(result).trim()) throw new Error('AI 返回空内容');
+        return String(result).trim();
+    } catch (err) {
+        clearTimeout(timeoutId);
+        const msg = err?.name === 'AbortError' ? '请求超时' : (err.message || String(err));
+        throw new Error(`AI 决策失败: ${msg}`);
+    }
+}
+
+function openSoulOsDb() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        request.onerror = () => reject(request.error);
+        request.onupgradeneeded = (event) => {
+            const database = event.target.result;
+            if (!database.objectStoreNames.contains(GAME_STORE)) {
+                database.createObjectStore(GAME_STORE, { keyPath: 'id' });
+            }
+        };
+        request.onsuccess = () => resolve(request.result);
+    });
+}
+
+async function saveGameState(gameId, state) {
+    const db = await openSoulOsDb();
+    return new Promise((resolve, reject) => {
+        try {
+            const tx = db.transaction(GAME_STORE, 'readwrite');
+            const store = tx.objectStore(GAME_STORE);
+            const putRequest = store.put({ id: gameId, state: JSON.parse(JSON.stringify(state)) });
+            putRequest.onerror = () => reject(putRequest.error);
+            tx.oncomplete = () => {
+                try { db.close(); } catch { /* ignore */ }
+                resolve();
+            };
+            tx.onerror = () => {
+                try { db.close(); } catch { /* ignore */ }
+                reject(tx.error);
+            };
+        } catch (e) {
+            try { db.close(); } catch { /* ignore */ }
+            reject(e);
+        }
+    });
+}
+
+async function loadGameState(gameId) {
+    const db = await openSoulOsDb();
+    return new Promise((resolve, reject) => {
+        try {
+            const tx = db.transaction(GAME_STORE, 'readonly');
+            const store = tx.objectStore(GAME_STORE);
+            const getRequest = store.get(gameId);
+            getRequest.onerror = () => {
+                try { db.close(); } catch { /* ignore */ }
+                reject(getRequest.error);
+            };
+            getRequest.onsuccess = () => {
+                const result = getRequest.result;
+                try { db.close(); } catch { /* ignore */ }
+                resolve(result ? result.state : null);
+            };
+            tx.onerror = () => {
+                try { db.close(); } catch { /* ignore */ }
+                reject(tx.error);
+            };
+        } catch (e) {
+            try { db.close(); } catch { /* ignore */ }
+            reject(e);
+        }
+    });
+}
+
+function createGameCard(game, state, duration, participants, highlights = []) {
+    const winnerLabel = state.winnerName || state.winner || '—';
+    return {
+        messageType: 'game_card',
+        gameId: game.id,
+        gameName: game.name,
+        participants: participants.map((p) => ({ name: p.name, avatar: p.avatar })),
+        duration,
+        result: typeof winnerLabel === 'string' ? `${winnerLabel} 获胜` : '游戏结束',
+        highlights: highlights.slice(0, 3),
+        timestamp: Date.now(),
+        snapshot: JSON.parse(JSON.stringify(state))
+    };
+}
+
+// ==================== UNO（最终完美版 - 2026.04） ====================
+
+function shuffleDeck(deck) {
+    const arr = [...deck];
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+}
+
+function buildUnoDeck() {
+    const colors = ['red', 'yellow', 'green', 'blue'];
+    const values = ['0','1','2','3','4','5','6','7','8','9','skip','reverse','draw2'];
+    let deck = [];
+
+    colors.forEach((color) => {
+        values.forEach((val) => {
+            deck.push({ color, value: val, type: ['skip','reverse','draw2'].includes(val) ? 'action' : 'number' });
+            if (val !== '0') deck.push({ color, value: val, type: 'number' });
+        });
+        deck.push({ color, value: 'skip', type: 'action' });
+        deck.push({ color, value: 'reverse', type: 'action' });
+        deck.push({ color, value: 'draw2', type: 'action' });
+    });
+
+    for (let i = 0; i < 4; i++) {
+        deck.push({ color: 'wild', value: 'wild', type: 'wild' });
+        deck.push({ color: 'wild', value: 'wild_draw4', type: 'wild' });
+    }
+    return shuffleDeck(deck);
+}
+
+const UNO = {
+    createState() {
+        return reactive({
+            deck: [],
+            discardPile: [],
+            players: [],
+            currentPlayer: 0,
+            currentColor: 'red',
+            direction: 1,
+            gameOver: false,
+            winnerName: '',
+            startTime: Date.now(),
+            isThinking: false
+        });
+    },
+
+    init(state, aiCount = 1) {
+        state.deck = buildUnoDeck();
+        state.players = [
+            { id: 0, type: 'user', name: '你', hand: [] },
+            ...Array.from({ length: aiCount }, (_, i) => ({
+                id: i + 1,
+                type: 'ai',
+                name: '李寻野',
+                hand: []
+            }))
+        ];
+
+        state.players.forEach((p) => {
+            p.hand = [];
+            for (let j = 0; j < 7; j++) {
+                if (state.deck.length) p.hand.push(state.deck.pop());
+            }
+        });
+
+        let first = state.deck.pop();
+        while (first && first.type === 'wild') {
+            state.deck.unshift(first);
+            first = state.deck.pop();
+        }
+        state.discardPile = [first];
+        state.currentColor = first.color;
+        state.currentPlayer = 0;
+        state.direction = 1;
+        state.gameOver = false;
+        state.winnerName = '';
+        state.isThinking = false;
+    },
+
+    playCard(state, cardIndex) {
+        if (state.gameOver || state.currentPlayer !== 0) return false;
+
+        const player = state.players[0];
+        const card = player.hand[cardIndex];
+        const top = state.discardPile[state.discardPile.length - 1];
+
+        if (!card || (card.type !== 'wild' && card.color !== state.currentColor && card.value !== top.value)) {
+            return false;
+        }
+
+        player.hand.splice(cardIndex, 1);
+        state.discardPile.push(card);
+
+        let nextPlayerAdvance = 1;
+
+        if (card.type === 'wild') {
+            state.currentColor = ['red','yellow','green','blue'][Math.floor(Math.random()*4)];
+            if (card.value === 'wild_draw4') {
+                UNO.drawCards(state, 1, 4);
+                nextPlayerAdvance = 2;
+            }
+        } else {
+            state.currentColor = card.color;
+
+            if (card.value === 'draw2') {
+                UNO.drawCards(state, 1, 2);
+                nextPlayerAdvance = 2;
+            } else if (card.value === 'skip') {
+                nextPlayerAdvance = 2;
+            } else if (card.value === 'reverse') {
+                state.direction *= -1;
+                if (state.players.length === 2) nextPlayerAdvance = 2;
+            }
+        }
+
+        if (player.hand.length === 0) {
+            state.gameOver = true;
+            state.winnerName = '你';
+            return true;
+        }
+
+        state.currentPlayer = (state.currentPlayer + nextPlayerAdvance * state.direction) % state.players.length;
+        if (state.currentPlayer < 0) state.currentPlayer += state.players.length;
+
+        return true;
+    },
+
+    drawCard(state) {
+        if (state.gameOver || state.currentPlayer !== 0 || state.deck.length === 0) return;
+        state.players[0].hand.push(state.deck.pop());
+        state.currentPlayer = (state.currentPlayer + state.direction) % state.players.length;
+        if (state.currentPlayer < 0) state.currentPlayer += state.players.length;
+    },
+
+    drawCards(state, playerIndex, count) {
+        for (let i = 0; i < count; i++) {
+            if (state.deck.length === 0) {
+                const top = state.discardPile.pop();
+                state.deck = shuffleDeck(state.discardPile);
+                state.discardPile = [top];
+            }
+            if (state.deck.length > 0) {
+                state.players[playerIndex].hand.push(state.deck.pop());
+            }
+        }
+    },
+
+    aiTurn(state, onDone) {
+        const done = () => {
+            if (typeof onDone === 'function') onDone();
+        };
+
+        if (state.gameOver || state.currentPlayer !== 1) {
+            done();
+            return;
+        }
+
+        state.isThinking = true;
+
+        setTimeout(() => {
+            try {
+                const ai = state.players[1];
+                const top = state.discardPile[state.discardPile.length - 1];
+
+                for (let i = 0; i < ai.hand.length; i++) {
+                    const card = ai.hand[i];
+                    if (card.type === 'wild' || card.color === state.currentColor || card.value === top.value) {
+                        ai.hand.splice(i, 1);
+                        state.discardPile.push(card);
+
+                        let advance = 1;
+
+                        if (card.type === 'wild') {
+                            state.currentColor = ['red','yellow','green','blue'][Math.floor(Math.random()*4)];
+                            if (card.value === 'wild_draw4') {
+                                UNO.drawCards(state, 0, 4);
+                                advance = 2;
+                            }
+                        } else {
+                            state.currentColor = card.color;
+                            if (card.value === 'draw2') { UNO.drawCards(state, 0, 2); advance = 2; }
+                            else if (card.value === 'skip') advance = 2;
+                            else if (card.value === 'reverse') {
+                                state.direction *= -1;
+                                if (state.players.length === 2) advance = 2;
+                            }
+                        }
+
+                        if (ai.hand.length === 0) {
+                            state.gameOver = true;
+                            state.winnerName = '李寻野';
+                            state.isThinking = false;
+                            done();
+                            return;
+                        }
+
+                        state.currentPlayer = (1 + advance * state.direction) % state.players.length;
+                        if (state.currentPlayer < 0) state.currentPlayer += state.players.length;
+
+                        state.isThinking = false;
+                        done();
+                        return;
+                    }
+                }
+
+                if (state.deck.length > 0) {
+                    ai.hand.push(state.deck.pop());
+                }
+                state.currentPlayer = (1 + state.direction) % state.players.length;
+                if (state.currentPlayer < 0) state.currentPlayer += state.players.length;
+
+                state.isThinking = false;
+                done();
+            } catch (e) {
+                state.isThinking = false;
+                console.error('aiTurn', e);
+                done();
+            }
+        }, 650);
+    },
+
+    injectCharacters(state, chars) {
+        if (!state?.players || !Array.isArray(chars)) return;
+        for (let i = 1; i < state.players.length; i++) {
+            const c = chars[i - 1];
+            if (c?.name) state.players[i].name = c.name;
+        }
+    },
+
+    async runAiTurn(state, aiPlayerIndex, _profile, _onMsg) {
+        if (state.gameOver || state.currentPlayer !== aiPlayerIndex) return;
+        if (state.players[state.currentPlayer]?.type !== 'ai') return;
+        await new Promise((resolve) => UNO.aiTurn(state, resolve));
+    },
+
+    generateCard(state, duration, participants) {
+        return createGameCard({ id: 'uno', name: 'UNO' }, state, duration, participants, []);
+    }
+};
+
+// ==================== useGames ====================
+
+export function useGames(activeProfileRef, charactersRef) {
+    const catalog = [
         {
             id: 'werewolf',
             name: '狼人杀',
@@ -81,7 +441,7 @@ export function useGames() {
             description: '经典卡牌游戏，通过策略出完手中的牌',
             icon: 'fas fa-cards',
             status: 'available',
-            players: '2-10人',
+            players: '2-4人',
             duration: '10-30分钟',
             rules: 'UNO是一款经典的卡牌游戏，玩家需要将手中的牌按照颜色或数字与出牌堆上的牌匹配。当玩家只剩一张牌时，必须喊"UNO"。先出完所有牌的玩家获胜。'
         },
@@ -150,31 +510,32 @@ export function useGames() {
     ];
 
     const currentGame = ref(null);
+    const activeGame = ref(null);
+    const gameMessages = ref([]);
     const gameState = reactive({
-        phase: 'lobby', // lobby, game, end
+        phase: 'lobby',
         players: [],
         currentPlayer: 0,
         day: 1,
         votes: {},
         deadPlayers: [],
-        // 石头剪刀布
         rpsPlayerChoice: null,
         rpsAIChoice: null,
         rpsResult: null,
         rpsScore: { player: 0, ai: 0 },
-        // 真心话大冒险
-        truthOrDare: null, // truth, dare
+        truthOrDare: null,
         currentTruth: null,
         currentDare: null,
-        // UNO
         unoDeck: [],
         discardPile: [],
         playerHand: [],
-        aiHands: [],
+        aiHands: [[], [], []],
         currentColor: null,
         unoCurrentTurn: 'player',
         unoWinner: null,
-        // 飞行棋
+        gameOver: false,
+        isThinking: false,
+        winnerName: '',
         ludoBoard: [],
         ludoPlayers: [],
         currentDice: 0,
@@ -185,10 +546,58 @@ export function useGames() {
         ludoPauseTurns: { player: 0, ai: 0 }
     });
 
+    let unoInternal = null;
+
+    let onGameStateChange = null;
+    let onGameMessage = null;
+    let onGameEnd = null;
+
+    const setOnStateChange = (cb) => { onGameStateChange = typeof cb === 'function' ? cb : null; };
+    const setOnGameMessage = (cb) => { onGameMessage = typeof cb === 'function' ? cb : null; };
+    const setOnGameEnd = (cb) => { onGameEnd = typeof cb === 'function' ? cb : null; };
+
+    function syncUnoToLegacy() {
+        if (!unoInternal) return;
+        gameState.unoDeck = unoInternal.deck;
+        gameState.discardPile = unoInternal.discardPile;
+        gameState.playerHand = unoInternal.players[0]?.hand || [];
+        gameState.aiHands = [
+            unoInternal.players[1]?.hand || [],
+            unoInternal.players[2]?.hand || [],
+            unoInternal.players[3]?.hand || []
+        ];
+        gameState.currentColor = unoInternal.currentColor;
+        gameState.unoCurrentTurn = unoInternal.currentPlayer === 0 ? 'player' : 'ai';
+        gameState.gameOver = unoInternal.gameOver;
+        gameState.isThinking = !!unoInternal.isThinking;
+        gameState.winnerName = unoInternal.winnerName || '';
+        gameState.players = unoInternal.players;
+        gameState.currentPlayer = unoInternal.currentPlayer;
+        if (unoInternal.gameOver) {
+            gameState.unoWinner = unoInternal.winnerName === '你' ? 'player' : 'ai';
+            gameState.phase = 'end';
+        } else {
+            gameState.unoWinner = null;
+            gameState.phase = 'game';
+        }
+    }
+
+    function clearUno() {
+        unoInternal = null;
+        activeGame.value = null;
+        gameState.gameOver = false;
+        gameState.isThinking = false;
+        gameState.winnerName = '';
+        if (currentGame.value?.id === 'uno') {
+            gameState.players = [];
+        }
+    }
+
     const startGame = (gameId) => {
-        const game = games.find(g => g.id === gameId);
+        const game = catalog.find((g) => g.id === gameId);
         if (game && game.status === 'available') {
             currentGame.value = game;
+            clearUno();
             Object.assign(gameState, {
                 phase: 'lobby',
                 players: [],
@@ -196,24 +605,23 @@ export function useGames() {
                 day: 1,
                 votes: {},
                 deadPlayers: [],
-                // 石头剪刀布
                 rpsPlayerChoice: null,
                 rpsAIChoice: null,
                 rpsResult: null,
                 rpsScore: { player: 0, ai: 0 },
-                // 真心话大冒险
                 truthOrDare: null,
                 currentTruth: null,
                 currentDare: null,
-                // UNO
                 unoDeck: [],
                 discardPile: [],
                 playerHand: [],
-                aiHands: [],
+                aiHands: [[], [], []],
                 currentColor: null,
                 unoCurrentTurn: 'player',
                 unoWinner: null,
-                // 飞行棋
+                gameOver: false,
+                isThinking: false,
+                winnerName: '',
                 ludoBoard: [],
                 ludoPlayers: [],
                 currentDice: 0,
@@ -227,6 +635,57 @@ export function useGames() {
         }
         return null;
     };
+
+    const startGameWithOptions = async (gameId, options = {}) => {
+        const g = startGame(gameId);
+        if (!g || gameId !== 'uno') return g;
+        unoInternal = UNO.createState();
+        UNO.init(unoInternal, 1);
+        const chars = options.aiCharacters || (charactersRef?.value || []).slice(0, 3);
+        UNO.injectCharacters(unoInternal, chars);
+        activeGame.value = UNO;
+        syncUnoToLegacy();
+        onGameStateChange?.(unoInternal);
+        const profile = activeProfileRef?.value;
+        if (profile && unoInternal.currentPlayer !== 0 && unoInternal.players[unoInternal.currentPlayer]?.type === 'ai') {
+            await advanceUnoAiTurns(profile);
+        }
+        void saveGameState('game_uno', unoInternal).catch(() => {});
+        return g;
+    };
+
+    async function advanceUnoAiTurns(profile) {
+        const result = { messages: [], lastCard: null, winner: null };
+        if (!unoInternal || unoInternal.gameOver) return result;
+        const p = profile || activeProfileRef?.value;
+        if (!p?.endpoint || !p?.key) return result;
+
+        while (
+            unoInternal
+            && !unoInternal.gameOver
+            && unoInternal.players[unoInternal.currentPlayer]?.type === 'ai'
+        ) {
+            const idx = unoInternal.currentPlayer;
+            try {
+                await UNO.runAiTurn(unoInternal, idx, p, (msg) => {
+                    result.messages.push(msg);
+                    gameMessages.value = [...gameMessages.value, { sender: 'UNO', text: msg, timestamp: Date.now() }];
+                    onGameMessage?.(gameMessages.value);
+                });
+            } catch (e) {
+                result.messages.push(String(e.message || e));
+                break;
+            }
+            syncUnoToLegacy();
+            onGameStateChange?.(unoInternal);
+            void saveGameState('game_uno', unoInternal).catch(() => {});
+            if (unoInternal.gameOver) {
+                result.winner = unoInternal.winnerName === '你' ? 0 : 1;
+                break;
+            }
+        }
+        return result;
+    }
 
     const joinGame = (playerName) => {
         if (currentGame.value && gameState.phase === 'lobby') {
@@ -244,36 +703,24 @@ export function useGames() {
     const startGameSession = () => {
         if (currentGame.value && gameState.phase === 'lobby' && gameState.players.length >= 4) {
             gameState.phase = 'game';
-            assignRoles();
+            if (currentGame.value.id === 'werewolf') {
+                const roles = [];
+                currentGame.value.roles.forEach((role) => {
+                    for (let i = 0; i < role.count; i++) roles.push(role.name);
+                });
+                roles.sort(() => Math.random() - 0.5);
+                gameState.players.forEach((player, index) => {
+                    player.role = roles[index] || '平民';
+                });
+            }
             return true;
         }
         return false;
     };
 
-    const assignRoles = () => {
-        if (currentGame.value && currentGame.value.id === 'werewolf') {
-            // 简单的角色分配逻辑
-            const roles = [];
-            const roleConfig = currentGame.value.roles;
-            
-            roleConfig.forEach(role => {
-                for (let i = 0; i < role.count; i++) {
-                    roles.push(role.name);
-                }
-            });
-            
-            // 随机分配角色
-            roles.sort(() => Math.random() - 0.5);
-            
-            gameState.players.forEach((player, index) => {
-                player.role = roles[index] || '平民';
-            });
-        }
-    };
-
     const castVote = (voterName, targetName) => {
         if (currentGame.value && gameState.phase === 'game') {
-            const voter = gameState.players.find(p => p.name === voterName);
+            const voter = gameState.players.find((p) => p.name === voterName);
             if (voter && voter.isAlive) {
                 voter.vote = targetName;
                 gameState.votes[voterName] = targetName;
@@ -285,20 +732,17 @@ export function useGames() {
 
     const getVoteResults = () => {
         const voteCounts = {};
-        Object.values(gameState.votes).forEach(vote => {
+        Object.values(gameState.votes).forEach((vote) => {
             voteCounts[vote] = (voteCounts[vote] || 0) + 1;
         });
-        
         let maxVotes = 0;
         let mostVoted = null;
-        
         Object.entries(voteCounts).forEach(([player, count]) => {
             if (count > maxVotes) {
                 maxVotes = count;
                 mostVoted = player;
             }
         });
-        
         return { mostVoted, maxVotes, voteCounts };
     };
 
@@ -306,55 +750,37 @@ export function useGames() {
         if (currentGame.value && gameState.phase === 'game') {
             const results = getVoteResults();
             if (results.mostVoted) {
-                const player = gameState.players.find(p => p.name === results.mostVoted);
+                const player = gameState.players.find((p) => p.name === results.mostVoted);
                 if (player) {
                     player.isAlive = false;
                     gameState.deadPlayers.push(player);
                 }
             }
-            
             gameState.day++;
             gameState.votes = {};
-            gameState.players.forEach(player => {
+            gameState.players.forEach((player) => {
                 player.vote = null;
             });
-            
-            // 检查游戏是否结束
-            checkGameEnd();
-        }
-    };
-
-    const checkGameEnd = () => {
-        if (currentGame.value && currentGame.value.id === 'werewolf') {
-            const werewolves = gameState.players.filter(p => p.isAlive && p.role === '狼人').length;
-            const nonWerewolves = gameState.players.filter(p => p.isAlive && p.role !== '狼人').length;
-            
-            if (werewolves === 0) {
-                gameState.phase = 'end';
-                return { winner: '平民和神民' };
-            } else if (werewolves >= nonWerewolves) {
-                gameState.phase = 'end';
-                return { winner: '狼人' };
+            if (currentGame.value.id === 'werewolf') {
+                const werewolves = gameState.players.filter((p) => p.isAlive && p.role === '狼人').length;
+                const nonWerewolves = gameState.players.filter((p) => p.isAlive && p.role !== '狼人').length;
+                if (werewolves === 0) gameState.phase = 'end';
+                else if (werewolves >= nonWerewolves) gameState.phase = 'end';
             }
         }
-        return null;
     };
 
-    // 石头剪刀布游戏逻辑
     const playRPS = (playerChoice) => {
         const choices = ['rock', 'paper', 'scissors'];
         const aiChoice = choices[Math.floor(Math.random() * choices.length)];
-        
         gameState.rpsPlayerChoice = playerChoice;
         gameState.rpsAIChoice = aiChoice;
-        
         let result;
-        if (playerChoice === aiChoice) {
-            result = '平局';
-        } else if (
-            (playerChoice === 'rock' && aiChoice === 'scissors') ||
-            (playerChoice === 'scissors' && aiChoice === 'paper') ||
-            (playerChoice === 'paper' && aiChoice === 'rock')
+        if (playerChoice === aiChoice) result = '平局';
+        else if (
+            (playerChoice === 'rock' && aiChoice === 'scissors')
+            || (playerChoice === 'scissors' && aiChoice === 'paper')
+            || (playerChoice === 'paper' && aiChoice === 'rock')
         ) {
             result = '你赢了';
             gameState.rpsScore.player++;
@@ -362,17 +788,14 @@ export function useGames() {
             result = '你输了';
             gameState.rpsScore.ai++;
         }
-        
         gameState.rpsResult = result;
         return { playerChoice, aiChoice, result, score: gameState.rpsScore };
     };
 
-    // 真心话大冒险游戏逻辑
     const spinTruthOrDare = () => {
         const options = ['truth', 'dare'];
         const choice = options[Math.floor(Math.random() * options.length)];
         gameState.truthOrDare = choice;
-        
         if (choice === 'truth') {
             const truths = currentGame.value.truths;
             gameState.currentTruth = truths[Math.floor(Math.random() * truths.length)];
@@ -382,142 +805,87 @@ export function useGames() {
             gameState.currentDare = dares[Math.floor(Math.random() * dares.length)];
             gameState.currentTruth = null;
         }
-        
         return { choice, truth: gameState.currentTruth, dare: gameState.currentDare };
     };
 
-    // UNO游戏逻辑
+    const syncAfterUnoAi = () => {
+        syncUnoToLegacy();
+        onGameStateChange?.(unoInternal);
+        void saveGameState('game_uno', unoInternal).catch(() => {});
+    };
+
     const startUNOGame = () => {
-        // 初始化牌组
-        const colors = ['red', 'blue', 'green', 'yellow'];
-        const values = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'skip', 'reverse', 'draw2'];
-        
-        let deck = [];
-        colors.forEach(color => {
-            values.forEach(value => {
-                deck.push({ color, value });
-                if (value !== '0') {
-                    deck.push({ color, value }); // 每种非0牌有两张
-                }
-            });
-        });
-        
-        // 添加万能牌
-        for (let i = 0; i < 4; i++) {
-            deck.push({ color: 'wild', value: 'wild' });
-            deck.push({ color: 'wild', value: 'draw4' });
-        }
-        
-        // 洗牌
-        deck.sort(() => Math.random() - 0.5);
-        
-        // 初始化游戏状态
-        gameState.unoDeck = deck;
-        gameState.discardPile = [deck.pop()];
-        gameState.currentColor = gameState.discardPile[0].color;
-        gameState.unoCurrentTurn = 'player';
-        gameState.unoWinner = null;
-        
-        // 发牌
-        gameState.playerHand = [];
-        gameState.aiHands = [[], [], []]; // 3个AI玩家
-        
-        // 玩家发7张牌
-        for (let i = 0; i < 7; i++) {
-            gameState.playerHand.push(deck.pop());
-        }
-        
-        // AI发7张牌
-        for (let i = 0; i < 3; i++) {
-            for (let j = 0; j < 7; j++) {
-                gameState.aiHands[i].push(deck.pop());
-            }
-        }
-        
-        gameState.phase = 'game';
+        if (!currentGame.value || currentGame.value.id !== 'uno') return false;
+        const chars = (charactersRef?.value || []).slice(0, 3);
+        unoInternal = UNO.createState();
+        UNO.init(unoInternal, 1);
+        UNO.injectCharacters(unoInternal, chars);
+        activeGame.value = UNO;
+        syncUnoToLegacy();
+        onGameStateChange?.(unoInternal);
+        void saveGameState('game_uno', unoInternal).catch(() => {});
         return true;
     };
 
     const isUnoPlayableCard = (card) => {
-        if (!card || gameState.discardPile.length === 0) return false;
-        const top = gameState.discardPile[gameState.discardPile.length - 1];
-        return (
-            card.color === 'wild' ||
-            card.color === gameState.currentColor ||
-            card.value === top.value
-        );
-    };
-
-    const pickBestUnoColor = (hand) => {
-        const counts = { red: 0, blue: 0, green: 0, yellow: 0 };
-        (hand || []).forEach(c => {
-            if (counts[c.color] != null) counts[c.color]++;
-        });
-        return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0] || 'red';
-    };
-
-    const drawUnoCardForPlayer = () => {
-        if (gameState.unoCurrentTurn !== 'player' || gameState.unoDeck.length === 0) return null;
-        const card = gameState.unoDeck.pop();
-        gameState.playerHand.push(card);
-        gameState.unoCurrentTurn = 'ai';
-        return card;
+        if (!unoInternal || !card) return false;
+        const top = unoInternal.discardPile[unoInternal.discardPile.length - 1];
+        if (!top) return false;
+        return card.type === 'wild' || card.color === unoInternal.currentColor || card.value === top.value;
     };
 
     const playUnoCard = (index) => {
-        if (gameState.unoCurrentTurn !== 'player') return { ok: false, reason: 'not_player_turn' };
-        const card = gameState.playerHand[index];
-        if (!card) return { ok: false, reason: 'invalid_card' };
-        if (!isUnoPlayableCard(card)) return { ok: false, reason: 'not_playable' };
+        if (!unoInternal) return;
+        const success = UNO.playCard(unoInternal, index);
+        if (!success) return;
 
-        gameState.playerHand.splice(index, 1);
-        gameState.discardPile.push(card);
-        gameState.currentColor = card.color === 'wild' ? pickBestUnoColor(gameState.playerHand) : card.color;
+        syncUnoToLegacy();
+        onGameStateChange?.(unoInternal);
+        void saveGameState('game_uno', unoInternal).catch(() => {});
 
-        if (gameState.playerHand.length === 0) {
-            gameState.unoWinner = 'player';
-            gameState.phase = 'end';
-            return { ok: true, winner: 'player' };
+        if (!unoInternal.gameOver && unoInternal.currentPlayer !== 0) {
+            UNO.aiTurn(unoInternal, syncAfterUnoAi);
         }
-
-        gameState.unoCurrentTurn = 'ai';
-        return { ok: true };
     };
 
-    const aiTurnUNO = () => {
-        if (gameState.unoCurrentTurn !== 'ai' || gameState.phase === 'end') return null;
-        const aiHand = gameState.aiHands[0] || [];
-        let action = 'draw';
-        let cardPlayed = null;
+    const drawUnoCardForPlayer = () => {
+        if (!unoInternal) return null;
+        UNO.drawCard(unoInternal);
+        syncUnoToLegacy();
+        onGameStateChange?.(unoInternal);
+        void saveGameState('game_uno', unoInternal).catch(() => {});
 
-        let playableIndex = aiHand.findIndex(isUnoPlayableCard);
-        if (playableIndex === -1 && gameState.unoDeck.length > 0) {
-            const drawn = gameState.unoDeck.pop();
-            aiHand.push(drawn);
-            playableIndex = aiHand.findIndex(isUnoPlayableCard);
-            action = 'draw_then_play';
+        if (!unoInternal.gameOver && unoInternal.currentPlayer !== 0) {
+            UNO.aiTurn(unoInternal, syncAfterUnoAi);
         }
-
-        if (playableIndex !== -1) {
-            cardPlayed = aiHand.splice(playableIndex, 1)[0];
-            gameState.discardPile.push(cardPlayed);
-            gameState.currentColor = cardPlayed.color === 'wild' ? pickBestUnoColor(aiHand) : cardPlayed.color;
-            action = action === 'draw_then_play' ? action : 'play';
-
-            if (aiHand.length === 0) {
-                gameState.unoWinner = 'ai';
-                gameState.phase = 'end';
-                return { action, card: cardPlayed, winner: 'ai' };
-            }
-        }
-
-        gameState.unoCurrentTurn = 'player';
-        return { action, card: cardPlayed, winner: null };
+        const hand = unoInternal.players[0]?.hand;
+        return hand?.length ? hand[hand.length - 1] : null;
     };
 
-    // 飞行棋游戏逻辑
+    const aiTurnUNO = async () => {
+        if (!unoInternal || unoInternal.gameOver) return null;
+        const profile = activeProfileRef?.value;
+        const topSig = () => {
+            const t = unoInternal.discardPile[unoInternal.discardPile.length - 1];
+            return t ? `${t.color}:${t.value}` : '';
+        };
+        const beforeTop = topSig();
+        await advanceUnoAiTurns(profile);
+        const afterTop = topSig();
+        const played = beforeTop !== afterTop;
+        const topCard = unoInternal.discardPile[unoInternal.discardPile.length - 1];
+        let winner = null;
+        if (unoInternal.gameOver) {
+            winner = unoInternal.winnerName === '你' ? 'player' : 'ai';
+        }
+        return {
+            action: played ? 'play' : 'draw',
+            card: played ? topCard : null,
+            winner
+        };
+    };
+
     const startLudoGame = () => {
-        // 初始化游戏板和玩家
         gameState.ludoBoard = [];
         gameState.ludoPlayers = [
             { color: 'red', planes: [-1, -1, -1, -1], home: false },
@@ -541,7 +909,6 @@ export function useGames() {
         return true;
     };
 
-    // 掷骰子
     const rollDice = () => {
         const dice = Math.floor(Math.random() * 6) + 1;
         gameState.currentDice = dice;
@@ -559,7 +926,7 @@ export function useGames() {
         const pos = player.planes[planeIndex];
         if (!canMoveLudoPlane(pos, dice)) return false;
         player.planes[planeIndex] = pos < 0 ? 0 : pos + dice;
-        const allHome = player.planes.every(p => p >= gameState.ludoTrackLength);
+        const allHome = player.planes.every((p) => p >= gameState.ludoTrackLength);
         if (allHome) {
             gameState.ludoWinner = playerIndex === 0 ? 'player' : 'ai';
             gameState.phase = 'end';
@@ -634,7 +1001,7 @@ export function useGames() {
             return { applied: true, needsQuestion: true };
         }
 
-        const allHome = planes.every(p => p >= gameState.ludoTrackLength);
+        const allHome = planes.every((p) => p >= gameState.ludoTrackLength);
         if (allHome) {
             gameState.ludoWinner = playerKind;
             gameState.phase = 'end';
@@ -652,7 +1019,7 @@ export function useGames() {
         } else {
             planes[planeIndex] = Math.max(-1, pos - 1);
         }
-        const allHome = planes.every(p => p >= gameState.ludoTrackLength);
+        const allHome = planes.every((p) => p >= gameState.ludoTrackLength);
         if (allHome) {
             gameState.ludoWinner = playerKind;
             gameState.phase = 'end';
@@ -660,18 +1027,88 @@ export function useGames() {
         return true;
     };
 
+    const playerAction = async (action, payload) => {
+        if (!activeGame.value || !unoInternal) return;
+        if (action === 'playCard') {
+            UNO.playCard(unoInternal, payload.cardIdx);
+        } else if (action === 'drawCard') {
+            UNO.drawCard(unoInternal);
+        } else if (action === 'callUno') {
+            return;
+        } else {
+            throw new Error(`未知动作: ${action}`);
+        }
+        syncUnoToLegacy();
+        onGameStateChange?.(unoInternal);
+        void saveGameState('game_uno', unoInternal).catch(() => {});
+        if (!unoInternal.gameOver && unoInternal.currentPlayer !== 0) {
+            UNO.aiTurn(unoInternal, syncAfterUnoAi);
+        }
+    };
+
+    const endGame = async () => {
+        if (activeGame.value && unoInternal) {
+            const duration = Math.floor((Date.now() - (unoInternal.startTime || Date.now())) / 1000);
+            const participants = unoInternal.players.map((p) => ({
+                name: p.name,
+                avatar: p.avatarUrl || ''
+            }));
+            const card = UNO.generateCard(unoInternal, duration, participants);
+            onGameEnd?.(card);
+        }
+        clearUno();
+        currentGame.value = null;
+        gameMessages.value = [];
+    };
+
+    const checkGameEnd = () => {
+        if (currentGame.value && currentGame.value.id === 'werewolf') {
+            const werewolves = gameState.players.filter((p) => p.isAlive && p.role === '狼人').length;
+            const nonWerewolves = gameState.players.filter((p) => p.isAlive && p.role !== '狼人').length;
+            if (werewolves === 0) {
+                gameState.phase = 'end';
+                return { winner: '平民和神民' };
+            }
+            if (werewolves >= nonWerewolves) {
+                gameState.phase = 'end';
+                return { winner: '狼人' };
+            }
+        }
+        return null;
+    };
+
+    const clearGameApp = () => {
+        clearUno();
+        currentGame.value = null;
+        gameMessages.value = [];
+    };
+
+    const getUnoColor = (color) => {
+        const map = {
+            red: '#ef4444',
+            yellow: '#eab308',
+            green: '#22c55e',
+            blue: '#3b82f6',
+            wild: '#8b5cf6'
+        };
+        return map[color] || '#64748b';
+    };
+
     return {
-        games,
+        games: catalog,
+        gamesList: catalog,
         currentGame,
+        activeGame,
         gameState,
+        gameMessages,
         startGame,
+        startGameWithOptions,
         joinGame,
         startGameSession,
         castVote,
         getVoteResults,
         endDay,
         checkGameEnd,
-        // 新游戏函数
         playRPS,
         spinTruthOrDare,
         startUNOGame,
@@ -679,11 +1116,23 @@ export function useGames() {
         drawUnoCardForPlayer,
         playUnoCard,
         aiTurnUNO,
+        advanceUnoAiTurns,
         startLudoGame,
         rollDice,
         moveLudoPlane,
         aiTurnLudo,
         applyLudoEffect,
-        applyLudoQuestionResult
+        applyLudoQuestionResult,
+        playerAction,
+        endGame,
+        setOnStateChange,
+        setOnGameMessage,
+        setOnGameEnd,
+        saveGameState,
+        loadGameState,
+        aiDecision,
+        clearGameApp,
+        getUnoColor,
+        UNO
     };
 }

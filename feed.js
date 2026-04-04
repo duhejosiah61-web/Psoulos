@@ -1,5 +1,6 @@
 // feed.js
 import { ref } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
+import { callAI } from './api.js';
 
 const CURRENT_USER_NAME = '我';
 const DEFAULT_MOMENTS_BG_URL = 'https://img.heliar.top/file/1774802842396_1774802818159.png';
@@ -656,31 +657,12 @@ ${postContext}
 3. 如果是朋友，可以调侃、赞美或互动。
 4. 直接输出评论内容，不要加引号。`;
 
-            const response = await fetch(endpoint.replace(/\/+$/, '') + '/chat/completions', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${key}`
-                },
-                body: JSON.stringify({
-                    model: modelId,
-                    messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: '请评论' }],
-                    temperature: 0.8,
-                    stream: false
-                })
-            });
-
-            if (!response.ok) throw new Error(`API Error: ${response.status}`);
-            
-            const data = await response.json();
-            let content = '';
-            if (data.choices && data.choices[0] && data.choices[0].message) {
-                content = data.choices[0].message.content;
-            } else if (data.message && data.message.content) {
-                content = data.message.content;
-            }
-
-            content = content.replace(/^["']|["']$/g, '').trim();
+            let content = await callAI(
+                { ...activeProfile, endpoint, key, model: modelId },
+                [{ role: 'system', content: systemPrompt }, { role: 'user', content: '请评论' }],
+                { temperature: 0.8 }
+            );
+            content = String(content || '').replace(/^["']|["']$/g, '').trim();
 
             // Submit the comment directly
             if (content) {
@@ -750,6 +732,10 @@ ${postContext}
         scrollTop.value = e.target.scrollTop;
         activeActionPostId.value = null;
     }
+
+    const cleanup = () => {
+        /* 滚动由模板 @scroll 绑定，随根组件卸载由 Vue 回收；此处预留给其它 Feed 侧定时器/监听 */
+    };
 
     // Create Post Logic
     function openCreatePost() {
@@ -1035,31 +1021,12 @@ ${character.persona || ''}
 3. 图片描述要具体且有画面感。
 4. 不要加任何其他解释性文字，直接输出动态内容。`;
 
-            const response = await fetch(endpoint.replace(/\/+$/, '') + '/chat/completions', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${key}`
-                },
-                body: JSON.stringify({
-                    model: modelId,
-                    messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: '发一条朋友圈' }],
-                    temperature: 0.8,
-                    stream: false
-                })
-            });
-
-            if (!response.ok) throw new Error(`API Error: ${response.status}`);
-            
-            const data = await response.json();
-            let content = '';
-            if (data.choices && data.choices[0] && data.choices[0].message) {
-                content = data.choices[0].message.content;
-            } else if (data.message && data.message.content) {
-                content = data.message.content;
-            }
-
-            rolePostText.value = content.replace(/^["']|["']$/g, '').trim();
+            const content = await callAI(
+                { ...activeProfile, endpoint, key, model: modelId },
+                [{ role: 'system', content: systemPrompt }, { role: 'user', content: '发一条朋友圈' }],
+                { temperature: 0.8 }
+            );
+            rolePostText.value = String(content || '').replace(/^["']|["']$/g, '').trim();
 
         } catch (error) {
             console.error('Generate Post Error:', error);
@@ -1161,6 +1128,7 @@ ${character.persona || ''}
         deleteComment,
         deletePost,
         handleScroll,
+        cleanup,
         openCreatePost,
         closeCreatePost,
         closeSheets,
