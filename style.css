@@ -6318,6 +6318,13 @@ label {
     margin-bottom: 0;
 }
 
+/* UNO 内层可滚动，减轻与下方聊天区抢高度、溢出重叠 */
+.card.games-panel.games-panel-uno-dedicated .games-mode-panel-uno {
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+}
+
 @keyframes slideUp {
     from {
         opacity: 0;

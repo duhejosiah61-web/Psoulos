@@ -22,7 +22,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Long+Cang&family=ZCOOL+XiaoWei&family=Playfair+Display:wght@400;600;700;800&family=Inter:wght@400;500;600&family=Caveat:wght@400;500;600&display=swap">
     <link rel="stylesheet" href="main.css?v=uno2026043">
-    <link rel="stylesheet" href="style.css?v=uno2026043">
+    <link rel="stylesheet" href="style.css?v=uno2026044">
     
     <script type="importmap">
         {
@@ -5388,103 +5388,109 @@
                         style="border:3px solid #16a34a !important;border-radius:18px;background:linear-gradient(165deg,#f8fafc,#ecfdf5,#f8fafc);box-shadow:0 10px 28px rgba(22,163,74,0.2);"
                     >
                         <div class="card-title">UNO</div>
-                        <div class="games-mode-panel" style="padding:20px 15px; text-align:center; min-height:75vh; background:#f8fafc;">
+                        <!-- ==================== UNO 优化适配版（不溢出） ==================== -->
+                        <div
+                            class="games-mode-panel games-mode-panel-uno"
+                            style="padding:15px 12px 20px;text-align:center;min-height:min(72vh, 520px);max-height:65vh;background:#f8fafc;overflow-y:auto;overflow-x:hidden;box-sizing:border-box;-webkit-overflow-scrolling:touch;"
+                        >
 
                             <button
                                 v-if="!games.gameState?.players?.length || games.gameState.gameOver"
                                 @click="startUNOGame"
                                 class="console-btn console-btn-primary"
-                                style="width:100%; padding:18px; font-size:19px; margin:20px 0 35px; border-radius:16px;">
+                                style="width:100%;padding:16px;font-size:18px;margin-bottom:20px;border-radius:14px;box-sizing:border-box;">
                                 🎮 开始新 UNO 游戏
                             </button>
 
-                            <div v-if="games.gameState && games.gameState.players && games.gameState.players.length > 0 && !games.gameState.gameOver">
+                            <div v-if="games.gameState && games.gameState.players && games.gameState.players.length > 0 && !games.gameState.gameOver" style="max-width:100%;margin:0 auto;">
 
-                                <div style="display:flex; justify-content:space-between; margin-bottom:25px; font-size:16px; padding:0 10px;">
-                                    <div>
-                                        当前颜色：
-                                        <span :style="{ color: games.getUnoColor ? games.getUnoColor(games.gameState.currentColor) : '#000', fontWeight:'bold' }">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;font-size:15px;padding:0 8px;gap:8px;flex-wrap:wrap;">
+                                    <div style="min-width:0;text-align:left;">
+                                        当前颜色：<span :style="{ color: games.getUnoColor ? games.getUnoColor(games.gameState.currentColor) : '#000', fontWeight:'700' }">
                                             {{ games.gameState.currentColor || '无' }}
                                         </span>
                                     </div>
-                                    <div>轮到：<strong>{{ games.gameState.currentPlayer === 0 ? '你' : '李寻野' }}</strong></div>
+                                    <div style="font-weight:600;white-space:nowrap;">轮到：{{ games.gameState.currentPlayer === 0 ? '你' : '李寻野' }}</div>
                                 </div>
 
-                                <div style="margin-bottom:30px;">
-                                    <div style="font-size:14px; color:#666; margin-bottom:8px;">牌堆顶部</div>
+                                <div style="margin-bottom:22px;">
+                                    <div style="font-size:13px;color:#666;margin-bottom:6px;">牌堆顶部</div>
                                     <div v-if="games.gameState.discardPile && games.gameState.discardPile.length > 0"
                                          :style="{
                                             backgroundColor: games.getUnoColor ? games.getUnoColor(games.gameState.discardPile[games.gameState.discardPile.length-1].color) : '#333',
-                                            color:'#fff',
-                                            padding:'18px 32px',
-                                            borderRadius:'16px',
-                                            fontSize:'19px',
-                                            boxShadow:'0 8px 20px rgba(0,0,0,0.3)',
-                                            display:'inline-block',
-                                            minWidth:'160px'
+                                            color: '#fff',
+                                            padding: '14px 28px',
+                                            borderRadius: '14px',
+                                            fontSize: '17px',
+                                            display: 'inline-block',
+                                            boxShadow: '0 6px 15px rgba(0,0,0,0.25)',
+                                            maxWidth: '85%',
+                                            boxSizing: 'border-box',
+                                            wordBreak: 'break-word'
                                          }">
                                         {{ games.gameState.discardPile[games.gameState.discardPile.length-1].color }}
                                         {{ games.gameState.discardPile[games.gameState.discardPile.length-1].value }}
                                     </div>
                                 </div>
 
-                                <div style="margin-bottom:35px;">
-                                    <div style="margin-bottom:15px; font-size:15px; color:#444;">
+                                <div style="margin-bottom:25px;">
+                                    <div style="margin-bottom:10px;font-size:14.5px;color:#333;">
                                         你的手牌（{{ games.gameState.players[0]?.hand?.length || 0 }} 张）
                                     </div>
-                                    <div style="display:flex; flex-wrap:wrap; gap:12px; justify-content:center;">
+                                    <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;max-width:100%;padding:0 8px;box-sizing:border-box;">
                                         <button
                                             v-for="(card, idx) in (games.gameState.players[0] ? games.gameState.players[0].hand : [])"
                                             :key="idx"
                                             @click="playUnoCard(idx)"
                                             :disabled="games.gameState.currentPlayer !== 0 || games.gameState.isThinking"
-                                            style="padding:18px 26px; font-size:17px; border-radius:14px; min-width:96px; box-shadow:0 6px 18px rgba(0,0,0,0.25); border:none; transition:all 0.2s;"
+                                            style="padding:14px 18px;font-size:15.5px;border-radius:12px;min-width:78px;max-width:calc(50% - 8px);box-shadow:0 4px 12px rgba(0,0,0,0.22);border:none;transition:all 0.15s;flex-shrink:0;box-sizing:border-box;"
                                             :style="{
                                                 backgroundColor: games.getUnoColor ? games.getUnoColor(card.color) : '#333',
                                                 color: '#fff',
-                                                opacity: (games.gameState.currentPlayer !== 0 || games.gameState.isThinking) ? 0.65 : 1
+                                                opacity: (games.gameState.currentPlayer !== 0 || games.gameState.isThinking) ? 0.6 : 1
                                             }"
                                         >
-                                            {{ card.color }}<br>{{ card.value }}
+                                            {{ card.color }}<br><strong>{{ card.value }}</strong>
                                         </button>
                                     </div>
                                 </div>
 
-                                <div style="display:flex; gap:15px; margin-bottom:30px;">
+                                <div style="display:flex;gap:12px;margin-bottom:22px;padding:0 8px;box-sizing:border-box;">
                                     <button
                                         class="console-btn console-btn-secondary"
                                         :disabled="games.gameState.currentPlayer !== 0 || games.gameState.isThinking"
                                         @click="drawUnoCardForPlayer"
-                                        style="flex:1; padding:16px;">
+                                        style="flex:1;min-width:0;padding:14px;font-size:15px;">
                                         抽一张牌
                                     </button>
                                     <button
                                         class="console-btn console-btn-secondary"
                                         @click="sayUNO"
-                                        style="flex:1; padding:16px;">
+                                        style="flex:1;min-width:0;padding:14px;font-size:15px;">
                                         喊 UNO！
                                     </button>
                                 </div>
 
-                                <div v-if="games.gameState.isThinking" style="color:#666; font-size:15px;">
+                                <div v-if="games.gameState.isThinking" style="margin:15px 0;color:#666;font-size:15px;">
                                     ⏳ 李寻野 正在思考...
                                 </div>
                             </div>
 
-                            <div v-if="games.gameState && games.gameState.gameOver" style="margin-top:80px; padding:60px 20px; background:linear-gradient(135deg,#f0fdf4,#ecfdf5); border-radius:24px; text-align:center;">
-                                <div style="font-size:48px; margin-bottom:20px;">🎉</div>
-                                <div style="font-size:32px; font-weight:bold; color:#22c55e;">
+                            <div v-if="games.gameState && games.gameState.gameOver"
+                                 style="margin-top:24px;padding:45px 16px;background:linear-gradient(135deg,#f0fdf4,#ecfdf5);border-radius:20px;text-align:center;box-sizing:border-box;">
+                                <div style="font-size:42px;margin-bottom:15px;">🎉</div>
+                                <div style="font-size:26px;font-weight:bold;color:#22c55e;">
                                     {{ games.gameState.winnerName }} 获胜！
                                 </div>
-                                <p style="margin-top:25px; color:#555; font-size:17px;">
-                                    {{ games.gameState.winnerName === '你' ? '太强了！你打败了李寻野！' : '李寻野赢了，下次再战！' }}
+                                <p style="margin-top:18px;color:#444;font-size:16px;">
+                                    {{ games.gameState.winnerName === '你' ? '太棒了！你赢了李寻野！' : '李寻野赢了，下次加油！' }}
                                 </p>
                             </div>
 
                             <button
                                 @click="closeGame"
                                 class="console-btn console-btn-secondary"
-                                style="margin-top:50px; width:100%; padding:16px; border-radius:16px;">
+                                style="margin-top:24px;width:100%;padding:15px;font-size:15.5px;border-radius:14px;box-sizing:border-box;">
                                 返回游戏大厅
                             </button>
                         </div>
