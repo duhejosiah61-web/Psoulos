@@ -10,6 +10,7 @@ import { useLive } from './live.js';
 import { usePeek } from './peek.js';
 import { useRead } from './read.js';
 import { useNest } from './nest.js';
+import { useEmber } from './ember.js';
 import { attachSoulStoreCoordinators } from './store.js';
 import { useLockScreen } from './composables/useLockScreen.js';
 import { useTheme } from './composables/useTheme.js';
@@ -281,7 +282,7 @@ export function setupApp() {
         );
 
         /** 游客仅可使用 SoulLink（chat）与 Dock：Workshop / Console / Theme / Notice */
-        const GUEST_ALLOWED_APPS = new Set(['chat', 'soullink', 'workshop', 'console', 'theme', 'notice']);
+        // const GUEST_ALLOWED_APPS = new Set(['chat', 'soullink', 'workshop', 'console', 'theme', 'notice']);
 
         const randomHexCode = ref('0x00000000');
         const isPlaying = ref(false);
@@ -868,10 +869,11 @@ export function setupApp() {
         
         const openApp = (appName) => {
             const normalizedName = appName ? appName.toLowerCase() : null;
-            if (lock.isGuest.value && normalizedName && !GUEST_ALLOWED_APPS.has(normalizedName)) {
-                alert('游客模式仅可使用 Chat（SoulLink）与底部 Dock 内应用。\n请使用 Discord 登录以使用全部功能。');
-                return;
-            }
+            // 游客限制（开发时注释）
+            // if (lock.isGuest.value && normalizedName && !GUEST_ALLOWED_APPS.has(normalizedName)) {
+            //     alert('游客模式仅可使用 Chat（SoulLink）与底部 Dock 内应用。\n请使用 Discord 登录以使用全部功能。');
+            //     return;
+            // }
             openedApp.value = normalizedName;
             console.log(`[System] Opening App: ${normalizedName}`);
             
@@ -893,16 +895,17 @@ export function setupApp() {
             }
         };
 
-        watch(
-            () => [lock.isGuest.value, openedApp.value],
-            () => {
-                const app = openedApp.value;
-                if (!lock.isGuest.value || !app) return;
-                if (!GUEST_ALLOWED_APPS.has(String(app).toLowerCase())) {
-                    openedApp.value = null;
-                }
-            }
-        );
+        // 游客限制：自动关闭非白名单应用（开发时注释）
+        // watch(
+        //     () => [lock.isGuest.value, openedApp.value],
+        //     () => {
+        //         const app = openedApp.value;
+        //         if (!lock.isGuest.value || !app) return;
+        //         if (!GUEST_ALLOWED_APPS.has(String(app).toLowerCase())) {
+        //             openedApp.value = null;
+        //         }
+        //     }
+        // );
 
         const closeApp = () => {
             openedApp.value = null;
@@ -1618,6 +1621,7 @@ export function setupApp() {
         // ==========================================================
 
         const feed = reactive(useFeed(profiles, activeProfile));
+        const ember = reactive(useEmber(characters, activeProfile));
         const chatSettingsHolder = { current: null };
         const chatSettings = new Proxy({}, {
             get(_, prop) {
@@ -4011,6 +4015,11 @@ ${styleGuide}
             if (newVal === 'feed') {
                 feed.loadPosts();
             }
+            if (newVal === 'ember') {
+                if (typeof ember.onEnter === 'function') ember.onEnter();
+            } else {
+                if (typeof ember.onLeave === 'function') ember.onLeave();
+            }
             if (newVal === 'chat') {
                 markActiveChatAiMessagesRead();
                 if (chatSettings.timeSenseEnabled.value && !messageTimeIntervalId) {
@@ -4030,6 +4039,7 @@ ${styleGuide}
             if (typeof chat?.cleanup === 'function') chat.cleanup();
             if (typeof live.cleanup === 'function') live.cleanup();
             if (typeof feed.cleanup === 'function') feed.cleanup();
+            if (typeof ember.cleanup === 'function') ember.cleanup();
             if (messageTimeIntervalId) {
                 clearInterval(messageTimeIntervalId);
                 messageTimeIntervalId = null;
@@ -4075,6 +4085,8 @@ ${styleGuide}
             // Core
             currentTime, currentDate, currentDay, currentMonth, currentMonthEn, currentDayOfMonth, randomHexCode, openedApp, currentScreen, deviceBatteryText, deviceSignalText,
             isHomeScreenVisible,
+            // Ember (Threads-like)
+            ember,
             liveWaveBars, liveOnlineCount, liveRooms, activeLiveRoomId, activeLiveRoom, activeLiveHost, activeLiveMessages, liveElapsedText, liveMicMuted, liveInput,
             liveOnMic, liveUserDisguiseNick, liveHallWallpaperUrl,
             liveSettingsOpen,

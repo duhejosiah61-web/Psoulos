@@ -21357,27 +21357,26 @@ label {
     min-height: 0;
     width: min(100%, 320px);
     aspect-ratio: 9 / 19.5;
-    background:
-        linear-gradient(140deg, #4b4c53 0%, #232429 36%, #131316 72%, #0d0d0f 100%);
-    border-radius: 20px;
-    padding: 7px;
+    /* 极简薄边框 + 玻璃质感（减少“手机里套手机”） */
+    background: rgba(14, 14, 16, 0.96);
+    border-radius: 28px;
+    padding: 3px;
     overflow: hidden;
     box-shadow:
-        0 0 0 1px rgba(255,255,255,0.18),
-        0 0 0 2px rgba(26,26,30,0.95),
-        0 0 0 3px rgba(0,0,0,0.45),
-        inset 1px 1px 2px rgba(255,255,255,0.22),
-        inset -2px -2px 5px rgba(0,0,0,0.5);
+        0 18px 50px rgba(0,0,0,0.45),
+        0 0 0 1px rgba(255,255,255,0.10),
+        inset 0 1px 0 rgba(255,255,255,0.10),
+        inset 0 -10px 24px rgba(0,0,0,0.38);
 }
 .left-peek-phone-frame::before {
     content: '';
     position: absolute;
-    top: 4px;
-    left: 10px;
-    right: 10px;
-    height: 20%;
-    border-radius: 12px 12px 40px 40px;
-    background: linear-gradient(180deg, rgba(255,255,255,0.24), rgba(255,255,255,0.03) 55%, rgba(255,255,255,0));
+    top: 2px;
+    left: 8px;
+    right: 8px;
+    height: 26%;
+    border-radius: 18px 18px 44px 44px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0.02) 55%, rgba(255,255,255,0));
     pointer-events: none;
     z-index: 1;
 }
@@ -21385,11 +21384,14 @@ label {
     content: '';
     position: absolute;
     inset: 0;
-    border-radius: 20px;
+    border-radius: 28px;
     pointer-events: none;
     background:
-        radial-gradient(125% 56% at 50% -12%, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0) 68%),
-        radial-gradient(90% 40% at 50% 112%, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0) 72%);
+        radial-gradient(120% 55% at 50% -10%, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0) 70%),
+        radial-gradient(90% 40% at 50% 112%, rgba(0,0,0,0.40) 0%, rgba(0,0,0,0) 72%),
+        /* 轻微指纹/使用痕迹 */
+        radial-gradient(30% 18% at 22% 18%, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 75%),
+        radial-gradient(34% 20% at 66% 34%, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0) 78%);
     z-index: 2;
 }
 .left-peek-side-buttons {
@@ -22229,6 +22231,33 @@ label {
 }
 .peek-phone-screen.dark .peek-generate-tip {
     color: rgba(245,246,250,0.58);
+}
+
+.peek-ai-error {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 59, 48, 0.22);
+    background: rgba(255, 59, 48, 0.08);
+    color: rgba(28, 29, 34, 0.86);
+}
+.peek-phone-screen.dark .peek-ai-error {
+    border-color: rgba(255, 69, 58, 0.28);
+    background: rgba(255, 69, 58, 0.10);
+    color: rgba(245, 246, 250, 0.86);
+}
+.peek-ai-error-title {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    margin-bottom: 4px;
+}
+.peek-ai-error-body {
+    font-size: 11px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    word-break: break-word;
+    opacity: 0.95;
 }
 .peek-home-grid {
     display: grid;
@@ -25508,4 +25537,331 @@ label {
     margin: 12px 0 0;
     font-size: 0.82rem;
     opacity: 0.85;
+}
+
+/* ------------------------------------------------------------------
+   Ember (Threads-like) — match screenshots (clean, thin dividers, tabbar)
+   ------------------------------------------------------------------ */
+.ember-app {
+    background: #ffffff;
+    color: #0b0b0c;
+}
+
+/* topbar */
+.ember-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px 8px;
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+.ember-topbar-btn {
+    width: 38px;
+    height: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    border-radius: 12px;
+    color: #0b0b0c;
+}
+.ember-topbar-btn svg {
+    width: 22px;
+    height: 22px;
+}
+.ember-topbar-logo {
+    width: 40px;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #0b0b0c;
+}
+.ember-topbar-logo svg {
+    width: 26px;
+    height: 26px;
+}
+
+/* feed */
+.ember-content {
+    padding: 0;
+}
+.ember-has-tabbar {
+    padding-bottom: 74px;
+}
+.ember-feed {
+    padding-top: 6px;
+}
+.ember-empty {
+    padding: 18px 16px;
+    color: rgba(11, 11, 12, 0.72);
+}
+.ember-empty-title {
+    font-weight: 800;
+    margin-bottom: 6px;
+    color: rgba(11, 11, 12, 0.92);
+}
+.ember-empty-sub {
+    font-size: 0.92rem;
+    line-height: 1.5;
+}
+
+.ember-post {
+    display: flex;
+    gap: 12px;
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+.ember-left {
+    width: 44px;
+    flex: 0 0 44px;
+}
+.ember-avatar-wrap {
+    position: relative;
+    width: 44px;
+    height: 44px;
+}
+.ember-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 999px;
+    object-fit: cover;
+    display: block;
+}
+.ember-avatar-plus {
+    position: absolute;
+    left: -4px;
+    bottom: -4px;
+    width: 20px;
+    height: 20px;
+    border-radius: 999px;
+    background: #0b0b0c;
+    color: #ffffff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #ffffff;
+}
+.ember-avatar-plus svg {
+    width: 14px;
+    height: 14px;
+}
+
+.ember-main {
+    flex: 1;
+    min-width: 0;
+}
+.ember-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+.ember-head-left {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+}
+.ember-username {
+    font-weight: 800;
+    font-size: 0.98rem;
+    color: #0b0b0c;
+    max-width: 64vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ember-time {
+    font-size: 0.86rem;
+    color: rgba(11, 11, 12, 0.45);
+    white-space: nowrap;
+}
+.ember-more {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 10px;
+    color: rgba(11, 11, 12, 0.55);
+}
+.ember-more svg {
+    width: 20px;
+    height: 20px;
+}
+.ember-text {
+    margin-top: 6px;
+    font-size: 0.98rem;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    color: rgba(11, 11, 12, 0.92);
+}
+
+.ember-actions {
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+}
+.ember-action {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    padding: 6px 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: rgba(11, 11, 12, 0.88);
+    font-family: inherit;
+}
+.ember-action svg {
+    width: 20px;
+    height: 20px;
+}
+.ember-action.active {
+    color: #e11d48;
+}
+.ember-action.danger {
+    color: rgba(220, 38, 38, 0.92);
+}
+.ember-count {
+    font-size: 0.9rem;
+    color: rgba(11, 11, 12, 0.65);
+}
+
+.ember-replies {
+    margin-top: 10px;
+    display: grid;
+    gap: 10px;
+}
+.ember-reply {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+}
+.ember-reply-avatar {
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    object-fit: cover;
+    flex: 0 0 22px;
+}
+.ember-reply-head {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+}
+.ember-reply-author {
+    font-weight: 750;
+    font-size: 0.92rem;
+}
+.ember-reply-time {
+    color: rgba(11, 11, 12, 0.45);
+    font-size: 0.82rem;
+}
+.ember-reply-text {
+    margin-top: 2px;
+    font-size: 0.92rem;
+    color: rgba(11, 11, 12, 0.9);
+    line-height: 1.35;
+    white-space: pre-wrap;
+}
+.ember-composer-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 14px;
+    z-index: 999;
+}
+.ember-composer-panel {
+    width: 100%;
+    max-width: 520px;
+    background: #fff;
+    border-radius: 18px;
+    border: 1px solid rgba(2, 6, 23, 0.10);
+    padding: 12px;
+}
+.ember-composer-title {
+    font-weight: 750;
+    margin-bottom: 10px;
+}
+.ember-composer-input {
+    width: 100%;
+    min-height: 120px;
+    resize: none;
+    border-radius: 14px;
+    border: 1px solid rgba(2, 6, 23, 0.12);
+    padding: 10px 12px;
+    font-family: inherit;
+    outline: none;
+}
+.ember-composer-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 10px;
+}
+.ember-btn {
+    border-radius: 999px;
+    border: 1px solid rgba(2, 6, 23, 0.12);
+    background: rgba(255, 255, 255, 0.92);
+    padding: 8px 14px;
+    cursor: pointer;
+    font-family: inherit;
+}
+.ember-btn-primary {
+    background: #0f172a;
+    border-color: #0f172a;
+    color: #fff;
+}
+
+/* tabbar */
+.ember-tabbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    height: 64px;
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    align-items: center;
+    padding: 0 6px;
+}
+.ember-tab {
+    height: 46px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    border-radius: 14px;
+    color: rgba(11, 11, 12, 0.82);
+}
+.ember-tab svg {
+    width: 24px;
+    height: 24px;
+}
+.ember-tab.is-active {
+    color: #0b0b0c;
+}
+.ember-tab-plus svg {
+    width: 28px;
+    height: 28px;
 }

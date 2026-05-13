@@ -1,61 +1,82 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
 import { buildChatCompletionUrlCandidates, callAI } from './api.js';
-
-const STORAGE_KEY = 'peek_app_state_v1';
+import { getPhoneState, putPhoneState, getGlobalState, putGlobalState, migratePeekLocalStorageToIdb } from './peekDb.js';
 
 const APP_DEFS = [
     { id: 'messages', name: '消息', icon: 'fa-comments' },
-    { id: 'calls', name: '通话', icon: 'fa-phone' },
+    { id: 'todo', name: '待办', icon: 'fa-list-check' },
+    { id: 'map', name: '地图', icon: 'fa-map-location-dot' },
+    { id: 'wallet', name: '钱包', icon: 'fa-wallet' },
+    { id: 'calendar', name: '日历', icon: 'fa-calendar-days' },
+    { id: 'health', name: '健康', icon: 'fa-heart-pulse' },
+    { id: 'mail', name: '邮件', icon: 'fa-envelope' },
     { id: 'album', name: '相册', icon: 'fa-image' },
     { id: 'notes', name: '备忘', icon: 'fa-note-sticky' },
     { id: 'browser', name: '浏览器', icon: 'fa-globe' },
     { id: 'files', name: '文件', icon: 'fa-folder' },
     { id: 'diary', name: '日记', icon: 'fa-book' },
-    { id: 'bank', name: '银行卡', icon: 'fa-credit-card' },
-    { id: 'map', name: '地图', icon: 'fa-map-location-dot' }
+    { id: 'bank', name: '银行卡', icon: 'fa-credit-card' }
 ];
 
 const DOCK_APPS = [
-    { id: 'calls', name: '通话', icon: 'fa-phone' },
     { id: 'messages', name: '消息', icon: 'fa-comments' },
-    { id: 'browser', name: '浏览器', icon: 'fa-globe' },
+    { id: 'todo', name: '待办', icon: 'fa-list-check' },
+    { id: 'map', name: '地图', icon: 'fa-map-location-dot' },
     { id: 'album', name: '相册', icon: 'fa-image' }
 ];
 
-const readState = () => {
-    try {
-        return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-    } catch {
-        return {};
-    }
+const DEFAULT_PHONE_STATE_VERSION = 1;
+const createDefaultPhoneState = (char) => {
+    const now = Date.now();
+    const name = char?.nickname || char?.name || 'TA';
+    return {
+        version: DEFAULT_PHONE_STATE_VERSION,
+        meta: {
+            createdAt: now,
+            lastGeneratedAt: 0,
+            wallpaper: null,
+            deviceLabel: `${name} 的手机`,
+            timezone: null
+        },
+        home: {
+            dock: DOCK_APPS.map((a) => a.id),
+            badges: {},
+            widgets: { weatherEnabled: true, photosEnabled: true }
+        },
+        cursors: {
+            diaryTs: 0,
+            todoTs: 0,
+            mapTs: 0,
+            walletTs: 0,
+            calendarTs: 0,
+            healthTs: 0,
+            mailTs: 0,
+            notesTs: 0,
+            messagesTs: 0,
+            photosTs: 0,
+            browserTs: 0,
+            filesTs: 0
+        },
+        apps: {
+            messages: [],
+            calls: [],
+            photos: [],
+            notes: [],
+            browserHistory: [],
+            files: [],
+            diaryEntries: [],
+            bankAccount: { balance: 0, monthlySpend: 0, records: [] },
+            mapTracks: [],
+            todoItems: [],
+            calendarEvents: [],
+            wallet: { balance: 0, records: [] },
+            health: { steps: [], sleep: [] },
+            mailThreads: []
+        }
+    };
 };
 
-const saveState = (state) => {
-    try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch {
-        // ignore storage failures
-    }
-};
-
-const getPeekCharDataKey = (charId) => `peek_char_data_v1_${String(charId || '')}`;
-const readPeekCharData = (charId) => {
-    if (!charId) return null;
-    try {
-        const raw = localStorage.getItem(getPeekCharDataKey(charId));
-        return raw ? JSON.parse(raw) : null;
-    } catch {
-        return null;
-    }
-};
-const savePeekCharData = (charId, data) => {
-    if (!charId) return;
-    try {
-        localStorage.setItem(getPeekCharDataKey(charId), JSON.stringify(data || {}));
-    } catch {
-        // ignore storage failures
-    }
-};
+// Legacy localStorage helpers removed; persisted via IndexedDB in peekDb.js
 
 const hashToHue = (s) => {
     const str = String(s || '');
@@ -134,12 +155,14 @@ const pickInitialPasscode = (char) => {
 };
 
 export function usePeek(charactersRef, activeProfileRef, soulLinkMessagesRef, soulLinkGroupsRef) {
-    const saved = readState();
+    const globalState = ref({ peekSelectedCharacterId: '', peekDark: true });
+    const phoneState = ref(null);
+    const isPeekHydrated = ref(false);
 
-    const peekSelectedCharacterId = ref(saved.peekSelectedCharacterId || '');
+    const peekSelectedCharacterId = ref('');
     const peekInnerApp = ref('home');
     const peekSearch = ref('');
-    const peekDark = ref(saved.peekDark !== false);
+    const peekDark = ref(true);
 
     const peekSelectedCharacter = computed(() => {
         const chars = Array.isArray(charactersRef?.value) ? charactersRef.value : [];
@@ -147,7 +170,8 @@ export function usePeek(charactersRef, activeProfileRef, soulLinkMessagesRef, so
     });
 
     const peekStatusTime = ref('');
-    const peekLocked = ref(true);
+    // Peek 锁屏已移除：默认不进入锁屏，避免用户看到黑屏/锁屏遮罩
+    const peekLocked = ref(false);
     const peekPasscodeInput = ref('');
     const peekLockHint = ref(' ');
     const peekWrongAttempts = ref(0);
@@ -256,26 +280,25 @@ export function usePeek(charactersRef, activeProfileRef, soulLinkMessagesRef, so
     const peekDiaryEntries = ref([]);
     const peekBankAccount = ref({ balance: 0, monthlySpend: 0, records: [] });
     const peekMapTracks = ref([]);
+    const peekTodoItems = ref([]);
+    const peekCalendarEvents = ref([]);
+    const peekWallet = ref({ balance: 0, records: [] });
+    const peekHealth = ref({ steps: [], sleep: [] });
+    const peekMailThreads = ref([]);
     const peekAiLastGeneratedAt = ref('');
     const peekAiGenerating = ref(false);
-    const PEAK_DIARY_CURSOR_KEY_PREFIX = 'peek_diary_cursor_ts_v1_';
-
-    const getDiaryCursorTs = (charId) => {
-        try {
-            const raw = localStorage.getItem(`${PEAK_DIARY_CURSOR_KEY_PREFIX}${String(charId)}`);
-            const n = Number(raw);
-            return Number.isFinite(n) ? n : 0;
-        } catch {
-            return 0;
-        }
+    const peekAiError = ref('');
+    const getCursorTs = (key) => {
+        const st = phoneState.value;
+        const c = st?.cursors || {};
+        const v = Number(c?.[key] || 0);
+        return Number.isFinite(v) ? v : 0;
     };
-
-    const setDiaryCursorTs = (charId, ts) => {
-        try {
-            localStorage.setItem(`${PEAK_DIARY_CURSOR_KEY_PREFIX}${String(charId)}`, String(ts || 0));
-        } catch {
-            // ignore
-        }
+    const setCursorTs = (key, ts) => {
+        const st = phoneState.value;
+        if (!st) return;
+        st.cursors = st.cursors || {};
+        st.cursors[key] = Number(ts || 0) || 0;
     };
 
     const formatTs = (ts) => {
@@ -477,15 +500,16 @@ export function usePeek(charactersRef, activeProfileRef, soulLinkMessagesRef, so
     const generatePeekLinkedData = async () => {
         const char = peekSelectedCharacter.value;
         if (!char || peekAiGenerating.value) return;
+        peekAiError.value = '';
         const profile = activeProfileRef?.value || null;
         if (!profile) {
-            alert('未检测到可用 API 配置，请先在 Console 选择/填写激活配置。');
+            peekAiError.value = '未检测到可用 API 配置，请先在 Console 选择/填写激活配置。';
             return;
         }
         const endpoint = String(profile.endpoint || '').trim();
         const key = String(profile.key || '').trim();
         if (!endpoint || !key) {
-            alert('API 配置不完整：请在 Console 填写 endpoint 和 key。');
+            peekAiError.value = 'API 配置不完整：请在 Console 填写 endpoint 和 key。';
             return;
         }
 
@@ -494,12 +518,22 @@ export function usePeek(charactersRef, activeProfileRef, soulLinkMessagesRef, so
             const signals = collectLinkedSignals(char);
             const charId = char?.id;
             const nowTs = Date.now();
-            const lastCursorTs = getDiaryCursorTs(charId);
+            const lastCursorTs = getCursorTs('diaryTs');
             const chatLines = collectChatSinceDiary(char, lastCursorTs, nowTs);
             const chatTranscript = (chatLines || []).join('\n');
             const chatTranscriptForPrompt = chatTranscript.length > 12000
                 ? chatTranscript.slice(chatTranscript.length - 12000)
                 : chatTranscript;
+
+            const stableId = (prefix, obj) => {
+                try {
+                    const base = JSON.stringify(obj || {}).slice(0, 1200);
+                    const n = hashU32(`${prefix}|${base}`);
+                    return `${prefix}_${n}`;
+                } catch {
+                    return `${prefix}_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+                }
+            };
 
             const mergeById = (existingArr, incomingArr) => {
                 const ex = Array.isArray(existingArr) ? existingArr : [];
@@ -508,14 +542,21 @@ export function usePeek(charactersRef, activeProfileRef, soulLinkMessagesRef, so
                 const exById = new Map(ex.map((e) => [String(e?.id), e]));
                 const newOnes = [];
                 for (const item of inc) {
-                    const id = String(item?.id);
-                    if (!id || id === 'undefined' || id === 'null') continue;
+                    const normalized = item && typeof item === 'object' ? { ...item } : null;
+                    if (!normalized) continue;
+                    let id = String(normalized?.id || '');
+                    if (!id || id === 'undefined' || id === 'null') {
+                        // 兼容：模型没给 id 时，生成一个稳定 id，避免整条被丢弃导致“同步成功但全空”
+                        const hint = normalized.ts || normalized.at || normalized.day || normalized.text || normalized.title || normalized.item || '';
+                        normalized.id = stableId('peek', { hint, ...normalized });
+                        id = String(normalized.id);
+                    }
                     if (exIdSet.has(id)) {
-                        exById.set(id, item);
+                        exById.set(id, normalized);
                     } else {
-                        newOnes.push(item);
+                        newOnes.push(normalized);
                         exIdSet.add(id);
-                        exById.set(id, item);
+                        exById.set(id, normalized);
                     }
                 }
                 const updatedExisting = ex.map((e) => exById.get(String(e?.id)) || e);
@@ -524,16 +565,32 @@ export function usePeek(charactersRef, activeProfileRef, soulLinkMessagesRef, so
 
             let payload = null;
             try {
+                const existingSummary = {
+                    socialMessageIds: (Array.isArray(peekMessages.value) ? peekMessages.value : []).slice(0, 40).map((x) => String(x?.id || '')).filter(Boolean),
+                    todoIds: (Array.isArray(peekTodoItems.value) ? peekTodoItems.value : []).slice(0, 60).map((x) => String(x?.id || '')).filter(Boolean),
+                    calendarIds: (Array.isArray(peekCalendarEvents.value) ? peekCalendarEvents.value : []).slice(0, 60).map((x) => String(x?.id || '')).filter(Boolean),
+                    walletRecordIds: (Array.isArray(peekWallet.value?.records) ? peekWallet.value.records : []).slice(0, 80).map((x) => String(x?.id || '')).filter(Boolean),
+                    mailIds: (Array.isArray(peekMailThreads.value) ? peekMailThreads.value : []).slice(0, 60).map((x) => String(x?.id || '')).filter(Boolean),
+                    diaryIds: (Array.isArray(peekDiaryEntries.value) ? peekDiaryEntries.value : []).slice(0, 80).map((x) => String(x?.id || '')).filter(Boolean),
+                    bankRecordIds: (Array.isArray(peekBankAccount.value?.records) ? peekBankAccount.value.records : []).slice(0, 80).map((x) => String(x?.id || '')).filter(Boolean),
+                    mapTrackIds: (Array.isArray(peekMapTracks.value) ? peekMapTracks.value : []).slice(0, 80).map((x) => String(x?.id || '')).filter(Boolean)
+                };
                 const prompt = `你是角色手机数据生成器。请仅返回 JSON，不要 markdown。
 输出结构:
 {
   "socialMessages":[{"id":"m1","app":"联系人或群名","text":"对话摘要","at":"HH:mm","ts":1710000000000}],
+  "todoItems":[{"id":"t1","text":"...","due":"YYYY-MM-DD","done":false,"ts":1710000000000}],
+  "calendarEvents":[{"id":"c1","title":"...","at":"YYYY-MM-DD HH:mm","location":"...","ts":1710000000000}],
+  "wallet":{"balance":1234,"records":[{"id":"w1","item":"...","amount":-12,"at":"09:00","note":"...","ts":1710000000000}]},
+  "health":{"steps":[{"id":"s1","day":"YYYY-MM-DD","count":8123}],"sleep":[{"id":"sl1","day":"YYYY-MM-DD","hours":7.2,"note":"..."}]},
+  "mailThreads":[{"id":"e1","from":"...","subject":"...","preview":"...","at":"HH:mm","unread":true,"ts":1710000000000}],
   "diaryEntries":[{"id":"d1","title":"...","mood":"...","content":"..."}],
-  "bankAccount":{"balance":1234,"monthlySpend":456,"records":[{"id":"b1","item":"...","amount":-12,"at":"09:00"}]},
-  "mapTracks":[{"id":"m1","place":"...","at":"08:30","note":"..."}]
+  "bankAccount":{"balance":1234,"monthlySpend":456,"records":[{"id":"b1","item":"...","amount":-12,"at":"09:00","ts":1710000000000}]},
+  "mapTracks":[{"id":"m1","place":"...","at":"08:30","note":"...","ts":1710000000000}]
 }
 角色: ${JSON.stringify({ id: char.id, name: char.nickname || char.name || 'TA' })}
-联动数据: ${JSON.stringify(signals)}`;
+联动数据: ${JSON.stringify(signals)}
+已有数据摘要（避免重复 id）：${JSON.stringify(existingSummary)}`;
                 const diaryPromptBlock = `
 上次日记生成时间戳（毫秒）: ${String(lastCursorTs)}
 本次生成时间戳（毫秒）: ${String(nowTs)}
@@ -543,6 +600,8 @@ ${chatTranscriptForPrompt || '（无增量聊天内容）'}
 1) diaryEntries 只输出“新增日记条目”，不要输出旧条目的重复 id（保证可追加，不要覆盖旧日记）。
 2) 如需提到图片，一律使用文字假装图格式，例如：[图片] 看到了一张夜景。
 3) 日记内容必须基于上面的聊天增量记录生成。
+4) 其它模块（socialMessages/todoItems/calendarEvents/wallet.records/mailThreads/mapTracks/bankAccount.records）只输出新增或更新条目；不要输出完全重复的旧条目；id 必须稳定且唯一。
+5) 恋爱痕迹要“低频、轻柔、像不经意”：本次最多出现 0-1 条带“用户/我/你”的相关元素（例如 1 条代办或 1 条钱包备注即可），不要密集直球、不要每个模块都出现。
 `;
                 const finalPrompt = prompt + diaryPromptBlock;
                 let content;
@@ -553,41 +612,167 @@ ${chatTranscriptForPrompt || '（无增量聊天内容）'}
                             { role: 'system', content: '只输出合法 JSON。' },
                             { role: 'user', content: finalPrompt }
                         ],
-                        { temperature: 0.7, max_tokens: 4000 }
+                        {
+                            temperature: 0.7,
+                            max_tokens: 4000,
+                            // DeepSeek/Grok 等网关：尽量强制 JSON 输出，减少 content_filter/空 delta
+                            extraBody: { response_format: { type: 'json_object' } }
+                        }
                     );
                 } catch (err) {
                     const triedUrls = buildChatCompletionUrlCandidates(endpoint);
                     if (String(err?.message || '').includes('404') && triedUrls.length) {
-                        alert(`生成失败：接口 404。\n请检查 Console 的 endpoint。\n已尝试：\n${triedUrls.join('\n')}`);
+                        peekAiError.value = `生成失败：接口 404。请检查 Console 的 endpoint。\n已尝试：\n${triedUrls.join('\n')}`;
                     } else {
-                        alert(`生成失败：${err?.message || '网络错误'}`);
+                        peekAiError.value = `生成失败：${err?.message || '网络错误'}`;
                     }
                     return;
                 }
                 if (!content) {
-                    alert('生成失败：API 返回内容为空。');
+                    peekAiError.value = '生成失败：API 返回内容为空。';
                     return;
                 }
-                const jsonText = String(content).replace(/```json|```/g, '').trim();
-                payload = JSON.parse(jsonText);
+                const tryParseJsonFromText = (txt) => {
+                    const s = String(txt || '').trim().replace(/```(?:json)?/gi, '').trim();
+                    if (!s) return null;
+                    try {
+                        return JSON.parse(s);
+                    } catch {
+                        // 兼容：模型只返回了 JSON 片段（少外层 {}），例如 `"socialMessages":[...]`
+                        // 这种情况下包一层 {} 再解析
+                        const trimmed = s.trim();
+                        if (!trimmed.startsWith('{')) {
+                            const frag = trimmed.replace(/^[\s,]+/, '').replace(/[\s,]+$/, '');
+                            const looksLikeKv = /^"[^"]+"\s*:/.test(frag) || /^[A-Za-z_][\w]*\s*:/.test(frag);
+                            if (looksLikeKv) {
+                                try {
+                                    return JSON.parse(`{${frag}}`);
+                                } catch {
+                                    // continue
+                                }
+                            }
+                        }
+                        // try first balanced {...}
+                        const start = s.indexOf('{');
+                        if (start < 0) return null;
+                        let depth = 0;
+                        let inStr = false;
+                        let esc = false;
+                        for (let i = start; i < s.length; i++) {
+                            const ch = s[i];
+                            if (inStr) {
+                                if (esc) esc = false;
+                                else if (ch === '\\') esc = true;
+                                else if (ch === '"') inStr = false;
+                                continue;
+                            }
+                            if (ch === '"') {
+                                inStr = true;
+                                continue;
+                            }
+                            if (ch === '{') depth += 1;
+                            if (ch === '}') depth -= 1;
+                            if (depth === 0) {
+                                const cand = s.slice(start, i + 1);
+                                try {
+                                    return JSON.parse(cand);
+                                } catch {
+                                    return null;
+                                }
+                            }
+                        }
+                        return null;
+                    }
+                };
+                payload = tryParseJsonFromText(content);
+                if (!payload) {
+                    const head = String(content || '').slice(0, 200);
+                    peekAiError.value = `生成失败：响应非 JSON（或未包含可解析的 JSON 对象）。\n${head}`;
+                    return;
+                }
             } catch (error) {
-                alert(`生成失败：${error?.message || '网络错误'}`);
+                peekAiError.value = `生成失败：${error?.message || '网络错误'}`;
                 return;
             }
             if (!payload || typeof payload !== 'object') {
-                alert('生成失败：返回数据格式不正确。');
+                peekAiError.value = '生成失败：返回数据格式不正确。';
                 return;
             }
 
+            // 兼容：部分模型/网关把真正 JSON 塞进 { code: "..." } 或类似字段
+            if (payload && typeof payload === 'object') {
+                const codeText = typeof payload.code === 'string' ? payload.code : '';
+                const onlyCode = Object.keys(payload).length === 1 && 'code' in payload;
+                if ((onlyCode || codeText) && codeText) {
+                    const recovered = tryParseJsonFromText(codeText);
+                    if (recovered && typeof recovered === 'object') {
+                        payload = recovered;
+                    }
+                }
+            }
+
                 // 追加/合并：不覆盖旧内容，生成后“在基础上变多”
+                const beforeCounts = {
+                    social: (Array.isArray(peekMessages.value) ? peekMessages.value.length : 0),
+                    todo: (Array.isArray(peekTodoItems.value) ? peekTodoItems.value.length : 0),
+                    calendar: (Array.isArray(peekCalendarEvents.value) ? peekCalendarEvents.value.length : 0),
+                    walletRecords: (Array.isArray(peekWallet.value?.records) ? peekWallet.value.records.length : 0),
+                    mail: (Array.isArray(peekMailThreads.value) ? peekMailThreads.value.length : 0),
+                    diary: (Array.isArray(peekDiaryEntries.value) ? peekDiaryEntries.value.length : 0),
+                    bankRecords: (Array.isArray(peekBankAccount.value?.records) ? peekBankAccount.value.records.length : 0),
+                    map: (Array.isArray(peekMapTracks.value) ? peekMapTracks.value.length : 0)
+                };
                 const incomingSocial = Array.isArray(payload.socialMessages) ? payload.socialMessages : [];
+                const incomingTodo = Array.isArray(payload.todoItems) ? payload.todoItems : [];
+                const incomingCal = Array.isArray(payload.calendarEvents) ? payload.calendarEvents : [];
+                const incomingWallet = payload.wallet && typeof payload.wallet === 'object' ? payload.wallet : null;
+                const incomingHealth = payload.health && typeof payload.health === 'object' ? payload.health : null;
+                const incomingMail = Array.isArray(payload.mailThreads) ? payload.mailThreads : [];
+                const incomingDiary = Array.isArray(payload.diaryEntries) ? payload.diaryEntries : [];
+                const incomingBank = payload.bankAccount || { balance: null, monthlySpend: null, records: [] };
+                const incomingMap = Array.isArray(payload.mapTracks) ? payload.mapTracks : [];
+
+                const incomingCounts = {
+                    social: incomingSocial.length,
+                    todo: incomingTodo.length,
+                    calendar: incomingCal.length,
+                    walletRecords: Array.isArray(incomingWallet?.records) ? incomingWallet.records.length : 0,
+                    healthSteps: Array.isArray(incomingHealth?.steps) ? incomingHealth.steps.length : 0,
+                    healthSleep: Array.isArray(incomingHealth?.sleep) ? incomingHealth.sleep.length : 0,
+                    mail: incomingMail.length,
+                    diary: incomingDiary.length,
+                    bankRecords: Array.isArray(incomingBank?.records) ? incomingBank.records.length : 0,
+                    map: incomingMap.length
+                };
+
                 if (incomingSocial.length > 0) {
                     peekMessages.value = mergeById(peekMessages.value, incomingSocial);
                 }
-                const incomingDiary = Array.isArray(payload.diaryEntries) ? payload.diaryEntries : [];
+                if (incomingTodo.length > 0) {
+                    peekTodoItems.value = mergeById(peekTodoItems.value, incomingTodo);
+                }
+                if (incomingCal.length > 0) {
+                    peekCalendarEvents.value = mergeById(peekCalendarEvents.value, incomingCal);
+                }
+                if (incomingWallet) {
+                    const prev = peekWallet.value || { balance: 0, records: [] };
+                    const merged = mergeById(Array.isArray(prev.records) ? prev.records : [], Array.isArray(incomingWallet.records) ? incomingWallet.records : []);
+                    peekWallet.value = {
+                        balance: typeof incomingWallet.balance === 'number' ? incomingWallet.balance : prev.balance,
+                        records: merged
+                    };
+                }
+                if (incomingHealth) {
+                    const prev = peekHealth.value || { steps: [], sleep: [] };
+                    const mergedSteps = mergeById(Array.isArray(prev.steps) ? prev.steps : [], Array.isArray(incomingHealth.steps) ? incomingHealth.steps : []);
+                    const mergedSleep = mergeById(Array.isArray(prev.sleep) ? prev.sleep : [], Array.isArray(incomingHealth.sleep) ? incomingHealth.sleep : []);
+                    peekHealth.value = { steps: mergedSteps, sleep: mergedSleep };
+                }
+                if (incomingMail.length > 0) {
+                    peekMailThreads.value = mergeById(peekMailThreads.value, incomingMail);
+                }
                 peekDiaryEntries.value = mergeById(peekDiaryEntries.value, incomingDiary);
 
-                const incomingBank = payload.bankAccount || { balance: null, monthlySpend: null, records: [] };
                 const prevBank = peekBankAccount.value || { balance: 0, monthlySpend: 0, records: [] };
                 const prevRecords = Array.isArray(prevBank.records) ? prevBank.records : [];
                 const incomingRecords = Array.isArray(incomingBank.records) ? incomingBank.records : [];
@@ -598,67 +783,106 @@ ${chatTranscriptForPrompt || '（无增量聊天内容）'}
                     records: mergedRecords
                 };
 
-                peekMapTracks.value = mergeById(peekMapTracks.value, Array.isArray(payload.mapTracks) ? payload.mapTracks : []);
+                peekMapTracks.value = mergeById(peekMapTracks.value, incomingMap);
 
                 peekAiLastGeneratedAt.value = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-                setDiaryCursorTs(charId, nowTs);
+                setCursorTs('diaryTs', nowTs);
+                setCursorTs('todoTs', nowTs);
+                setCursorTs('mapTs', nowTs);
+                setCursorTs('walletTs', nowTs);
+                setCursorTs('calendarTs', nowTs);
+                setCursorTs('healthTs', nowTs);
+                setCursorTs('mailTs', nowTs);
+                if (phoneState.value && phoneState.value.meta) phoneState.value.meta.lastGeneratedAt = nowTs;
+
+                const afterCounts = {
+                    social: (Array.isArray(peekMessages.value) ? peekMessages.value.length : 0),
+                    todo: (Array.isArray(peekTodoItems.value) ? peekTodoItems.value.length : 0),
+                    calendar: (Array.isArray(peekCalendarEvents.value) ? peekCalendarEvents.value.length : 0),
+                    walletRecords: (Array.isArray(peekWallet.value?.records) ? peekWallet.value.records.length : 0),
+                    mail: (Array.isArray(peekMailThreads.value) ? peekMailThreads.value.length : 0),
+                    diary: (Array.isArray(peekDiaryEntries.value) ? peekDiaryEntries.value.length : 0),
+                    bankRecords: (Array.isArray(peekBankAccount.value?.records) ? peekBankAccount.value.records.length : 0),
+                    map: (Array.isArray(peekMapTracks.value) ? peekMapTracks.value.length : 0)
+                };
+                const changed =
+                    afterCounts.social !== beforeCounts.social ||
+                    afterCounts.todo !== beforeCounts.todo ||
+                    afterCounts.calendar !== beforeCounts.calendar ||
+                    afterCounts.walletRecords !== beforeCounts.walletRecords ||
+                    afterCounts.mail !== beforeCounts.mail ||
+                    afterCounts.diary !== beforeCounts.diary ||
+                    afterCounts.bankRecords !== beforeCounts.bankRecords ||
+                    afterCounts.map !== beforeCounts.map;
+                if (!changed) {
+                    peekAiError.value =
+                        `本次联动未新增任何内容。\n` +
+                        `返回字段：${Object.keys(payload || {}).join(',')}\n` +
+                        `返回数量：${JSON.stringify(incomingCounts)}`;
+                }
         } finally {
             peekAiGenerating.value = false;
         }
     };
 
-    const rebuildCharacterData = (char) => {
+    const syncRefsFromPhoneState = () => {
+        const st = phoneState.value;
+        const apps = st?.apps || {};
+        peekMessages.value = Array.isArray(apps.messages) ? apps.messages : [];
+        peekCalls.value = Array.isArray(apps.calls) ? apps.calls : [];
+        peekNotes.value = Array.isArray(apps.notes) ? apps.notes : [];
+        peekPhotos.value = Array.isArray(apps.photos) ? apps.photos : [];
+        peekFiles.value = Array.isArray(apps.files) ? apps.files : [];
+        peekBrowserHistory.value = Array.isArray(apps.browserHistory) ? apps.browserHistory : [];
+        peekDiaryEntries.value = Array.isArray(apps.diaryEntries) ? apps.diaryEntries : [];
+        peekBankAccount.value = apps.bankAccount && typeof apps.bankAccount === 'object' ? apps.bankAccount : { balance: 0, monthlySpend: 0, records: [] };
+        peekMapTracks.value = Array.isArray(apps.mapTracks) ? apps.mapTracks : [];
+        peekTodoItems.value = Array.isArray(apps.todoItems) ? apps.todoItems : [];
+        peekCalendarEvents.value = Array.isArray(apps.calendarEvents) ? apps.calendarEvents : [];
+        peekWallet.value = apps.wallet && typeof apps.wallet === 'object' ? apps.wallet : { balance: 0, records: [] };
+        peekHealth.value = apps.health && typeof apps.health === 'object' ? apps.health : { steps: [], sleep: [] };
+        peekMailThreads.value = Array.isArray(apps.mailThreads) ? apps.mailThreads : [];
+    };
+
+    const syncPhoneStateFromRefs = () => {
+        const st = phoneState.value;
+        if (!st) return;
+        st.apps = st.apps || {};
+        st.apps.messages = Array.isArray(peekMessages.value) ? peekMessages.value : [];
+        st.apps.calls = Array.isArray(peekCalls.value) ? peekCalls.value : [];
+        st.apps.notes = Array.isArray(peekNotes.value) ? peekNotes.value : [];
+        st.apps.photos = Array.isArray(peekPhotos.value) ? peekPhotos.value : [];
+        st.apps.files = Array.isArray(peekFiles.value) ? peekFiles.value : [];
+        st.apps.browserHistory = Array.isArray(peekBrowserHistory.value) ? peekBrowserHistory.value : [];
+        st.apps.diaryEntries = Array.isArray(peekDiaryEntries.value) ? peekDiaryEntries.value : [];
+        st.apps.bankAccount = peekBankAccount.value || { balance: 0, monthlySpend: 0, records: [] };
+        st.apps.mapTracks = Array.isArray(peekMapTracks.value) ? peekMapTracks.value : [];
+        st.apps.todoItems = Array.isArray(peekTodoItems.value) ? peekTodoItems.value : [];
+        st.apps.calendarEvents = Array.isArray(peekCalendarEvents.value) ? peekCalendarEvents.value : [];
+        st.apps.wallet = peekWallet.value || { balance: 0, records: [] };
+        st.apps.health = peekHealth.value || { steps: [], sleep: [] };
+        st.apps.mailThreads = Array.isArray(peekMailThreads.value) ? peekMailThreads.value : [];
+    };
+
+    const rebuildCharacterData = async (char) => {
         const charId = String(char?.id || '');
-        const cached = readPeekCharData(charId);
+        if (!charId) return;
+        const cached = await getPhoneState(charId);
         if (cached && typeof cached === 'object') {
-            peekMessages.value = Array.isArray(cached.peekMessages) ? cached.peekMessages : [];
-            peekCalls.value = Array.isArray(cached.peekCalls) ? cached.peekCalls : [];
-            peekNotes.value = Array.isArray(cached.peekNotes) ? cached.peekNotes : [];
-            peekPhotos.value = Array.isArray(cached.peekPhotos) ? cached.peekPhotos : [];
-            peekFiles.value = Array.isArray(cached.peekFiles) ? cached.peekFiles : [];
-            peekBrowserHistory.value = Array.isArray(cached.peekBrowserHistory) ? cached.peekBrowserHistory : [];
-            peekDiaryEntries.value = Array.isArray(cached.peekDiaryEntries) ? cached.peekDiaryEntries : [];
-            peekBankAccount.value = cached.peekBankAccount && typeof cached.peekBankAccount === 'object'
-                ? cached.peekBankAccount
-                : { balance: 0, monthlySpend: 0, records: [] };
-            peekMapTracks.value = Array.isArray(cached.peekMapTracks) ? cached.peekMapTracks : [];
-            peekAiLastGeneratedAt.value = String(cached.peekAiLastGeneratedAt || '');
+            phoneState.value = cached;
+            syncRefsFromPhoneState();
+            const lastGen = Number(cached?.meta?.lastGeneratedAt || 0);
+            peekAiLastGeneratedAt.value = lastGen ? formatTs(lastGen).slice(-5) : '';
             return;
         }
-
-        const charName = char?.nickname || char?.name || 'TA';
-        peekMessages.value = [
-            { id: Date.now() + 1, app: '林然', text: '今晚电影还去吗', at: '22:16' },
-            { id: Date.now() + 2, app: '设计组', text: `${charName}：我把初稿发群里了`, at: '20:03' },
-            { id: Date.now() + 3, app: '快递员', text: '放在驿站了，记得取件', at: '18:44' }
-        ];
-        peekCalls.value = [
-            { id: Date.now() + 4, who: '未知号码', type: 'missed', at: '今天 21:30' },
-            { id: Date.now() + 5, who: '我', type: 'outgoing', at: '今天 10:12' }
-        ];
-        peekNotes.value = [
-            { id: Date.now() + 6, title: '待办', content: '买咖啡豆\n回消息\n整理照片' },
-            { id: Date.now() + 7, title: '灵感', content: '下次见面要聊旅行计划。' }
-        ];
-        peekPhotos.value = samplePhotos(charName);
-        peekFiles.value = [
-            { id: Date.now() + 8, name: 'chat_export.txt', size: '18 KB' },
-            { id: Date.now() + 9, name: 'plan.md', size: '4 KB' },
-            { id: Date.now() + 10, name: 'trip.png', size: '2.1 MB' }
-        ];
-        peekBrowserHistory.value = [
-            { id: Date.now() + 11, title: '如何快速入睡', url: 'example.com/sleep' },
-            { id: Date.now() + 12, title: '附近咖啡店', url: 'example.com/coffee' }
-        ];
-        peekDiaryEntries.value = [];
-        peekBankAccount.value = { balance: 0, monthlySpend: 0, records: [] };
-        peekMapTracks.value = [];
-        peekAiLastGeneratedAt.value = '';
+        phoneState.value = createDefaultPhoneState(char);
+        syncRefsFromPhoneState();
+        await putPhoneState(charId, phoneState.value);
     };
 
     const selectPeekCharacter = (id) => {
         peekSelectedCharacterId.value = String(id || '');
-        peekLocked.value = true;
+        peekLocked.value = false;
         peekInnerApp.value = 'home';
     };
 
@@ -673,6 +897,17 @@ ${chatTranscriptForPrompt || '（无增量聊天内容）'}
     const getPeekAppName = (appId) => {
         const hit = APP_DEFS.find((a) => a.id === appId);
         return hit ? hit.name : '应用';
+    };
+
+    const getPeekBadgeCount = (appId) => {
+        const id = String(appId || '');
+        if (!id) return 0;
+        if (id === 'messages') return Number(peekWidgetUnreadCount.value || 0) || 0;
+        if (id === 'mail') {
+            const rows = Array.isArray(peekMailThreads.value) ? peekMailThreads.value : [];
+            return rows.reduce((sum, t) => sum + (t?.unread ? 1 : 0), 0);
+        }
+        return 0;
     };
 
     const unlockPeek = () => {
@@ -700,7 +935,8 @@ ${chatTranscriptForPrompt || '（无增量聊天内容）'}
         return false;
     };
     const lockPeek = () => {
-        peekLocked.value = true;
+        // 锁屏入口已删除，lockPeek 保持为“无操作”
+        peekLocked.value = false;
         peekPasscodeInput.value = '';
         peekLockHint.value = ' ';
     };
@@ -754,32 +990,39 @@ ${chatTranscriptForPrompt || '（无增量聊天内容）'}
             peekDiaryEntries,
             peekBankAccount,
             peekMapTracks,
+            peekTodoItems,
+            peekCalendarEvents,
+            peekWallet,
+            peekHealth,
+            peekMailThreads,
             peekAiLastGeneratedAt
         ],
         () => {
             const charId = String(peekSelectedCharacterId.value || '');
-            if (!charId) return;
-            savePeekCharData(charId, {
-                peekMessages: peekMessages.value,
-                peekCalls: peekCalls.value,
-                peekNotes: peekNotes.value,
-                peekPhotos: peekPhotos.value,
-                peekFiles: peekFiles.value,
-                peekBrowserHistory: peekBrowserHistory.value,
-                peekDiaryEntries: peekDiaryEntries.value,
-                peekBankAccount: peekBankAccount.value,
-                peekMapTracks: peekMapTracks.value,
-                peekAiLastGeneratedAt: peekAiLastGeneratedAt.value
-            });
+            if (!charId || !phoneState.value) return;
+            syncPhoneStateFromRefs();
+            putPhoneState(charId, phoneState.value).catch(() => {});
         },
         { deep: true }
     );
 
     watch([peekSelectedCharacterId, peekDark], () => {
-        saveState({
+        globalState.value = {
             peekSelectedCharacterId: peekSelectedCharacterId.value,
             peekDark: peekDark.value
-        });
+        };
+        putGlobalState(globalState.value).catch(() => {});
+    });
+
+    onMounted(async () => {
+        try { await migratePeekLocalStorageToIdb(); } catch { /* ignore */ }
+        try {
+            const g = await getGlobalState();
+            if (g && typeof g === 'object') globalState.value = g;
+        } catch { /* ignore */ }
+        peekSelectedCharacterId.value = String(globalState.value.peekSelectedCharacterId || '');
+        peekDark.value = globalState.value.peekDark !== false;
+        isPeekHydrated.value = true;
     });
 
     return {
@@ -800,8 +1043,14 @@ ${chatTranscriptForPrompt || '（无增量聊天内容）'}
         peekDiaryEntries,
         peekBankAccount,
         peekMapTracks,
+        peekTodoItems,
+        peekCalendarEvents,
+        peekWallet,
+        peekHealth,
+        peekMailThreads,
         peekAiLastGeneratedAt,
         peekAiGenerating,
+        peekAiError,
         peekApps,
         peekHomeApps,
         filteredPeekApps,
@@ -819,6 +1068,7 @@ ${chatTranscriptForPrompt || '（无增量聊天内容）'}
         openPeekInnerApp,
         closePeekInnerApp,
         getPeekAppName,
+        getPeekBadgeCount,
         peekFormatAmount,
         generatePeekLinkedData,
         unlockPeek,
@@ -830,6 +1080,7 @@ ${chatTranscriptForPrompt || '（无增量聊天内容）'}
         peekEffectivePasscode,
         appendPeekPasscodeDigit,
         removePeekPasscodeDigit,
-        clearPeekPasscodeInput
+        clearPeekPasscodeInput,
+        isPeekHydrated
     };
 }
