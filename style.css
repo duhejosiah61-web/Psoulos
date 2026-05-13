@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400;1,600&family=Inter:wght@400;600&display=swap');
+
 /* Reset & Base - 高端杂志风格 */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -10,6 +12,8 @@
     --safe-area-bottom: env(safe-area-inset-bottom);
     --safe-area-left: env(safe-area-inset-left);
     --safe-area-right: env(safe-area-inset-right);
+    /* 主屏：与 .status-bar 占位一致（桌面无 env 时仍留出顶栏高度，避免内容被遮挡） */
+    --sp-home-status-reserve: calc(48px + env(safe-area-inset-top, 0px));
     
     --spacing-xs: 2%;
     --spacing-sm: 3%;
@@ -1047,7 +1051,8 @@ body {
     overflow: visible;
     transition: transform 0.3s ease;
     box-sizing: border-box;
-    touch-action: none;
+    touch-action: pan-y;
+    will-change: transform;
     -webkit-overflow-scrolling: touch;
     -ms-overflow-style: none;
     scrollbar-width: none;
@@ -1425,9 +1430,6 @@ body {
     height: 100%;
 }
 
-/* 引入字体 */
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,600&family=Inter:wght@400;600&display=swap');
-
 :root {
   /* 让灵动岛/胶囊背景变为真正“半透明玻璃”，底图可以透出来 */
   --panel-bg: #000000;
@@ -1686,9 +1688,6 @@ body {
     font-weight: 500;
     text-align: center;
 }
-
-/* 引入高级衬线体 */
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;1,400&display=swap');
 
 :root {
     --main-color: #ffffff;
@@ -6584,6 +6583,11 @@ label {
     align-items: center;
 }
 
+.message.system-message .message-avatar,
+.message.call-message .message-avatar {
+    display: none !important;
+}
+
 .message.system-message .bubble {
     background: rgba(0, 0, 0, 0.05) !important;
     color: #999999 !important;
@@ -6971,11 +6975,21 @@ label {
 .message-time {
     font-size: 10px;
     color: #666666;
-    margin-top: 8px;
+    margin: 0 auto 4px;
     font-family: 'Inter', sans-serif;
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 1px;
+    text-align: center;
+    align-self: center;
+    width: 100%;
+}
+
+.system-time-divider {
+    max-width: none;
+    padding: 2px 10px;
+    color: rgba(0, 0, 0, 0.45);
+    font-style: italic;
 }
 
 .message-status {
@@ -9261,25 +9275,37 @@ label {
 /* Novel Mode (Offline) - Pure Novel Style */
 .wechat-messages.novel-mode {
     background: #f8f5f0;
-    padding: 32px 32px 120px;
-    font-family: 'Playfair Display', Georgia, serif;
-    line-height: 1.8;
-    background-image: linear-gradient(#e0e0e0 1px, transparent 1px);
-    background-size: 100% 32px;
-    background-position: 0 16px;
+    padding: 34px 34px 120px;
+    font-family: 'Playfair Display', 'Noto Serif SC', 'Songti SC', Georgia, serif;
+    line-height: 2;
+    background-image: none !important;
     overflow-y: auto;
+}
+
+.wechat-messages.novel-mode .message {
+    display: block;
+    margin: 0 0 18px;
+    padding: 0;
+}
+
+.wechat-messages.novel-mode .message-avatar,
+.wechat-messages.novel-mode .message-status,
+.wechat-messages.novel-mode .bubble,
+.wechat-messages.novel-mode .group-sender-name {
+    display: none !important;
 }
 
 .novel-text {
     font-size: 16px;
     color: #2c2c2c;
-    margin: 16px 0;
+    margin: 0;
     padding: 0;
     background: transparent;
     border: none;
     border-radius: 0;
     box-shadow: none;
     position: relative;
+    text-indent: 2em;
 }
 
 .novel-char-name {
@@ -21092,12 +21118,26 @@ label {
     left: 50%;
     top: auto;
     bottom: 0;
+    /* 仅裁切水平方向：避免相邻页漏边；不要用 overflow:hidden 以免裁掉 translateX 后的第 2/3 页 */
+    overflow-x: hidden;
+    overflow-y: visible;
     /* 预留底部 UI（翻页器 + Dock）高度，避免遮住第5-6行 */
     --home-bottom-gap: clamp(120px, calc(18vh + env(safe-area-inset-bottom)), 190px);
-    /* 关键：用 100dvh 并扣掉顶部/底部安全区，确保横屏宽屏也能完整显示 */
+    /*
+     * 缩放高度预算：必须减去顶部固定状态栏 + 底部安全区（状态栏为 position:absolute，不占文档流）
+     * 使用 min(100dvh, 100svh) 缓解部分桌面/移动浏览器地址栏导致的裁切
+     */
+    --sp-home-vh-budget: min(100dvh, 100vh);
     --phone-scale: min(
-        calc(100vw / 430px),
-        calc((100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) / 930px)
+        calc((100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)) / 430px),
+        calc(
+            (
+                var(--sp-home-vh-budget)
+                - var(--sp-home-status-reserve)
+                - max(env(safe-area-inset-bottom), 0px)
+                - 10px
+            ) / 930px
+        )
     );
     transform: translateX(-50%) scale(var(--phone-scale));
     transform-origin: center bottom;
@@ -21107,11 +21147,16 @@ label {
 .home-pages {
     width: 100%;
     flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
     display: flex;
-    overflow: visible !important;
+    /* 只裁 X：保留纵向给 grid；hidden 会导致多页横滑后内容被整块裁没 */
+    overflow-x: visible;
+    overflow-y: visible;
     transition: transform 0.3s ease;
     box-sizing: border-box;
-    touch-action: none;
+    touch-action: pan-y;
+    will-change: transform;
     -webkit-overflow-scrolling: touch;
     -ms-overflow-style: none;
     scrollbar-width: none;
@@ -21134,11 +21179,11 @@ label {
     scrollbar-color: #000000 #f5f5f5;
 }
 
-/* 页面指示器：固定在舞台内靠近底部，但不压到第5-6行 */
+/* 页面指示器：固定在舞台内靠近底部，但不压到第5-6行（坐标在 930px 画布内，不再叠加 env 以免与全局缩放重复） */
 .page-indicator-container {
     position: absolute !important;
     left: 50% !important;
-    bottom: calc(110px + env(safe-area-inset-bottom)) !important;
+    bottom: 112px !important;
     transform: translateX(-50%) !important;
     display: flex;
     align-items: center;
@@ -21150,11 +21195,11 @@ label {
     flex: 0 0 auto;
 }
 
-/* Dock：贴住舞台最底部中间 */
+/* Dock：贴住舞台最底部中间（画布内像素；安全区已在 --phone-scale 中扣除） */
 .dock {
     position: absolute !important;
     left: 50% !important;
-    bottom: calc(20px + env(safe-area-inset-bottom)) !important;
+    bottom: 18px !important;
     transform: translateX(-50%) !important;
     width: auto;
     min-width: 320px;

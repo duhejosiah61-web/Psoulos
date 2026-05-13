@@ -27,6 +27,8 @@ export function setupApp() {
     console.log('setup start'); 
     
     const lock = useLockScreen();
+    /** useChat 仍接收 isGuest ref；已不再使用账号体系，恒为 false */
+    const chatIsGuestStub = ref(false);
     const theme = useTheme();
     const {
         fonts,
@@ -273,16 +275,12 @@ export function setupApp() {
         const deviceNetworkOnline = ref(true);
         const openedApp = ref(null);
         
-        // 主屏幕状态 - 必须在openedApp定义之后
+        // 主屏幕状态 - 必须在openedApp定义之后（无账号门闸：解锁且无打开应用即显示）
         const isHomeScreenVisible = computed(
             () =>
-                (lock.isLoggedIn.value || lock.isGuest.value) &&
                 !lock.isLockScreenVisible.value &&
                 !openedApp.value
         );
-
-        /** 游客仅可使用 SoulLink（chat）与 Dock：Workshop / Console / Theme / Notice */
-        // const GUEST_ALLOWED_APPS = new Set(['chat', 'soullink', 'workshop', 'console', 'theme', 'notice']);
 
         const randomHexCode = ref('0x00000000');
         const isPlaying = ref(false);
@@ -850,6 +848,12 @@ export function setupApp() {
         watch(worldbooks, saveWorldbooks, { deep: true });
         watch(presets, savePresets, { deep: true });
         watch(profiles, () => saveProfiles(true), { deep: true });
+        watch(activeProfileId, (id) => {
+            try {
+                if (id != null) localStorage.setItem('soulos_active_api_profile_id', String(id));
+            } catch { /* ignore */ }
+            saveProfiles(true);
+        });
 
         // --- COMPUTED PROPERTIES ---
 
@@ -869,11 +873,6 @@ export function setupApp() {
         
         const openApp = (appName) => {
             const normalizedName = appName ? appName.toLowerCase() : null;
-            // 游客限制（开发时注释）
-            // if (lock.isGuest.value && normalizedName && !GUEST_ALLOWED_APPS.has(normalizedName)) {
-            //     alert('游客模式仅可使用 Chat（SoulLink）与底部 Dock 内应用。\n请使用 Discord 登录以使用全部功能。');
-            //     return;
-            // }
             openedApp.value = normalizedName;
             console.log(`[System] Opening App: ${normalizedName}`);
             
@@ -895,29 +894,8 @@ export function setupApp() {
             }
         };
 
-        // 游客限制：自动关闭非白名单应用（开发时注释）
-        // watch(
-        //     () => [lock.isGuest.value, openedApp.value],
-        //     () => {
-        //         const app = openedApp.value;
-        //         if (!lock.isGuest.value || !app) return;
-        //         if (!GUEST_ALLOWED_APPS.has(String(app).toLowerCase())) {
-        //             openedApp.value = null;
-        //         }
-        //     }
-        // );
-
         const closeApp = () => {
             openedApp.value = null;
-        };
-
-        /** 主题内：退出 SoulPocket 账号（Discord / 游客），回到登录页 */
-        const onSoulPocketAccountExit = () => {
-            try {
-                lock.logout();
-            } finally {
-                closeApp();
-            }
         };
 
         const goBack = () => {
@@ -1484,6 +1462,8 @@ export function setupApp() {
         const onProfileSelect = () => {
             availableModels.value = [];
             if (activeProfile.value) {
+                try { localStorage.setItem('soulos_active_api_profile_id', String(activeProfile.value.id)); } catch {}
+                saveProfiles(true);
                 addConsoleLog(`已切换到配置：「${activeProfile.value.name}」`, 'info');
             }
         };
@@ -1643,7 +1623,7 @@ export function setupApp() {
             feed,
             chatSettings,
             userAvatar,
-            lock.isGuest,
+            chatIsGuestStub,
             {
                 openedApp,
                 saveSoulLinkMessages: () => chatPersistence.saveSoulLinkMessages(),
@@ -2333,7 +2313,6 @@ export function setupApp() {
             soulLinkTab.value = 'msg';
             if (!soulLinkMessages.value[charId]) {
                 soulLinkMessages.value[charId] = [];
-                sendOnlineModeGreeting();
             }
             loadChatMenuSettings();
             markActiveChatAiMessagesRead();
@@ -2377,7 +2356,7 @@ export function setupApp() {
                 });
             }
             const messages = soulLinkMessages.value[soulLinkActiveChat.value] || [];
-            return messages.filter((m) => !m.isHidden);
+            return messages.filter((m) => m && !m.isHidden && (m.isSystem || m.isCallMessage || m.messageType || String(m.text || '').replace(/\u200b/g, '').trim() || String(m.osContent || '').trim()));
         });
         const currentChatMessages = computed(() => activeChatMessages.value);
 
@@ -3195,7 +3174,7 @@ ${styleGuide}
                     entry.status = 'failed';
                     entry.body = '总结失败（可稍后再试）。';
                 } finally {
-                    // 持久化更新
+                    callDiaryRecords.value = { ...callDiaryRecords.value };
                     saveCallDiaryRecords();
                 }
             })();
@@ -3275,9 +3254,9 @@ ${styleGuide}
             if (!soulLinkActiveChat.value) return;
             const isVideo = callType.value === 'video';
             const diaryEntry = await createCallDiaryEntry();
-            pushMessageToActiveChat({
+            const callMessage = {
                 id: Date.now(),
-                sender: 'ai',
+                sender: 'system',
                 messageType: 'call',
                 callType: callType.value,
                 isCallMessage: true,
@@ -3286,7 +3265,35 @@ ${styleGuide}
                 callDiaryId: diaryEntry?.id || null,
                 callDiaryHint: diaryEntry ? '正在总结...（可点开查看）' : '',
                 timestamp: Date.now()
-            });
+            };
+            pushMessageToActiveChat(callMessage);
+            const updateCallDiaryHint = (hint) => {
+                callMessage.callDiaryHint = hint;
+                syncActiveChatState();
+                persistActiveChat();
+            };
+            if (diaryEntry?.status === 'ready') {
+                updateCallDiaryHint('总结完成（可点开查看）');
+            } else if (diaryEntry?.status === 'failed') {
+                updateCallDiaryHint('总结失败（可点开查看）');
+            } else if (diaryEntry?.id) {
+                const startedAt = Date.now();
+                const timer = setInterval(() => {
+                    const key = getCallDiaryKey();
+                    const list = Array.isArray(callDiaryRecords.value[key]) ? callDiaryRecords.value[key] : [];
+                    const found = list.find((x) => String(x.id) === String(diaryEntry.id));
+                    if (found?.status === 'ready') {
+                        clearInterval(timer);
+                        updateCallDiaryHint('总结完成（可点开查看）');
+                    } else if (found?.status === 'failed') {
+                        clearInterval(timer);
+                        updateCallDiaryHint('总结失败（可点开查看）');
+                    } else if (Date.now() - startedAt > 90000) {
+                        clearInterval(timer);
+                        updateCallDiaryHint('总结生成较慢（可点开查看）');
+                    }
+                }, 800);
+            }
             syncActiveChatState();
             persistActiveChat();
         };
@@ -3492,7 +3499,24 @@ ${styleGuide}
             }
         };
 
-        const updateChatBackground = () => chatSettings.updateChatBackground();
+        const chatBackgroundInlineStyle = computed(() => {
+            const style = chatSettings.chatBackgroundStyle?.value || chatSettings.chatBackgroundStyle || 'default';
+            if (style === 'gradient') {
+                return { background: `linear-gradient(135deg, ${chatSettings.gradientStartColor?.value || chatSettings.gradientStartColor} 0%, ${chatSettings.gradientEndColor?.value || chatSettings.gradientEndColor} 100%)` };
+            }
+            if (style === 'color') {
+                return { background: chatSettings.solidBackgroundColor?.value || chatSettings.solidBackgroundColor || '#f2f2f7' };
+            }
+            const image = chatSettings.chatBackgroundImage?.value || chatSettings.chatBackgroundImage || '';
+            if (style === 'image' && image) {
+                return { background: `url(${image}) center/cover no-repeat` };
+            }
+            return {};
+        });
+        const updateChatBackground = () => {
+            chatSettings.updateChatBackground();
+            chatSettings.saveChatMenuSettings();
+        };
         const selectBackgroundImage = () => {
             const input = document.createElement('input');
             input.type = 'file';
@@ -3510,6 +3534,7 @@ ${styleGuide}
                     chatSettings.chatBackgroundImageInput.value = compressedDataUrl;
                     chatSettings.chatBackgroundStyle.value = 'image';
                     chatSettings.updateChatBackground();
+                    chatSettings.saveChatMenuSettings();
                 });
             };
             reader.readAsDataURL(file);
@@ -4122,7 +4147,7 @@ ${styleGuide}
             manualSummarizeChat,
             clearChatSummaryBoard,
             shouldShowTimeDivider,
-            updateChatBackground, selectBackgroundImage, handleBackgroundImageSelect, applyBackgroundImageLink, clearBackgroundImage, chatSettingsPanelStyle,
+            updateChatBackground, chatBackgroundInlineStyle, selectBackgroundImage, handleBackgroundImageSelect, applyBackgroundImageLink, clearBackgroundImage, chatSettingsPanelStyle,
             // Profile & Navigation
             profileChar, viewCharacterProfile, goBackInSoulLink, showProfile, showChatMenu,
             // New Input Logic
@@ -4138,7 +4163,7 @@ ${styleGuide}
             showImageCropModal, imageCropSource, imageCropRect, imageCropScale, imageCropCanvasAspect,
             closeImageCropModal, confirmImageCrop, onImageCropDragStart, onImageCropScaleChange,
             // App Launch
-            openApp, closeApp, onSoulPocketAccountExit, goBack, openGame, joinGame, startGameSession, castVote, endDay, closeGame, getAppIcon,
+            openApp, closeApp, goBack, openGame, joinGame, startGameSession, castVote, endDay, closeGame, getAppIcon,
             // Console
             profiles, activeProfileId, activeProfile, apiStatus,
             availableModels, fetchingModels, consoleLogs,
@@ -4305,13 +4330,6 @@ ${styleGuide}
             saveLockWallpaper: lock.saveLockWallpaper,
             lockDateTimeColor: lock.lockDateTimeColor,
             saveLockDateTimeColor: lock.saveLockDateTimeColor,
-            isLoggedIn: lock.isLoggedIn,
-            discordUser: lock.discordUser,
-            isLoading: lock.isLoading,
-            loginWithDiscord: lock.loginWithDiscord,
-            loginAsGuest: lock.loginAsGuest,
-            isGuest: lock.isGuest,
-            logout: lock.logout,
             // home (non-lockscreen) style functions
             homeWallpaper, homeWallpaperInput, saveHomeWallpaper, homeTextColor, homeTextColorInput, saveHomeTextColor,
             enableHomeGlass, toggleHomeGlass,

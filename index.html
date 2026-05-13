@@ -22,7 +22,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Long+Cang&family=ZCOOL+XiaoWei&family=Playfair+Display:wght@400;600;700;800&family=Inter:wght@400;500;600&family=Caveat:wght@400;500;600&display=swap">
     <link rel="stylesheet" href="main.css?v=uno2026043">
-    <link rel="stylesheet" href="style.css?v=uno2026044">
+    <link rel="stylesheet" href="style.css?v=uno2026045">
     <link rel="stylesheet" href="cal.css?v=uno2026044">
     
     <script type="importmap">
@@ -39,26 +39,6 @@
         v-cloak
         :class="{ 'home-notch-off': !enableNotchAdaptation }"
     >
-        <!-- SoulPocket 登录（开发：已注释，逻辑在 composables/useAuth.js）
-        <div class="login-screen" v-if="!isLoggedIn && !isGuest">
-            <div class="login-screen-aurora" aria-hidden="true"></div>
-            <div class="login-screen-grid" aria-hidden="true"></div>
-            <div class="login-container login-card">
-                <div class="login-brand-wrap">
-                    <h1 class="login-brand">SoulPocket</h1>
-                    <span class="login-brand-line" aria-hidden="true"></span>
-                </div>
-                <p class="login-welcome">欢迎回来</p>
-                <p class="login-hint">登录后使用完整功能；也可先以游客体验<span class="login-hint-accent">（仅 Chat 与 Dock）</span></p>
-                <button type="button" @click="loginWithDiscord" class="discord-btn" :disabled="isLoading">
-                    <i class="fab fa-discord" aria-hidden="true"></i>
-                    <span>{{ isLoading ? '登录中…' : '用 Discord 登录' }}</span>
-                </button>
-                <button type="button" class="guest-btn" @click="loginAsGuest">游客进入</button>
-            </div>
-        </div>
-        -->
-
         <!-- 锁屏毛玻璃背景 -->
         <div v-if="isLockScreenVisible" class="lock-screen-background-blur"></div>
         <!-- 锁屏界面 -->
@@ -159,12 +139,11 @@
                 <div class="home-pages" ref="homePages" style="cursor: grab;">
                     <!-- 最左页：角色手机模拟 -->
                     <div class="home-page home-page-left-peek" :class="{ 'active': currentPage === 0 }">
-                        <template v-if="!isGuest">
                         <div class="grid-6x4">
                             <div class="grid-cell grid-row-1-6 left-peek-cell">
                                 <div class="left-peek-container" :class="{ dark: peek.peekDark }">
                                     <div class="left-peek-toolbar">
-                                        <select class="left-peek-select" :value="peek.peekSelectedCharacterId" @change="peek.selectPeekCharacter($event.target.value)">
+                                        <select name="sp_field_1" id="sp-field-1" class="left-peek-select" :value="peek.peekSelectedCharacterId" @change="peek.selectPeekCharacter($event.target.value)">
                                             <option value="">选择角色手机</option>
                                             <option v-for="char in characters" :key="char.id" :value="char.id">
                                                 {{ char.nickname || char.name || '未命名' }}
@@ -400,14 +379,6 @@
                                 </div>
                             </div>
                         </div>
-                        </template>
-                        <div v-else class="grid-6x4 guest-peek-placeholder-wrap">
-                            <div class="grid-cell grid-row-1-6 left-peek-cell guest-peek-placeholder">
-                                <p class="guest-peek-title">游客模式</p>
-                                <p>此页（角色 Peek）不可用</p>
-                                <p class="guest-peek-hint">向右滑动进入主屏</p>
-                            </div>
-                        </div>
                     </div>
                     <!-- 第一页 -->
                     <div class="home-page" :class="{ 'active': currentPage === 1 }">
@@ -459,19 +430,19 @@
                                         </div>
                                         <div class="app-label">Chat</div>
                                     </div>
-                                    <div class="app-icon" :class="{ 'app-icon--guest-off': isGuest }" @click="openApp('games')">
+                                    <div class="app-icon" @click="openApp('games')">
                                         <div class="app-icon-wrapper">
                                             <i class="fa fa-gamepad app-icon-font"></i>
                                         </div>
                                         <div class="app-label">Games</div>
                                     </div>
-                                    <div class="app-icon" :class="{ 'app-icon--guest-off': isGuest }" @click="openApp('live')">
+                                    <div class="app-icon" @click="openApp('live')">
                                         <div class="app-icon-wrapper">
                                             <i class="fa fa-microphone app-icon-font"></i>
                                         </div>
                                         <div class="app-label">Live</div>
                                     </div>
-                                    <div class="app-icon" :class="{ 'app-icon--guest-off': isGuest }" @click="openApp('ember')">
+                                    <div class="app-icon" @click="openApp('ember')">
                                         <div class="app-icon-wrapper">
                                             <i class="fa fa-fire app-icon-font"></i>
                                         </div>
@@ -479,11 +450,11 @@
                                     </div>
                                 </div>
 
+                            </div>
                         </div>
-                                </div>
-                        </div>
-                </div>
-                
+                    </div>
+                    </div>
+
                 <!-- 第二页 -->
                 <div class="home-page page-2-grid" :class="{ 'active': currentPage === 2 }">
                     <div class="grid-6x4">
@@ -577,25 +548,25 @@
                         <!-- 第5-6行：app和胶囊框 (2行×4格) -->
                         <div class="grid-cell grid-row-5-6">
                             <div class="app-grid-bottom-left">
-                                <div class="app-icon" :class="{ 'app-icon--guest-off': isGuest }" @click="openApp('mate')">
+                                <div class="app-icon" @click="openApp('mate')">
                                     <div class="app-icon-wrapper">
                                         <i class="fa fa-user app-icon-font"></i>
                                     </div>
                                     <div class="app-label">Mate</div>
                                 </div>
-                                <div class="app-icon" :class="{ 'app-icon--guest-off': isGuest }" @click="openApp('read')">
+                                <div class="app-icon" @click="openApp('read')">
                                     <div class="app-icon-wrapper">
                                         <i class="fa fa-book-open app-icon-font"></i>
                                     </div>
                                     <div class="app-label">Read</div>
                                 </div>
-                                <div class="app-icon" :class="{ 'app-icon--guest-off': isGuest }" @click="openApp('feed')">
+                                <div class="app-icon" @click="openApp('feed')">
                                     <div class="app-icon-wrapper">
                                         <i class="fa fa-list app-icon-font"></i>
                                     </div>
                                     <div class="app-label">Feed</div>
                                 </div>
-                                <div class="app-icon" :class="{ 'app-icon--guest-off': isGuest }" @click="openApp('nest')">
+                                <div class="app-icon" @click="openApp('nest')">
                                     <div class="app-icon-wrapper">
                                         <i class="fa fa-home app-icon-font"></i>
                                     </div>
@@ -614,9 +585,9 @@
                             </div>
                         </div>
                     </div>
-                    </div>
                 </div>
-                
+                </div>
+
                 <!-- 页面指示器和翻页箭头（固定在 homescreen-inner 内部） -->
                 <div
                     class="page-indicator-container"
@@ -698,7 +669,7 @@
                 <!-- 角色列表 -->
                 <div v-if="soulLinkTab === 'msg'" class="wechat-list" style="flex: 1; overflow-y: auto; padding-bottom: 80px;">
                     <div v-for="char in characters" :key="char.id" class="wechat-item" @click="startSoulLinkChat(char.id)">
-                        <img :src="char.avatarUrl || 'https://placehold.co/100x100?text=No+Avatar'" class="wechat-avatar">
+                        <img :src="char.avatarUrl || char.avatar || char.image || char.icon || char.coverUrl || 'https://placehold.co/100x100?text=Avatar'" class="wechat-avatar">
                         <div class="wechat-info">
                             <div class="wechat-name-row">
                                 <span class="wechat-name">{{ char.nickname || char.name }}</span>
@@ -817,7 +788,7 @@
                         <div class="call-bottom-area">
                             <!-- 文字输入框 -->
                             <div class="call-text-input-bar">
-                                <input type="text" v-model="callInputText" @keyup.enter="sendCallText" placeholder="输入消息...">
+                                <input name="sp_field_2" id="sp-field-2" type="text" v-model="callInputText" @keyup.enter="sendCallText" placeholder="输入消息...">
                                 <button class="call-send-btn" @click="sendCallText">
                                     <i class="fas fa-paper-plane"></i>
                                 </button>
@@ -925,7 +896,7 @@
                         <div class="video-magazine-bottom">
                             <!-- 文字输入框 -->
                             <div class="video-call-input-bar">
-                                <input type="text" v-model="callInputText" @keyup.enter="sendCallText" placeholder="输入消息...">
+                                <input name="sp_field_3" id="sp-field-3" type="text" v-model="callInputText" @keyup.enter="sendCallText" placeholder="输入消息...">
                                 <button class="video-call-send-btn" @click="sendCallText">
                                     <i class="fas fa-paper-plane"></i>
                                 </button>
@@ -949,16 +920,20 @@
 
                 <!-- 普通聊天 -->
                 <template v-else>
-                    <div class="wechat-messages" :class="{ 'novel-mode': isOfflineMode, 'group-chat': soulLinkActiveChatType === 'group' }" ref="chatMessagesContainer" @click="onChatBackgroundClick">
-                        <div v-for="(msg, index) in currentChatMessages" :key="index" class="message" :class="[msg.sender, { 'novel-message': isOfflineMode, 'call-message': msg.isCallMessage, 'special-card-message': msg.messageType === 'location' || msg.messageType === 'transfer' || msg.messageType === 'textImage' || msg.messageType === 'image' || msg.messageType === 'takeaway' || msg.messageType === 'tarot' || msg.messageType === 'pet' || msg.messageType === 'vote' || msg.messageType === 'order' || msg.messageType === 'helpBuy' || msg.messageType === 'share' || msg.messageType === 'voice' || msg.messageType === 'sticker', 'group-message': soulLinkActiveChatType === 'group', 'system-message': msg.isSystem }]" @contextmenu="onMessageContextMenu($event, msg)" @touchstart="onMessageTouchStart($event, msg)" @touchmove="onMessageTouchMove" @touchend="onMessageTouchEnd" @click.stop>
+                    <div class="wechat-messages" :class="{ 'novel-mode': isOfflineMode, 'group-chat': soulLinkActiveChatType === 'group' }" :style="chatBackgroundInlineStyle" ref="chatMessagesContainer" @click="onChatBackgroundClick">
+                        <template v-for="(msg, index) in currentChatMessages" :key="index">
+                        <div v-if="!isOfflineMode && chatSettings.timeSenseEnabled && shouldShowTimeDivider(index) && msg.timestamp" class="message-time system-time-divider">
+                            {{ formatTime(msg.timestamp, chatSettings.messageTimeNow) }}
+                        </div>
+                        <div class="message" :class="[msg.sender, { 'novel-message': isOfflineMode, 'call-message': msg.isCallMessage, 'special-card-message': msg.messageType === 'location' || msg.messageType === 'transfer' || msg.messageType === 'textImage' || msg.messageType === 'image' || msg.messageType === 'takeaway' || msg.messageType === 'tarot' || msg.messageType === 'pet' || msg.messageType === 'vote' || msg.messageType === 'order' || msg.messageType === 'helpBuy' || msg.messageType === 'share' || msg.messageType === 'voice' || msg.messageType === 'sticker', 'group-message': soulLinkActiveChatType === 'group', 'system-message': msg.isSystem }]" @contextmenu="onMessageContextMenu($event, msg)" @touchstart="onMessageTouchStart($event, msg)" @touchmove="onMessageTouchMove" @touchend="onMessageTouchEnd" @click.stop>
                             <div
-                                v-if="!msg.isSystem && chatSettings.bubbleAvatarMode !== 'hide'"
+                                v-if="!msg.isSystem && !msg.isCallMessage && chatSettings.bubbleAvatarMode !== 'hide'"
                                 class="message-avatar"
                                 :class="{ 'is-hidden-avatar': chatSettings.bubbleAvatarMode === 'first' && !(index === 0 || currentChatMessages[index - 1].sender !== msg.sender || (soulLinkActiveChatType === 'group' && currentChatMessages[index - 1].senderName !== msg.senderName)) }"
                             >
                                 <img
                                     v-if="chatSettings.bubbleAvatarMode === 'all' || (chatSettings.bubbleAvatarMode === 'first' && (index === 0 || currentChatMessages[index - 1].sender !== msg.sender || (soulLinkActiveChatType === 'group' && currentChatMessages[index - 1].senderName !== msg.senderName)))"
-                                    :src="msg.senderAvatar || (msg.sender === 'ai' ? currentChatAvatar : userAvatar) || 'https://placehold.co/60x60?text=?'"
+                                    :src="msg.senderAvatar || (msg.sender === 'ai' ? currentChatAvatar : userAvatar) || 'https://placehold.co/60x60?text=%3F'"
                                     alt="avatar"
                                 >
                             </div>
@@ -978,7 +953,8 @@
                                 </div>
                                 <div v-else-if="msg.messageType === 'image'" class="special-card polaroid-card">
                                     <div class="polaroid-frame">
-                                        <img :src="msg.imageUrl" class="chat-image">
+                                        <img v-if="msg.imageUrl" :src="msg.imageUrl" class="chat-image">
+                                        <div v-else class="polaroid-text">{{ msg.text || '一张照片' }}</div>
                                     </div>
                                     <div class="polaroid-bottom">
                                         <span class="polaroid-date">{{ formatMessageDate(msg.timestamp) }}</span>
@@ -1011,7 +987,7 @@
                                 </div>
                                 <div v-else-if="msg.messageType === 'transfer'" class="special-card transfer-card">
                                     <div class="transfer-card-label">TRANSFER</div>
-                                    <div class="transfer-card-amount">¥ {{ msg.transferAmount || '0.00' }}</div>
+                                    <div class="transfer-card-amount">¥ {{ msg.transferAmount || msg.amount || '0.00' }}</div>
                                     <svg class="transfer-card-coin" viewBox="0 0 40 40" fill="none">
                                         <circle cx="20" cy="20" r="18" stroke="#000000" stroke-width="2" fill="none"/>
                                         <circle cx="20" cy="20" r="12" stroke="#000000" stroke-width="1.5" fill="none"/>
@@ -1151,22 +1127,17 @@
                                 </template>
                             </div>
                             <div v-else class="novel-text">
-                                <span v-if="msg.sender === 'ai'" class="novel-char-name">{{ currentChatName }}：</span>
-                                <span v-else class="novel-char-name">我：</span>
-                                <div class="message-text">{{ msg.text }}</div>
+                                <div class="message-text">{{ msg.sender === 'user' ? '我：' : '' }}{{ msg.text }}</div>
                                 <div v-if="chatSettings.soulLinkForeignTranslationEnabled && msg.replyTranslation" class="reply-translation">
                                     <div class="translation-divider"></div>
                                     <div class="translation-text">{{ msg.replyTranslation }}</div>
                                 </div>
                             </div>
-                            <div v-if="!isOfflineMode && !msg.isCallMessage && !msg.isSystem" class="message-status">
+                            <div v-if="!isOfflineMode && !msg.isCallMessage && !msg.isSystem && (msg.text || msg.messageType)" class="message-status">
                                 <template v-if="msg.sender === 'user'">
                                     <span class="status-check single">✓</span>
                                     <span v-if="msg.isReplied" class="status-check double">✓</span>
                                 </template>
-                            </div>
-                            <div v-if="!isOfflineMode && chatSettings.timeSenseEnabled && !msg.isSystem && shouldShowTimeDivider(index) && msg.timestamp" class="message-time">
-                                {{ formatTime(msg.timestamp, chatSettings.messageTimeNow) }}
                             </div>
                             </div>
                             <div v-if="msg.sender === 'ai' && msg.osContent && !msg.isSystem" 
@@ -1186,6 +1157,7 @@
                                 </svg>
                             </div>
                         </div>
+                        </template>
                         <div v-if="isAiTyping" class="message ai">
                             <div class="bubble typing">
                                 <div class="typing-dots">
@@ -1211,7 +1183,7 @@
                             <button class="action-btn" @click="toggleAttachmentPanel" title="添加">
                                 <i class="fas fa-plus"></i>
                             </button>
-                            <input type="text" v-model="soulLinkInput" @keyup.enter="onSendOrCall" :placeholder="editingMessageId ? '修改消息...' : (isOfflineMode ? '输入消息（线下模式）' : '输入消息...')">
+                            <input name="sp_field_4" id="sp-field-4" type="text" v-model="soulLinkInput" @keyup.enter="onSendOrCall" :placeholder="editingMessageId ? '修改消息...' : (isOfflineMode ? '输入消息（线下模式）' : '输入消息...')">
                             <button class="send-btn" @click="onSendOrCall" title="发送">
                                 <i class="fas fa-paper-plane"></i>
                             </button>
@@ -1307,12 +1279,12 @@
                             <div class="sticker-import-content">
                                 <div class="import-field">
                                     <label>表情包名称</label>
-                                    <input type="text" v-model="newPackName" placeholder="输入表情包名称..." class="pack-name-input">
+                                    <input name="sp_field_5" id="sp-field-5" type="text" v-model="newPackName" placeholder="输入表情包名称..." class="pack-name-input">
                                 </div>
                                 
                                 <div class="import-field">
                                     <label>表情内容</label>
-                                    <textarea v-model="stickerImportText" class="sticker-import-textarea" placeholder="格式示例：
+                                    <textarea name="sp_field_6" id="sp-field-6" v-model="stickerImportText" class="sticker-import-textarea" placeholder="格式示例：
 委屈： https://example.com/1.jpg
 开心： https://example.com/2.jpg"></textarea>
                                 </div>
@@ -1367,12 +1339,12 @@
                         <label>金额</label>
                         <div class="transfer-amount-input">
                             <span class="currency-symbol">¥</span>
-                            <input type="number" v-model="transferAmount" placeholder="0.00" min="0" step="0.01">
+                            <input name="sp_field_7" id="sp-field-7" type="number" v-model="transferAmount" placeholder="0.00" min="0" step="0.01">
                         </div>
                     </div>
                     <div class="transfer-input-group">
                         <label>备注</label>
-                        <input type="text" v-model="transferNote" placeholder="添加转账备注（可选）">
+                        <input name="sp_field_8" id="sp-field-8" type="text" v-model="transferNote" placeholder="添加转账备注（可选）">
                     </div>
                     <button class="transfer-btn" @click="sendTransfer" :disabled="!transferAmount || transferAmount <= 0">确认转账</button>
                 </div>
@@ -1426,7 +1398,7 @@
                         </div>
                         <div class="art-input-wrapper">
                             <label class="art-input-label">我的身份</label>
-                            <input type="text" v-model="chatSettings.userIdentity" class="art-settings-input" placeholder="向ta介绍一下我自己....">
+                            <input name="sp_field_9" id="sp-field-9" type="text" v-model="chatSettings.userIdentity" class="art-settings-input" placeholder="向ta介绍一下我自己....">
                         </div>
                     </div>
 
@@ -1442,7 +1414,7 @@
                         </div>
                         <div class="art-input-wrapper">
                             <label class="art-input-label">我的人称代词</label>
-                            <select v-model="chatSettings.userPronoun" class="art-settings-input">
+                            <select name="sp_field_10" id="sp-field-10" v-model="chatSettings.userPronoun" class="art-settings-input">
                                 <option value="unknown">保密/中性（TA）</option>
                                 <option value="female">女性（她）</option>
                                 <option value="male">男性（他）</option>
@@ -1463,7 +1435,7 @@
                         </div>
                         <div class="art-input-wrapper">
                             <label class="art-input-label">和TA的关系</label>
-                            <input type="text" v-model="chatSettings.userRelation" class="art-settings-input" placeholder="例如：闺蜜、死党...">
+                            <input name="sp_field_11" id="sp-field-11" type="text" v-model="chatSettings.userRelation" class="art-settings-input" placeholder="例如：闺蜜、死党...">
                         </div>
                     </div>
                     
@@ -1473,7 +1445,7 @@
                             <img :src="member.avatarUrl || 'https://placehold.co/100x100?text=No+Avatar'" class="group-member-small-avatar">
                             <div class="group-member-info">
                                 <div class="group-member-name">{{ member.name }}</div>
-                                <input type="text" v-model="member.relation" class="group-member-relation-input" :placeholder="'与' + member.name + '的关系'">
+                                <input name="sp_field_12" id="sp-field-12" type="text" v-model="member.relation" class="group-member-relation-input" :placeholder="'与' + member.name + '的关系'">
                             </div>
                             <button type="button" class="edit-member-btn" @click="openMemberEditor(member)" title="编辑人设与世界书">
                                 <i class="fas fa-pen"></i>
@@ -1523,7 +1495,7 @@
                         <div class="art-input-wrapper">
                             <label class="art-input-label">输出语言(A) / 翻译语言(B)</label>
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                                <select v-model="chatSettings.soulLinkForeignPrimaryLang" class="art-settings-input">
+                                <select name="sp_field_13" id="sp-field-13" v-model="chatSettings.soulLinkForeignPrimaryLang" class="art-settings-input">
                                     <option value="zh-CN">中文(简体)</option>
                                     <option value="zh-TW">中文(繁體)</option>
                                     <option value="en">English</option>
@@ -1542,7 +1514,7 @@
                                     <option value="id">Bahasa Indonesia</option>
                                     <option value="tr">Türkçe</option>
                                 </select>
-                                <select v-model="chatSettings.soulLinkForeignSecondaryLang" class="art-settings-input">
+                                <select name="sp_field_14" id="sp-field-14" v-model="chatSettings.soulLinkForeignSecondaryLang" class="art-settings-input">
                                     <option value="zh-CN">中文(简体)</option>
                                     <option value="zh-TW">中文(繁體)</option>
                                     <option value="en">English</option>
@@ -1582,7 +1554,7 @@
                         </div>
                         <div class="art-input-wrapper">
                             <label class="art-input-label">背景样式</label>
-                            <select v-model="chatSettings.chatBackgroundStyle" class="art-settings-input" @change="updateChatBackground">
+                            <select name="sp_field_15" id="sp-field-15" v-model="chatSettings.chatBackgroundStyle" class="art-settings-input" @change="updateChatBackground(); chatSettings.saveChatMenuSettings()">
                                 <option value="default">默认</option>
                                 <option value="gradient">渐变</option>
                                 <option value="color">纯色</option>
@@ -1602,8 +1574,8 @@
                         <div class="art-input-wrapper">
                             <label class="art-input-label">渐变颜色</label>
                             <div style="display:flex; gap:10px; align-items:center;">
-                                <input type="color" v-model="chatSettings.gradientStartColor" class="art-settings-input" @input="updateChatBackground" style="padding:6px; height:40px;">
-                                <input type="color" v-model="chatSettings.gradientEndColor" class="art-settings-input" @input="updateChatBackground" style="padding:6px; height:40px;">
+                                <input name="sp_field_16" id="sp-field-16" type="color" v-model="chatSettings.gradientStartColor" class="art-settings-input" @input="updateChatBackground(); chatSettings.saveChatMenuSettings()" style="padding:6px; height:40px;">
+                                <input name="sp_field_17" id="sp-field-17" type="color" v-model="chatSettings.gradientEndColor" class="art-settings-input" @input="updateChatBackground(); chatSettings.saveChatMenuSettings()" style="padding:6px; height:40px;">
                             </div>
                         </div>
                     </div>
@@ -1616,7 +1588,7 @@
                         </div>
                         <div class="art-input-wrapper">
                             <label class="art-input-label">纯色</label>
-                            <input type="color" v-model="chatSettings.solidBackgroundColor" class="art-settings-input" @input="updateChatBackground" style="padding:6px; height:40px;">
+                            <input name="sp_field_18" id="sp-field-18" type="color" v-model="chatSettings.solidBackgroundColor" class="art-settings-input" @input="updateChatBackground(); chatSettings.saveChatMenuSettings()" style="padding:6px; height:40px;">
                         </div>
                     </div>
                     <div v-if="chatSettings.chatBackgroundStyle === 'image'" class="art-settings-input-item">
@@ -1629,7 +1601,7 @@
                         </div>
                         <div class="art-input-wrapper">
                             <label class="art-input-label">图片链接 / 相册</label>
-                            <input type="text" v-model="chatSettings.chatBackgroundImageInput" class="art-settings-input" placeholder="https://... 或 data:image/...">
+                            <input name="sp_field_19" id="sp-field-19" type="text" v-model="chatSettings.chatBackgroundImageInput" class="art-settings-input" placeholder="https://... 或 data:image/...">
                             <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
                                 <button class="btn-small" @click="applyBackgroundImageLink">应用链接</button>
                                 <button class="btn-small" @click="selectBackgroundImage">从相册选择</button>
@@ -1669,7 +1641,7 @@
                         </div>
                         <div class="art-input-wrapper">
                             <label class="art-input-label">模块 1：头像</label>
-                            <select v-model="chatSettings.bubbleAvatarMode" class="art-settings-input">
+                            <select name="sp_field_20" id="sp-field-20" v-model="chatSettings.bubbleAvatarMode" class="art-settings-input">
                                 <option value="hide">隐藏头像</option>
                                 <option value="first">连续消息只显示第一个</option>
                                 <option value="all">头像全显</option>
@@ -1688,7 +1660,7 @@
                         </div>
                         <div class="art-input-wrapper">
                             <label class="art-input-label">模块 2：气泡形状</label>
-                            <select v-model="chatSettings.bubbleShapeMode" class="art-settings-input" @change="applyBubbleStyle">
+                            <select name="sp_field_21" id="sp-field-21" v-model="chatSettings.bubbleShapeMode" class="art-settings-input" @change="applyBubbleStyle">
                                 <option value="round">圆弧（圆角）</option>
                                 <option value="sharp">直角（锐角）</option>
                             </select>
@@ -1706,7 +1678,7 @@
                         </div>
                         <div class="art-input-wrapper">
                             <label class="art-input-label">模块 3：气泡颜色（对比色）</label>
-                            <select v-model="chatSettings.bubbleColorPreset" class="art-settings-input" @change="applyBubbleStyle">
+                            <select name="sp_field_22" id="sp-field-22" v-model="chatSettings.bubbleColorPreset" class="art-settings-input" @change="applyBubbleStyle">
                                 <option value="default">对比色 1（黑 + 浅灰）</option>
                                 <option value="blue">对比色 2（黑 + 蓝调）</option>
                                 <option value="orange">对比色 3（黑 + 橙暖）</option>
@@ -1727,7 +1699,7 @@
                         </div>
                         <div class="art-input-wrapper" style="width: 100%;">
                             <label class="art-input-label">模块 4：自定义 CSS</label>
-                            <textarea v-model="chatSettings.customBubbleCSS" class="art-settings-input" rows="4"
+                            <textarea name="sp_field_23" id="sp-field-23" v-model="chatSettings.customBubbleCSS" class="art-settings-input" rows="4"
                                 placeholder="例如：background:#111;color:#fff;border-radius:16px; box-shadow:none;"
                                 style="margin-top:8px; resize: vertical;"></textarea>
                             <div style="margin-top:8px;">
@@ -1757,7 +1729,7 @@
                             </div>
                             <div v-if="chatSettings.chatSummaryEnabled" style="margin-top: 10px; display: flex; align-items: center; gap: 10px;">
                                 <span style="font-size: 13px; color: rgba(0,0,0,.65);">每</span>
-                                <input type="number" v-model.number="chatSettings.chatSummaryEveryN" min="1" step="1" class="art-settings-input" style="max-width: 110px;">
+                                <input name="sp_field_24" id="sp-field-24" type="number" v-model.number="chatSettings.chatSummaryEveryN" min="1" step="1" class="art-settings-input" style="max-width: 110px;">
                                 <span style="font-size: 13px; color: rgba(0,0,0,.65);">次对话自动总结一次</span>
                             </div>
                             <div style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap;">
@@ -1835,7 +1807,7 @@
                         </div>
                         <div class="art-input-wrapper">
                             <label class="art-input-label">用户时区</label>
-                            <input type="text" v-model="chatSettings.userTimeZone" class="art-settings-input" placeholder="例如：Asia/Shanghai 或 UTC+8">
+                            <input name="sp_field_25" id="sp-field-25" type="text" v-model="chatSettings.userTimeZone" class="art-settings-input" placeholder="例如：Asia/Shanghai 或 UTC+8">
                         </div>
                     </div>
                     <div v-if="chatSettings.timeZoneSystemEnabled" class="art-settings-input-item">
@@ -1850,7 +1822,7 @@
                         </div>
                         <div class="art-input-wrapper">
                             <label class="art-input-label">角色时区</label>
-                            <input type="text" v-model="chatSettings.roleTimeZone" class="art-settings-input" placeholder="例如：Asia/Tokyo 或 UTC+9">
+                            <input name="sp_field_26" id="sp-field-26" type="text" v-model="chatSettings.roleTimeZone" class="art-settings-input" placeholder="例如：Asia/Tokyo 或 UTC+9">
                         </div>
                     </div>
                 </div>
@@ -1872,9 +1844,9 @@
                             </div>
                             <div v-if="chatSettings.activeMessageEnabled" style="display:flex; gap:10px; margin-top:8px; align-items:center;">
                                 <span style="font-size:13px; color:#666;">频率(分钟)</span>
-                                <input type="number" min="1" step="1" v-model.number="chatSettings.activeMessageFrequencyMin" class="art-settings-input" style="max-width:110px;">
+                                <input name="sp_field_27" id="sp-field-27" type="number" min="1" step="1" v-model.number="chatSettings.activeMessageFrequencyMin" class="art-settings-input" style="max-width:110px;">
                                 <span style="font-size:13px; color:#666;">回复延迟(秒)</span>
-                                <input type="number" min="1" step="1" v-model.number="chatSettings.activeReplyDelaySec" class="art-settings-input" style="max-width:110px;">
+                                <input name="sp_field_28" id="sp-field-28" type="number" min="1" step="1" v-model.number="chatSettings.activeReplyDelaySec" class="art-settings-input" style="max-width:110px;">
                             </div>
                             <p style="font-size:12px; color:rgba(0,0,0,.5); margin-top:8px; line-height:1.45;">按当前会话保存：每个单聊、每个群聊的主动消息开关与频率各自独立。群聊仅在已配置有效 API 且模型返回内容时，才会随机选一名未拉黑成员发送一条主动消息。</p>
                         </div>
@@ -2014,7 +1986,7 @@
                 </div>
                 <div style="margin-top:10px;">
                     <label style="font-size:12px; color:#666;">框选大小</label>
-                    <input type="range" min="0.45" max="0.95" step="0.01" v-model.number="imageCropScale" @input="onImageCropScaleChange" style="width:100%;">
+                    <input name="sp_field_29" id="sp-field-29" type="range" min="0.45" max="0.95" step="0.01" v-model.number="imageCropScale" @input="onImageCropScaleChange" style="width:100%;">
                 </div>
                 <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px;">
                     <button class="btn-small" @click="closeImageCropModal">取消</button>
@@ -2049,12 +2021,12 @@
                 
                 <div class="art-savearchive-input-group">
                     <label class="art-savearchive-label">存档名称</label>
-                    <input type="text" v-model="archiveName" class="art-savearchive-input" placeholder="给这段回忆起个名字">
+                    <input name="sp_field_30" id="sp-field-30" type="text" v-model="archiveName" class="art-savearchive-input" placeholder="给这段回忆起个名字">
                 </div>
                 
                 <div class="art-savearchive-input-group">
                     <label class="art-savearchive-label">描述</label>
-                    <textarea v-model="archiveDescription" class="art-savearchive-textarea" placeholder="添加一些笔记..."></textarea>
+                    <textarea name="sp_field_31" id="sp-field-31" v-model="archiveDescription" class="art-savearchive-textarea" placeholder="添加一些笔记..."></textarea>
                 </div>
                 
                 <div class="art-savearchive-buttons">
@@ -2096,7 +2068,7 @@
                         <img :src="newGroupAvatar || 'https://placehold.co/80x80?text=Group'" 
                              style="width: 80px; height: 80px; border-radius: 50%; border: 2px solid #000; object-fit: cover; cursor: pointer;"
                              @click="triggerGroupAvatarUpload">
-                        <input type="file" ref="groupAvatarInput" @change="handleGroupAvatarUpload" accept="image/*" style="display: none;">
+                        <input name="sp_field_32" id="sp-field-32" type="file" ref="groupAvatarInput" @change="handleGroupAvatarUpload" accept="image/*" style="display: none;">
                         <button @click="triggerGroupAvatarUpload" 
                                 style="padding: 8px 16px; border: 2px solid #000; border-radius: 12px; background: #FFF; cursor: pointer; font-family: 'Inter', sans-serif;">
                             选择图片
@@ -2106,7 +2078,7 @@
                 
                 <div class="art-savearchive-input-group">
                     <label class="art-savearchive-label">群聊名称</label>
-                    <input type="text" v-model="newGroupName" class="art-savearchive-input" placeholder="给群聊起个名字">
+                    <input name="sp_field_33" id="sp-field-33" type="text" v-model="newGroupName" class="art-savearchive-input" placeholder="给群聊起个名字">
                 </div>
                 
                 <div class="art-savearchive-input-group">
@@ -2185,7 +2157,7 @@
                             <img :src="customMemberAvatar || 'https://placehold.co/80x80?text=NPC'" 
                                  style="width: 80px; height: 80px; border-radius: 50%; border: 2px solid #000; object-fit: cover; cursor: pointer;"
                                  @click="triggerCustomMemberAvatarUpload">
-                            <input type="file" ref="customMemberAvatarInput" @change="handleCustomMemberAvatarUpload" accept="image/*" style="display: none;">
+                            <input name="sp_field_34" id="sp-field-34" type="file" ref="customMemberAvatarInput" @change="handleCustomMemberAvatarUpload" accept="image/*" style="display: none;">
                             <button @click="triggerCustomMemberAvatarUpload" 
                                     style="padding: 8px 16px; border: 2px solid #000; border-radius: 12px; background: #FFF; cursor: pointer; font-family: 'Inter', sans-serif;">
                                 选择图片
@@ -2195,12 +2167,12 @@
                     
                     <div class="art-savearchive-input-group">
                         <label class="art-savearchive-label">成员名字</label>
-                        <input type="text" v-model="customMemberName" class="art-savearchive-input" placeholder="给这位成员起个名字">
+                        <input name="sp_field_35" id="sp-field-35" type="text" v-model="customMemberName" class="art-savearchive-input" placeholder="给这位成员起个名字">
                     </div>
                     
                     <div class="art-savearchive-input-group">
                         <label class="art-savearchive-label">成员人设</label>
-                        <textarea v-model="customMemberPersona" class="art-savearchive-input" placeholder="简单描述一下这位成员的性格特点..." style="min-height: 100px; resize: vertical;"></textarea>
+                        <textarea name="sp_field_36" id="sp-field-36" v-model="customMemberPersona" class="art-savearchive-input" placeholder="简单描述一下这位成员的性格特点..." style="min-height: 100px; resize: vertical;"></textarea>
                     </div>
                     <div class="art-savearchive-input-group">
                         <label class="art-savearchive-label">绑定世界书（可多选）</label>
@@ -2208,20 +2180,20 @@
                         <div v-else class="custom-member-worldbook-list">
                             <label v-for="wb in worldbooks" :key="wb.id" class="custom-member-wb-row">
                                 <span>{{ wb.name }}</span>
-                                <input type="checkbox" v-model="customMemberWorldbookIds" :value="wb.id">
+                                <input name="sp_field_37" id="sp-field-37" type="checkbox" v-model="customMemberWorldbookIds" :value="wb.id">
                             </label>
                         </div>
                     </div>
                     <div class="art-savearchive-input-group">
                         <label class="art-savearchive-label">绑定预设</label>
-                        <select v-model="customMemberPresetId" class="art-savearchive-input">
+                        <select name="sp_field_38" id="sp-field-38" v-model="customMemberPresetId" class="art-savearchive-input">
                             <option :value="null">不绑定预设</option>
                             <option v-for="p in presets" :key="p.id" :value="p.id">{{ p.name }}</option>
                         </select>
                     </div>
                     <div v-if="addMemberMode === 'custom'" class="art-savearchive-input-group">
                         <label class="art-savearchive-label">时区（群聊时差）</label>
-                        <select v-model="customMemberTimeZone" class="art-savearchive-input">
+                        <select name="sp_field_39" id="sp-field-39" v-model="customMemberTimeZone" class="art-savearchive-input">
                             <option value="Asia/Shanghai">上海/北京 (UTC+8)</option>
                             <option value="Asia/Tokyo">东京 (UTC+9)</option>
                             <option value="America/New_York">纽约 (UTC-5/UTC-4)</option>
@@ -2248,25 +2220,25 @@
                 </div>
                 <div class="modal-body member-editor-modal-body">
                     <label class="member-editor-label">人设</label>
-                    <textarea v-model="editingMember.persona" class="art-settings-input" rows="3" placeholder="成员的性格描述..."></textarea>
+                    <textarea name="sp_field_40" id="sp-field-40" v-model="editingMember.persona" class="art-settings-input" rows="3" placeholder="成员的性格描述..."></textarea>
 
                     <label class="member-editor-label mt-2">绑定世界书</label>
                     <div v-if="!worldbooks || worldbooks.length === 0" class="profile-meta">暂无世界书，请先在工作室创建</div>
                     <div v-else class="member-editor-wb-list">
                         <div v-for="wb in worldbooks" :key="wb.id" class="member-editor-wb-row">
                             <span>{{ wb.name }}</span>
-                            <input type="checkbox" v-model="editingMember.worldbookIds" :value="wb.id">
+                            <input name="sp_field_41" id="sp-field-41" type="checkbox" v-model="editingMember.worldbookIds" :value="wb.id">
                         </div>
                     </div>
 
                     <label class="member-editor-label mt-2">绑定预设</label>
-                    <select v-model="editingMember.selectedPresetId" class="art-settings-input">
+                    <select name="sp_field_42" id="sp-field-42" v-model="editingMember.selectedPresetId" class="art-settings-input">
                         <option :value="null">不绑定预设</option>
                         <option v-for="p in presets" :key="p.id" :value="p.id">{{ p.name }}</option>
                     </select>
 
                     <label class="member-editor-label mt-2">时区（群聊时差）</label>
-                    <select v-model="editingMember.timeZone" class="art-settings-input">
+                    <select name="sp_field_43" id="sp-field-43" v-model="editingMember.timeZone" class="art-settings-input">
                         <option value="Asia/Shanghai">上海/北京 (UTC+8)</option>
                         <option value="Asia/Tokyo">东京 (UTC+9)</option>
                         <option value="America/New_York">纽约 (UTC-5/UTC-4)</option>
@@ -2388,7 +2360,7 @@
                         <img :src="tempGroupAvatar || activeGroupChat?.avatarUrl || 'https://placehold.co/80x80?text=Group'" 
                              style="width: 80px; height: 80px; border-radius: 50%; border: 2px solid #000; object-fit: cover; cursor: pointer;"
                              @click="triggerRenameGroupAvatarUpload">
-                        <input type="file" ref="renameGroupAvatarInput" @change="handleRenameGroupAvatarUpload" accept="image/*" style="display: none;">
+                        <input name="sp_field_44" id="sp-field-44" type="file" ref="renameGroupAvatarInput" @change="handleRenameGroupAvatarUpload" accept="image/*" style="display: none;">
                         <button @click="triggerRenameGroupAvatarUpload" 
                                 style="padding: 8px 16px; border: 2px solid #000; border-radius: 12px; background: #FFF; cursor: pointer; font-family: 'Inter', sans-serif;">
                             选择图片
@@ -2398,7 +2370,7 @@
                 
                 <div class="art-savearchive-input-group">
                     <label class="art-savearchive-label">群聊名称</label>
-                    <input type="text" v-model="newGroupNameInput" class="art-savearchive-input" placeholder="给群聊起个新名字">
+                    <input name="sp_field_45" id="sp-field-45" type="text" v-model="newGroupNameInput" class="art-savearchive-input" placeholder="给群聊起个新名字">
                 </div>
                 
                 <div class="art-savearchive-buttons">
@@ -2579,7 +2551,7 @@
                         <span v-if="ember.replyingTo">回复 @{{ ember.replyingTo.authorName }}</span>
                         <span v-else>发一条动态</span>
                     </div>
-                    <textarea class="ember-composer-input" v-model="ember.composerText" placeholder="说点什么…"></textarea>
+                    <textarea name="sp_field_46" id="sp-field-46" class="ember-composer-input" v-model="ember.composerText" placeholder="说点什么…"></textarea>
                     <div class="ember-composer-actions">
                         <button class="ember-btn" @click="ember.closeComposer()">取消</button>
                         <button class="ember-btn ember-btn-primary" @click="ember.publishMyPost()">发布</button>
@@ -2743,7 +2715,7 @@
                                         
                                         <!-- Reply Input -->
                                         <div v-if="feed.activeReplyCommentId === comment.id" class="reply-input">
-                                            <input type="text" v-model="feed.replyInput" placeholder="回复一下..." @keyup.enter="feed.submitComment(post.id, comment.id)">
+                                            <input name="sp_field_47" id="sp-field-47" type="text" v-model="feed.replyInput" placeholder="回复一下..." @keyup.enter="feed.submitComment(post.id, comment.id)">
                                             <button @click="feed.submitComment(post.id, comment.id)">→</button>
                                         </div>
                                     </div>
@@ -2752,7 +2724,7 @@
                                 
                                 <!-- Comment Input -->
                                 <div v-if="feed.activeCommentPostId === post.id" class="entry-comment-input">
-                                    <input type="text" v-model="feed.commentInput" placeholder="说点什么..." @keyup.enter="feed.submitComment(post.id)">
+                                    <input name="sp_field_48" id="sp-field-48" type="text" v-model="feed.commentInput" placeholder="说点什么..." @keyup.enter="feed.submitComment(post.id)">
                                     <button @click="feed.submitComment(post.id)">→</button>
                                 </div>
                             </div>
@@ -2813,7 +2785,7 @@
                     <div class="create-post-content">
                         <div class="create-post-input-row">
                             <img :src="feed.userProfile.avatar || 'https://placehold.co/100x100/333/fff?text=Me'" class="create-post-avatar">
-                            <textarea v-model="feed.newPostText" placeholder="这一刻的想法..."></textarea>
+                            <textarea name="sp_field_49" id="sp-field-49" v-model="feed.newPostText" placeholder="这一刻的想法..."></textarea>
                         </div>
                         <div class="create-post-light-options">
                             <button class="light-option-item" type="button" @click="feed.openLocationSheet()">
@@ -2840,7 +2812,7 @@
                                 </div>
                                 <div class="wechat-sheet-body">
                                     <div class="wechat-field">
-                                        <input v-model="feed.locationText" placeholder="输入位置（可留空）" />
+                                        <input name="sp_field_50" id="sp-field-50" v-model="feed.locationText" placeholder="输入位置（可留空）" />
                                     </div>
                                     <button class="wechat-row" @click="feed.locationText=''">
                                         <span>不显示位置</span>
@@ -2990,7 +2962,7 @@
                                 </div>
                             </div>
                             <div class="text-image-controls">
-                                <textarea v-model="feed.feedTextImageText" placeholder="输入要显示的文字..." class="text-image-input" maxlength="50"></textarea>
+                                <textarea name="sp_field_51" id="sp-field-51" v-model="feed.feedTextImageText" placeholder="输入要显示的文字..." class="text-image-input" maxlength="50"></textarea>
                                 <div class="color-options">
                                     <span class="color-label">选择背景:</span>
                                     <div class="color-grid">
@@ -3108,15 +3080,15 @@
                         </div>
                         <div class="edit-input-group">
                             <label>昵称</label>
-                            <input type="text" v-model="feed.userProfile.name" placeholder="输入昵称">
+                            <input name="sp_field_52" id="sp-field-52" type="text" v-model="feed.userProfile.name" placeholder="输入昵称">
                         </div>
                         <div class="edit-input-group">
                             <label>个性签名</label>
-                            <textarea v-model="feed.userProfile.bio" placeholder="输入个性签名"></textarea>
+                            <textarea name="sp_field_53" id="sp-field-53" v-model="feed.userProfile.bio" placeholder="输入个性签名"></textarea>
                         </div>
                         <div class="edit-input-group">
                             <label>朋友圈背景（全面屏）</label>
-                            <input
+                            <input name="sp_field_54" id="sp-field-54"
                                 type="text"
                                 :value="feed.momentsBgUrl"
                                 @input="feed.setMomentsBgUrl($event.target.value)"
@@ -3170,7 +3142,7 @@
                         <button class="generate-btn" @click="feed.generateRolePost(characters.find ? characters.find(c => String(c.id) === String(feed.selectedRoleId)) : characters.value?.find(c => String(c.id) === String(feed.selectedRoleId)), activeProfile)" :disabled="!feed.selectedRoleId || !activeProfile || feed.isGeneratingPost" style="margin-bottom: 16px;">
                             {{ feed.isGeneratingPost ? '生成中...' : 'AI生成' }}
                         </button>
-                        <textarea v-model="feed.rolePostText" placeholder="点击 AI生成 自动创作，或手动输入..."></textarea>
+                        <textarea name="sp_field_55" id="sp-field-55" v-model="feed.rolePostText" placeholder="点击 AI生成 自动创作，或手动输入..."></textarea>
                     </div>
                 </div>
             </div>
@@ -3246,7 +3218,7 @@
                             </div>
 
                             <div class="live-bgm-search-row">
-                                <input class="live-settings-input live-bgm-search-input" type="text"
+                                <input name="sp_field_56" id="sp-field-56" class="live-settings-input live-bgm-search-input" type="text"
                                     v-model="liveBgmSearchTerm" placeholder="输入歌名/歌手后回车"
                                     @keyup.enter="searchLiveBgmSongs(liveBgmSearchTerm)">
                                 <button type="button" class="live-bgm-search-btn"
@@ -3275,15 +3247,15 @@
                         </div>
 
                         <label class="live-settings-label">用户马甲</label>
-                        <input class="live-settings-input" type="text" v-model="liveSettingsDraftUserMask"
+                        <input name="sp_field_57" id="sp-field-57" class="live-settings-input" type="text" v-model="liveSettingsDraftUserMask"
                             placeholder="例如：夜航船_123">
 
                         <label class="live-settings-label">语音厅壁纸（上传图片/链接）</label>
                         <div class="live-wallpaper-upload-row">
-                            <input class="live-wallpaper-upload-input" type="file" accept="image/*"
+                            <input name="sp_field_58" id="sp-field-58" class="live-wallpaper-upload-input" type="file" accept="image/*"
                                 @change="onLiveHallWallpaperUpload">
                         </div>
-                        <input class="live-settings-input" type="text" v-model="liveSettingsDraftHallWallpaperUrl"
+                        <input name="sp_field_59" id="sp-field-59" class="live-settings-input" type="text" v-model="liveSettingsDraftHallWallpaperUrl"
                             placeholder="https://.../wallpaper.jpg（或上传图片后会自动生成 dataURL）">
                         <div class="live-wallpaper-preview"
                             v-if="liveSettingsDraftHallWallpaperUrl && String(liveSettingsDraftHallWallpaperUrl).length > 10">
@@ -3394,7 +3366,7 @@
                             </span>
                         </div>
                         <div class="live-feed-compose-row">
-                            <input class="live-feed-input" v-model="liveInput" @keyup.enter="sendLiveMessage" :placeholder="liveOnMic ? '说点什么…（角色知道是你）' : '说点什么…（马甲发言，角色以为是网友）'" autocomplete="off">
+                            <input name="sp_field_60" id="sp-field-60" class="live-feed-input" v-model="liveInput" @keyup.enter="sendLiveMessage" :placeholder="liveOnMic ? '说点什么…（角色知道是你）' : '说点什么…（马甲发言，角色以为是网友）'" autocomplete="off">
                             <button type="button" class="live-quick-btn" @click="sendLiveGift" title="送礼" aria-label="送礼"><i class="fas fa-gift"></i></button>
                             <button type="button" class="live-feed-send" @click="sendLiveMessage">发送</button>
                         </div>
@@ -3635,11 +3607,11 @@
                     </div>
                     <div class="modal-body">
                         <label>上次经期开始日期</label>
-                        <input type="date" :value="mate.lastPeriodDate?.toISOString().split('T')[0]" @input="mate.setPeriodStartDate($event.target.value)">
+                        <input name="sp_field_61" id="sp-field-61" type="date" :value="mate.lastPeriodDate?.toISOString().split('T')[0]" @input="mate.setPeriodStartDate($event.target.value)">
                         <label class="mt-2">平均周期 (天)</label>
-                        <input type="number" v-model="mate.cycleLength">
+                        <input name="sp_field_62" id="sp-field-62" type="number" v-model="mate.cycleLength">
                         <label class="mt-2">平均持续天数 (天)</label>
-                        <input type="number" v-model="mate.periodLength">
+                        <input name="sp_field_63" id="sp-field-63" type="number" v-model="mate.periodLength">
                         <button class="journal-btn primary mt-2 w-100" @click="mate.showPeriodSettings = false">保存设置</button>
                     </div>
                 </div>
@@ -3654,9 +3626,9 @@
                     </div>
                     <div class="modal-body">
                         <label>金额 (¥)</label>
-                        <input type="number" v-model="mate.newExpense.amount" placeholder="0.00">
+                        <input name="sp_field_64" id="sp-field-64" type="number" v-model="mate.newExpense.amount" placeholder="0.00">
                         <label class="mt-2">类别</label>
-                        <select v-model="mate.newExpense.category">
+                        <select name="sp_field_65" id="sp-field-65" v-model="mate.newExpense.category">
                             <option value="餐饮">餐饮</option>
                             <option value="交通">交通</option>
                             <option value="购物">购物</option>
@@ -3665,11 +3637,11 @@
                             <option value="其他">其他</option>
                         </select>
                         <label class="mt-2">描述</label>
-                        <input type="text" v-model="mate.newExpense.description" placeholder="去哪儿花了？">
+                        <input name="sp_field_66" id="sp-field-66" type="text" v-model="mate.newExpense.description" placeholder="去哪儿花了？">
                         <label class="mt-2">日期</label>
-                        <input type="date" v-model="mate.newExpense.date">
+                        <input name="sp_field_67" id="sp-field-67" type="date" v-model="mate.newExpense.date">
                         <label class="mt-2">选择留言角色</label>
-                        <select v-model="mate.newExpense.selectedCharacterId">
+                        <select name="sp_field_68" id="sp-field-68" v-model="mate.newExpense.selectedCharacterId">
                             <option :value="null">不留言</option>
                             <option v-for="char in characters" :key="char.id" :value="char.id">
                                 {{ char.nickname || char.name }}
@@ -3692,18 +3664,18 @@
                     </div>
                     <div class="modal-body">
                         <label>金额 (¥)</label>
-                        <input type="number" v-model="mate.newIncome.amount" placeholder="0.00">
+                        <input name="sp_field_69" id="sp-field-69" type="number" v-model="mate.newIncome.amount" placeholder="0.00">
                         <label class="mt-2">类别</label>
-                        <select v-model="mate.newIncome.category">
+                        <select name="sp_field_70" id="sp-field-70" v-model="mate.newIncome.category">
                             <option value="工资">工资</option>
                             <option value="奖金">奖金</option>
                             <option value="投资">投资</option>
                             <option value="其他">其他</option>
                         </select>
                         <label class="mt-2">描述</label>
-                        <input type="text" v-model="mate.newIncome.description" placeholder="收入来源？">
+                        <input name="sp_field_71" id="sp-field-71" type="text" v-model="mate.newIncome.description" placeholder="收入来源？">
                         <label class="mt-2">日期</label>
-                        <input type="date" v-model="mate.newIncome.date">
+                        <input name="sp_field_72" id="sp-field-72" type="date" v-model="mate.newIncome.date">
                         <button class="journal-btn primary mt-2 w-100" @click="mate.submitIncome">
                             确认添加
                         </button>
@@ -3741,9 +3713,9 @@
                     </div>
                     <div class="modal-body">
                         <label>待办内容</label>
-                        <input type="text" v-model="mate.newTodo.text" placeholder="要做什么？">
+                        <input name="sp_field_73" id="sp-field-73" type="text" v-model="mate.newTodo.text" placeholder="要做什么？">
                         <label class="mt-2">提醒时间</label>
-                        <input type="datetime-local" v-model="mate.newTodo.time">
+                        <input name="sp_field_74" id="sp-field-74" type="datetime-local" v-model="mate.newTodo.time">
                         <button class="journal-btn primary mt-2 w-100" @click="mate.submitTodo">确认新建</button>
                     </div>
                 </div>
@@ -3758,13 +3730,13 @@
                     </div>
                     <div class="modal-body">
                         <label>日程标题</label>
-                        <input type="text" v-model="mate.newEvent.title" placeholder="要做什么日程？">
+                        <input name="sp_field_75" id="sp-field-75" type="text" v-model="mate.newEvent.title" placeholder="要做什么日程？">
                         <label class="mt-2">开始时间</label>
-                        <input type="datetime-local" v-model="mate.newEvent.startTime">
+                        <input name="sp_field_76" id="sp-field-76" type="datetime-local" v-model="mate.newEvent.startTime">
                         <label class="mt-2">结束时间</label>
-                        <input type="datetime-local" v-model="mate.newEvent.endTime">
+                        <input name="sp_field_77" id="sp-field-77" type="datetime-local" v-model="mate.newEvent.endTime">
                         <label class="mt-2">类别</label>
-                        <select v-model="mate.newEvent.category">
+                        <select name="sp_field_78" id="sp-field-78" v-model="mate.newEvent.category">
                             <option value="class">学习/工作</option>
                             <option value="exercise">运动/健康</option>
                             <option value="other">其他</option>
@@ -3864,7 +3836,7 @@
                 <div class="taobao-header">
                     <div class="taobao-search">
                         <i class="fas fa-search"></i>
-                        <input type="text" v-model="taobaoSearchTerm" placeholder="搜索商品..." @keypress.enter="searchTaobaoProducts">
+                        <input name="sp_field_79" id="sp-field-79" type="text" v-model="taobaoSearchTerm" placeholder="搜索商品..." @keypress.enter="searchTaobaoProducts">
                         <button class="taobao-search-btn" @click="searchTaobaoProducts">搜索</button>
                     </div>
                     <button class="close-btn" @click="showTaobaoPanel = false"><i class="fas fa-times"></i></button>
@@ -3922,7 +3894,7 @@
                     </div>
                     <div class="share-input-group">
                         <label>分享内容概述</label>
-                        <textarea v-model="shareContent" placeholder="描述你想分享的内容..." rows="4"></textarea>
+                        <textarea name="sp_field_80" id="sp-field-80" v-model="shareContent" placeholder="描述你想分享的内容..." rows="4"></textarea>
                     </div>
                     <button class="share-send-btn" @click="sendShareCard" :disabled="!shareSource || !shareContent.trim()">发送</button>
                 </div>
@@ -3939,12 +3911,12 @@
                 <div class="modal-content">
                     <div class="vote-input-group">
                         <label>投票问题</label>
-                        <input type="text" v-model="voteQuestion" placeholder="输入投票问题...">
+                        <input name="sp_field_81" id="sp-field-81" type="text" v-model="voteQuestion" placeholder="输入投票问题...">
                     </div>
                     <div class="vote-options-group">
                         <label>选项</label>
                         <div v-for="(option, index) in voteOptions" :key="index" class="vote-option-input">
-                            <input type="text" v-model="voteOptions[index]" :placeholder="'选项 ' + (index + 1)">
+                            <input name="sp_field_82" id="sp-field-82" type="text" v-model="voteOptions[index]" :placeholder="'选项 ' + (index + 1)">
                             <button v-if="voteOptions.length > 2" class="remove-option-btn" @click="removeVoteOption(index)">
                                 <i class="fas fa-times"></i>
                             </button>
@@ -4000,7 +3972,7 @@
                         </div>
                     </div>
                     <div class="text-image-controls">
-                        <textarea v-model="textImageText" placeholder="输入要显示的文字..." class="text-image-input" maxlength="50"></textarea>
+                        <textarea name="sp_field_83" id="sp-field-83" v-model="textImageText" placeholder="输入要显示的文字..." class="text-image-input" maxlength="50"></textarea>
                         <div class="color-options">
                             <span class="color-label">选择背景:</span>
                             <div class="color-grid">
@@ -4030,7 +4002,7 @@
                         <i class="fas fa-microphone"></i>
                         <span>输入文字，将转换为语音消息</span>
                     </div>
-                    <textarea v-model="voiceInputText" placeholder="输入要转换为语音的文字..." class="voice-textarea" maxlength="200"></textarea>
+                    <textarea name="sp_field_84" id="sp-field-84" v-model="voiceInputText" placeholder="输入要转换为语音的文字..." class="voice-textarea" maxlength="200"></textarea>
                     <div class="voice-preview" v-if="voiceInputText.trim()">
                         <div class="voice-bubble-preview">
                             <div class="voice-wave">
@@ -4079,15 +4051,15 @@
                 <div class="location-place-name">位置信息</div>
                 <div class="location-input-section">
                     <label class="location-label">我的位置</label>
-                    <input type="text" v-model="userAddress" class="location-input" placeholder="输入你的位置...">
+                    <input name="sp_field_85" id="sp-field-85" type="text" v-model="userAddress" class="location-input" placeholder="输入你的位置...">
                 </div>
                 <div class="location-input-section">
                     <label class="location-label">TA的位置</label>
-                    <input type="text" v-model="aiAddress" class="location-input" placeholder="输入TA的位置...">
+                    <input name="sp_field_86" id="sp-field-86" type="text" v-model="aiAddress" class="location-input" placeholder="输入TA的位置...">
                 </div>
                 <div class="location-input-section">
                     <label class="location-label">相距距离</label>
-                    <input type="text" v-model="calculatedDistance" class="location-input" placeholder="输入距离...">
+                    <input name="sp_field_87" id="sp-field-87" type="text" v-model="calculatedDistance" class="location-input" placeholder="输入距离...">
                 </div>
             </div>
             
@@ -4126,14 +4098,14 @@
             <div class="transfer-amount-section">
                 <span class="currency-symbol">¥</span>
                 <div class="amount-display">
-                    <input type="number" v-model.number="transferAmount" placeholder="0.00" step="0.01" class="amount-input">
+                    <input name="sp_field_88" id="sp-field-88" type="number" v-model.number="transferAmount" placeholder="0.00" step="0.01" class="amount-input">
                 </div>
                 <div class="amount-underline"></div>
             </div>
             
             <!-- 备注 -->
             <div class="transfer-memo-section">
-                <textarea v-model="transferNote" placeholder="添加备注..." class="memo-input" maxlength="20"></textarea>
+                <textarea name="sp_field_89" id="sp-field-89" v-model="transferNote" placeholder="添加备注..." class="memo-input" maxlength="20"></textarea>
             </div>
             
             <!-- 确认按钮 -->
@@ -4168,7 +4140,7 @@
                     <div class="card read-card">
                         <div class="read-search-row">
                             <i class="fas fa-search" style="opacity:0.7;"></i>
-                            <input
+                            <input name="sp_field_90" id="sp-field-90"
                                 v-model="read.searchQuery"
                                 placeholder="搜索作品标题/标签/简介..."
                                 class="read-input"
@@ -4391,7 +4363,7 @@
                                     </div>
 
                                     <div v-if="read.replyToCommentId === c.id" style="margin-top:10px; display:flex; flex-direction:column; gap:8px;">
-                                        <textarea v-model="read.replyInput" placeholder="写下你的回复..." rows="3" style="border:1px solid rgba(0,0,0,0.12); border-radius:10px; padding:10px; outline:none;"></textarea>
+                                        <textarea name="sp_field_91" id="sp-field-91" v-model="read.replyInput" placeholder="写下你的回复..." rows="3" style="border:1px solid rgba(0,0,0,0.12); border-radius:10px; padding:10px; outline:none;"></textarea>
                                         <div style="display:flex; gap:10px; justify-content:flex-end;">
                                             <button class="btn-small" @click="read.cancelReply">取消</button>
                                             <button class="btn-small primary" @click="read.submitReply">发送回复</button>
@@ -4419,7 +4391,7 @@
                                         {{ read.isGeneratingComment ? '生成中...' : 'AI 生成留言' }}
                                     </button>
                                 </div>
-                                <textarea v-model="read.newCommentInput" placeholder="写下你的评论（支持换行）..." rows="3" style="width:100%; border:1px solid rgba(0,0,0,0.12); border-radius:10px; padding:10px; outline:none;"></textarea>
+                                <textarea name="sp_field_92" id="sp-field-92" v-model="read.newCommentInput" placeholder="写下你的评论（支持换行）..." rows="3" style="width:100%; border:1px solid rgba(0,0,0,0.12); border-radius:10px; padding:10px; outline:none;"></textarea>
                                 <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:10px;">
                                     <button class="btn-small" @click="read.newCommentInput=''" :disabled="!read.newCommentInput">清空</button>
                                     <button class="btn-small primary" @click="read.submitNewComment" :disabled="!read.newCommentInput">发送</button>
@@ -4505,7 +4477,7 @@
                             <div style="font-size:12px; color:rgba(0,0,0,0.6); margin-bottom:6px;">
                                 作品标题（Work Title；可留空；续写时默认取原标题）
                             </div>
-                            <input
+                            <input name="sp_field_93" id="sp-field-93"
                                 v-model="read.writerForm.workTitleText"
                                 placeholder="例如：星夜下的约定"
                                 :disabled="read.writerMode !== 'create'"
@@ -4517,7 +4489,7 @@
                             <div style="font-size:12px; color:rgba(0,0,0,0.6); margin-bottom:6px; margin-top:4px;">
                                 章标题（Chapter Title；可留空则由 AI 生成）
                             </div>
-                            <input
+                            <input name="sp_field_94" id="sp-field-94"
                                 v-model="read.writerForm.chapterTitleText"
                                 placeholder="例如：在雨里说再见"
                                 style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;"
@@ -4528,7 +4500,7 @@
                             <div style="font-size:12px; color:rgba(0,0,0,0.6); margin-bottom:6px; margin-top:4px;">
                                 作者的话（Author Notes；可留空）
                             </div>
-                            <textarea
+                            <textarea name="sp_field_95" id="sp-field-95"
                                 v-model="read.writerForm.authorNotesText"
                                 placeholder="例如：这章的核心是‘没说出口的那句’。"
                                 rows="3"
@@ -4539,14 +4511,14 @@
                         <div style="display:flex; gap:10px;">
                             <div style="flex:1;">
                                 <div style="font-size:12px; color:rgba(0,0,0,0.6); margin-bottom:6px;">角色A</div>
-                                <select v-model="read.writerForm.charAId" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;">
+                                <select name="sp_field_96" id="sp-field-96" v-model="read.writerForm.charAId" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;">
                                     <option value="__me__">我（当前用户）</option>
                                     <option v-for="c in characters" :key="c.id" :value="c.id">{{ c.nickname || c.name }}</option>
                                 </select>
                             </div>
                             <div style="flex:1;">
                                 <div style="font-size:12px; color:rgba(0,0,0,0.6); margin-bottom:6px;">角色B</div>
-                                <select v-model="read.writerForm.charBId" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;">
+                                <select name="sp_field_97" id="sp-field-97" v-model="read.writerForm.charBId" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;">
                                     <option value="__me__">我（当前用户）</option>
                                     <option v-for="c in characters" :key="c.id" :value="c.id">{{ c.nickname || c.name }}</option>
                                 </select>
@@ -4555,35 +4527,35 @@
 
                         <div>
                             <div style="font-size:12px; color:rgba(0,0,0,0.6); margin-bottom:6px;">配对（可留空自动推断）</div>
-                            <input v-model="read.writerForm.pairingText" placeholder="例如：A x B" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;">
+                            <input name="sp_field_98" id="sp-field-98" v-model="read.writerForm.pairingText" placeholder="例如：A x B" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;">
                         </div>
 
                         <div>
                             <div style="font-size:12px; color:rgba(0,0,0,0.6); margin-bottom:6px;">额外标签（Additional Tags；逗号分隔；可留空）</div>
-                            <input v-model="read.writerForm.tagsText" placeholder="例如：校园, 甜文, 误会" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;">
+                            <input name="sp_field_99" id="sp-field-99" v-model="read.writerForm.tagsText" placeholder="例如：校园, 甜文, 误会" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;">
                         </div>
 
                         <div>
                             <div style="font-size:12px; color:rgba(0,0,0,0.6); margin-bottom:6px;">归档警告（Archive Warnings；逗号分隔；可留空）</div>
-                            <input v-model="read.writerForm.archiveWarningsText" placeholder="例如：暴力, 创伤, 自伤（没有就留空）" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;">
+                            <input name="sp_field_100" id="sp-field-100" v-model="read.writerForm.archiveWarningsText" placeholder="例如：暴力, 创伤, 自伤（没有就留空）" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;">
                         </div>
 
                         <div>
                             <div style="font-size:12px; color:rgba(0,0,0,0.6); margin-bottom:6px;">作品简介（Work Summary；可留空）</div>
-                            <textarea v-model="read.writerForm.workSummaryText" placeholder="用 2-3 句话说明你想写的核心氛围/冲突/结尾走向（可留空由 AI 推断）" rows="3" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;"></textarea>
+                            <textarea name="sp_field_101" id="sp-field-101" v-model="read.writerForm.workSummaryText" placeholder="用 2-3 句话说明你想写的核心氛围/冲突/结尾走向（可留空由 AI 推断）" rows="3" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;"></textarea>
                         </div>
 
                         <div style="display:flex; gap:10px;">
                             <div style="flex:1;">
                                 <div style="font-size:12px; color:rgba(0,0,0,0.6); margin-bottom:6px;">世界书（可选）</div>
-                                <select v-model="read.writerForm.worldbookId" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;">
+                                <select name="sp_field_102" id="sp-field-102" v-model="read.writerForm.worldbookId" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;">
                                     <option :value="null">不使用世界书</option>
                                     <option v-for="wb in worldbooks" :key="wb.id" :value="wb.id">{{ wb.name }}</option>
                                 </select>
                             </div>
                             <div style="flex:1;">
                                 <div style="font-size:12px; color:rgba(0,0,0,0.6); margin-bottom:6px;">预设（可选）</div>
-                                <select v-model="read.writerForm.presetId" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;">
+                                <select name="sp_field_103" id="sp-field-103" v-model="read.writerForm.presetId" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;">
                                     <option :value="null">不使用预设</option>
                                     <option v-for="p in presets" :key="p.id" :value="p.id">{{ p.name }}</option>
                                 </select>
@@ -4593,11 +4565,11 @@
                         <div style="display:flex; gap:10px;">
                             <div style="flex:1;">
                                 <div style="font-size:12px; color:rgba(0,0,0,0.6); margin-bottom:6px;">评级</div>
-                                <input v-model="read.writerForm.ratingText" placeholder="PG-13" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;">
+                                <input name="sp_field_104" id="sp-field-104" v-model="read.writerForm.ratingText" placeholder="PG-13" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;">
                             </div>
                             <div style="flex:1;">
                                 <div style="font-size:12px; color:rgba(0,0,0,0.6); margin-bottom:6px;">字数档位</div>
-                                <select v-model="read.writerForm.lengthPreset" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;">
+                                <select name="sp_field_105" id="sp-field-105" v-model="read.writerForm.lengthPreset" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;">
                                     <option value="short">短篇</option>
                                     <option value="medium">中篇</option>
                                     <option value="long">长篇</option>
@@ -4607,7 +4579,7 @@
 
                         <div>
                             <div style="font-size:12px; color:rgba(0,0,0,0.6); margin-bottom:6px;">你的额外 AI 指令（可留空）</div>
-                            <textarea v-model="read.writerForm.userInstruction" placeholder="例如：保持人物语气一致；增加一个误会；结尾留钩子..." rows="4" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;"></textarea>
+                            <textarea name="sp_field_106" id="sp-field-106" v-model="read.writerForm.userInstruction" placeholder="例如：保持人物语气一致；增加一个误会；结尾留钩子..." rows="4" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;"></textarea>
                             <div style="font-size:12px; color:rgba(0,0,0,0.55); margin-top:6px;">
                                 当前长度目标：{{ read.lengthHint }}
                             </div>
@@ -4646,7 +4618,7 @@
                         <div style="font-size:12px; color:rgba(0,0,0,0.62); margin-bottom:8px;">
                             背景图片链接
                         </div>
-                        <input
+                        <input name="sp_field_107" id="sp-field-107"
                             v-model="read.readerBackgroundUrl"
                             type="url"
                             class="read-input"
@@ -4658,7 +4630,7 @@
                                 <span>背景遮罩</span>
                                 <span>{{ Math.round(read.readerPrefs.overlayOpacity * 100) }}%</span>
                             </div>
-                            <input v-model.number="read.readerPrefs.overlayOpacity" type="range" min="0" max="0.9" step="0.05" style="width:100%;">
+                            <input name="sp_field_108" id="sp-field-108" v-model.number="read.readerPrefs.overlayOpacity" type="range" min="0" max="0.9" step="0.05" style="width:100%;">
                         </div>
                         <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:10px;">
                             <button type="button" class="btn-small" @click="read.resetReaderBackground">恢复默认背景</button>
@@ -4670,7 +4642,7 @@
                         <div style="font-weight:700; margin-bottom:10px;">文字排版</div>
 
                         <div style="font-size:12px; color:rgba(0,0,0,0.62); margin-bottom:6px;">字体风格</div>
-                        <select v-model="read.readerPrefs.fontFamily" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;">
+                        <select name="sp_field_109" id="sp-field-109" v-model="read.readerPrefs.fontFamily" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); outline:none;">
                             <option v-for="f in read.readerFontOptions" :key="f.value" :value="f.value">{{ f.label }}</option>
                         </select>
 
@@ -4679,7 +4651,7 @@
                                 <span>字号</span>
                                 <span>{{ read.readerPrefs.fontSize }}px</span>
                             </div>
-                            <input v-model.number="read.readerPrefs.fontSize" type="range" min="14" max="40" step="1" style="width:100%;">
+                            <input name="sp_field_110" id="sp-field-110" v-model.number="read.readerPrefs.fontSize" type="range" min="14" max="40" step="1" style="width:100%;">
                         </div>
 
                         <div style="margin-top:12px;">
@@ -4687,7 +4659,7 @@
                                 <span>行距</span>
                                 <span>{{ read.readerPrefs.lineHeight.toFixed(2) }}</span>
                             </div>
-                            <input v-model.number="read.readerPrefs.lineHeight" type="range" min="1.3" max="2.6" step="0.05" style="width:100%;">
+                            <input name="sp_field_111" id="sp-field-111" v-model.number="read.readerPrefs.lineHeight" type="range" min="1.3" max="2.6" step="0.05" style="width:100%;">
                         </div>
 
                         <div style="margin-top:12px;">
@@ -4695,7 +4667,7 @@
                                 <span>版心宽度</span>
                                 <span>{{ read.readerPrefs.contentWidth }}px</span>
                             </div>
-                            <input v-model.number="read.readerPrefs.contentWidth" type="range" min="520" max="1100" step="10" style="width:100%;">
+                            <input name="sp_field_112" id="sp-field-112" v-model.number="read.readerPrefs.contentWidth" type="range" min="520" max="1100" step="10" style="width:100%;">
                         </div>
 
                         <div style="margin-top:12px;">
@@ -4704,8 +4676,8 @@
                                 <span>{{ read.readerPrefs.textColor }}</span>
                             </div>
                             <div style="display:flex; gap:8px; align-items:center;">
-                                <input v-model="read.readerPrefs.textColor" type="color" style="width:44px; height:32px; border:1px solid rgba(0,0,0,0.12); border-radius:8px; padding:0;">
-                                <input v-model="read.readerPrefs.textColor" type="text" class="read-input" placeholder="#1f2933" style="flex:1; min-width:0;" @blur="read.saveReaderPrefs">
+                                <input name="sp_field_113" id="sp-field-113" v-model="read.readerPrefs.textColor" type="color" style="width:44px; height:32px; border:1px solid rgba(0,0,0,0.12); border-radius:8px; padding:0;">
+                                <input name="sp_field_114" id="sp-field-114" v-model="read.readerPrefs.textColor" type="text" class="read-input" placeholder="#1f2933" style="flex:1; min-width:0;" @blur="read.saveReaderPrefs">
                             </div>
                         </div>
 
@@ -4780,7 +4752,7 @@
                             <i class="fas fa-upload" @click="triggerCharacterImport"></i>
                         </div>
                     </div>
-                    <input type="file" ref="characterImportInput" @change="handleCharacterImport" accept=".json,.png" style="display: none;">
+                    <input name="sp_field_115" id="sp-field-115" type="file" ref="characterImportInput" @change="handleCharacterImport" accept=".json,.png" style="display: none;">
                     <div class="card-body">
                         <div class="character-grid">
                             <div v-for="char in characters" :key="char.id" class="character-card" @click="openDossier(char)">
@@ -4829,7 +4801,7 @@
                             <i class="fas fa-upload" @click="triggerPresetImport"></i>
                         </div>
                     </div>
-                    <input type="file" ref="presetImportInput" @change="handlePresetImport" accept=".json" style="display: none;">
+                    <input name="sp_field_116" id="sp-field-116" type="file" ref="presetImportInput" @change="handlePresetImport" accept=".json" style="display: none;">
                     <div class="card-body">
                         <div v-if="presets.length === 0" class="empty-state">暂无预设，点击下方添加</div>
                         <div v-for="preset in presets" :key="preset.id" class="profile-item" @click="openPresetEditor(preset)">
@@ -4855,6 +4827,7 @@
                         <label class="import-password-label" for="import-password-field">密码</label>
                         <input
                             id="import-password-field"
+                            name="importPasswordDraft"
                             ref="importPasswordFocusEl"
                             v-model="importPasswordDraft"
                             type="password"
@@ -4906,7 +4879,7 @@
                                 <div class="custom-checkbox" :class="{ checked: batchDeleteSelections.includes(item.id) }">
                                     <i class="fas fa-check" v-if="batchDeleteSelections.includes(item.id)"></i>
                                 </div>
-                                <input type="checkbox" :value="item.id" v-model="batchDeleteSelections" class="hidden-checkbox">
+                                <input name="sp_field_117" id="sp-field-117" type="checkbox" :value="item.id" v-model="batchDeleteSelections" class="hidden-checkbox">
                                 <div class="batch-delete-info">
                                     <div class="batch-delete-name">{{ item.name }}</div>
                                     <div class="batch-delete-meta">{{ item.meta }}</div>
@@ -4939,22 +4912,22 @@
                 </div>
                 <div class="modal-body">
                     <label>昵称</label>
-                    <input v-model="editingCharacter.nickname" placeholder="昵称">
+                    <input name="sp_field_118" id="sp-field-118" v-model="editingCharacter.nickname" placeholder="昵称">
                     <label class="mt-2">内部名称</label>
-                    <input v-model="editingCharacter.internalName" placeholder="内部名称">
+                    <input name="sp_field_119" id="sp-field-119" v-model="editingCharacter.internalName" placeholder="内部名称">
                     <label class="mt-2">简介</label>
-                    <textarea v-model="editingCharacter.summary" rows="2" placeholder="角色简介..."></textarea>
+                    <textarea name="sp_field_120" id="sp-field-120" v-model="editingCharacter.summary" rows="2" placeholder="角色简介..."></textarea>
                     <label class="mt-2">人设</label>
-                    <textarea v-model="editingCharacter.persona" rows="4" placeholder="角色人设..."></textarea>
+                    <textarea name="sp_field_121" id="sp-field-121" v-model="editingCharacter.persona" rows="4" placeholder="角色人设..."></textarea>
                     <label class="mt-2">头像</label>
                     <div class="flex" style="gap: 8px;">
-                        <input v-model="editingCharacter.avatarUrl" placeholder="头像 URL" style="flex: 1;">
+                        <input name="sp_field_122" id="sp-field-122" v-model="editingCharacter.avatarUrl" placeholder="头像 URL" style="flex: 1;">
                         <button class="btn-small" @click="triggerAvatarUpload"><i class="fas fa-image"></i> 相册</button>
                     </div>
                     
                     <label class="mt-2">开场白</label>
                     <div v-for="(line, index) in editingCharacter.openingLines" :key="index" class="flex mt-1" style="gap: 8px;">
-                        <input v-model="editingCharacter.openingLines[index]" placeholder="输入开场白内容..." style="flex: 1;">
+                        <input name="sp_field_123" id="sp-field-123" v-model="editingCharacter.openingLines[index]" placeholder="输入开场白内容..." style="flex: 1;">
                         <button class="btn-small danger" @click="removeOpeningLine(index)" v-if="editingCharacter.openingLines.length > 1"><i class="fas fa-minus"></i></button>
                     </div>
                     <button class="btn-small mt-1" @click="addOpeningLine"><i class="fas fa-plus"></i> 添加更多开场白</button>
@@ -4967,7 +4940,7 @@
                         </span>
                     </div>
                     <div class="flex mt-1" style="gap: 8px;">
-                        <input v-model="newTagInput" placeholder="添加标签..." style="flex: 1;">
+                        <input name="sp_field_124" id="sp-field-124" v-model="newTagInput" placeholder="添加标签..." style="flex: 1;">
                         <button class="btn-small" @click="addTag"><i class="fas fa-plus"></i></button>
                     </div>
                     
@@ -4976,18 +4949,18 @@
                     <div v-else class="worldbook-list">
                         <div v-for="wb in worldbooks" :key="wb.id" class="worldbook-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid rgba(0,0,0,0.1);">
                             <span>{{ wb.name }}</span>
-                            <input type="checkbox" v-model="editingCharacter.worldbookIds" :value="wb.id">
+                            <input name="sp_field_125" id="sp-field-125" type="checkbox" v-model="editingCharacter.worldbookIds" :value="wb.id">
                         </div>
                     </div>
 
                     <label class="mt-2">绑定预设 (线下模式使用)</label>
-                    <select v-model="editingCharacter.selectedPresetId">
+                    <select name="sp_field_126" id="sp-field-126" v-model="editingCharacter.selectedPresetId">
                         <option :value="null">不绑定预设</option>
                         <option v-for="p in presets" :key="p.id" :value="p.id">{{ p.name }}</option>
                     </select>
 
                     <label class="mt-2">用户人设</label>
-                    <textarea v-model="editingCharacter.userPersona" rows="2" placeholder="用户在此角色面前的人设..."></textarea>
+                    <textarea name="sp_field_127" id="sp-field-127" v-model="editingCharacter.userPersona" rows="2" placeholder="用户在此角色面前的人设..."></textarea>
                     
                     <div class="flex mt-2" style="justify-content: flex-end; gap: 12px;">
                         <button class="btn btn-danger" @click="deleteCharacter">删除</button>
@@ -5007,16 +4980,16 @@
                 </div>
                 <div class="modal-body">
                     <label>名称</label>
-                    <input v-model="editingWorldbook.name" placeholder="世界书名称">
+                    <input name="sp_field_128" id="sp-field-128" v-model="editingWorldbook.name" placeholder="世界书名称">
                     <label class="mt-2">描述</label>
-                    <textarea v-model="editingWorldbook.description" rows="2" placeholder="世界书描述..."></textarea>
+                    <textarea name="sp_field_129" id="sp-field-129" v-model="editingWorldbook.description" rows="2" placeholder="世界书描述..."></textarea>
                     <label class="mt-2">条目</label>
                     <div v-for="(entry, idx) in editingWorldbook.entries" :key="entry.id" class="worldbook-entry">
-                        <input v-model="entry.key" placeholder="关键词" class="entry-key">
-                        <textarea v-model="entry.content" placeholder="内容" rows="3" class="entry-content"></textarea>
+                        <input name="sp_field_130" id="sp-field-130" v-model="entry.key" placeholder="关键词" class="entry-key">
+                        <textarea name="sp_field_131" id="sp-field-131" v-model="entry.content" placeholder="内容" rows="3" class="entry-content"></textarea>
                         <div class="entry-actions">
                             <label class="checkbox-label">
-                                <input type="checkbox" v-model="entry.enabled">
+                                <input name="sp_field_132" id="sp-field-132" type="checkbox" v-model="entry.enabled">
                                 <span>启用</span>
                             </label>
                             <button class="btn-small danger" @click="deleteWorldbookEntry(entry.id)">删除</button>
@@ -5041,16 +5014,16 @@
                 </div>
                 <div class="modal-body">
                     <label>名称</label>
-                    <input v-model="editingPreset.name" placeholder="预设名称">
+                    <input name="sp_field_133" id="sp-field-133" v-model="editingPreset.name" placeholder="预设名称">
                     <label class="mt-2">内容 (或使用分段)</label>
-                    <textarea v-model="editingPreset.content" rows="3" placeholder="预设内容..."></textarea>
+                    <textarea name="sp_field_134" id="sp-field-134" v-model="editingPreset.content" rows="3" placeholder="预设内容..."></textarea>
                     <label class="mt-2">分段</label>
                     <div v-for="(seg, idx) in editingPreset.segments" :key="seg.id" class="preset-segment">
-                        <input v-model="seg.title" placeholder="分段标题" class="segment-title">
-                        <textarea v-model="seg.content" placeholder="分段内容" rows="3" class="segment-content"></textarea>
+                        <input name="sp_field_135" id="sp-field-135" v-model="seg.title" placeholder="分段标题" class="segment-title">
+                        <textarea name="sp_field_136" id="sp-field-136" v-model="seg.content" placeholder="分段内容" rows="3" class="segment-content"></textarea>
                         <div class="segment-actions">
                             <label class="checkbox-label">
-                                <input type="checkbox" v-model="seg.enabled">
+                                <input name="sp_field_137" id="sp-field-137" type="checkbox" v-model="seg.enabled">
                                 <span>启用</span>
                             </label>
                             <button class="btn-small danger" @click="editingPreset.segments.splice(idx, 1)">删除</button>
@@ -5125,26 +5098,26 @@
                                 <label class="console-label">
                                     <i class="fas fa-tag"></i> 配置名称
                                 </label>
-                                <input type="text" class="console-input" placeholder="输入配置名称" v-model="activeProfile.name">
+                                <input name="sp_field_138" id="sp-field-138" type="text" class="console-input" placeholder="输入配置名称" v-model="activeProfile.name">
                             </div>
                             <div class="console-form-group">
                                 <label class="console-label">
                                     <i class="fas fa-link"></i> API 地址
                                 </label>
-                                <input type="text" class="console-input" placeholder="https://api.example.com/v1" v-model="activeProfile.endpoint">
+                                <input name="sp_field_139" id="sp-field-139" type="text" class="console-input" placeholder="https://api.example.com/v1" v-model="activeProfile.endpoint">
                             </div>
                             <div class="console-form-group">
                                 <label class="console-label">
                                     <i class="fas fa-key"></i> API Key
                                 </label>
-                                <input type="password" class="console-input" placeholder="输入 API Key" v-model="activeProfile.key">
+                                <input name="sp_field_140" id="sp-field-140" type="password" class="console-input" placeholder="输入 API Key" v-model="activeProfile.key">
                             </div>
                             <div class="console-form-group">
                                 <label class="console-label">
                                     <i class="fas fa-brain"></i> 模型
                                 </label>
                                 <div class="console-model-select">
-                                    <select class="console-select" v-model="activeProfile.model">
+                                    <select name="sp_field_141" id="sp-field-141" class="console-select" v-model="activeProfile.model">
                                         <option value="">选择模型</option>
                                         <option v-for="model in availableModels" :key="model.id" :value="model.id">{{ model.id }}</option>
                                     </select>
@@ -5159,7 +5132,7 @@
                                     <i class="fas fa-thermometer-half"></i> 温度 (Temperature)
                                     <span class="temperature-value">{{ activeProfile.temperature !== undefined ? activeProfile.temperature : 0.7 }}</span>
                                 </label>
-                                <input type="range" class="console-slider" min="0" max="2" step="0.1" v-model.number="activeProfile.temperature">
+                                <input name="sp_field_142" id="sp-field-142" type="range" class="console-slider" min="0" max="2" step="0.1" v-model.number="activeProfile.temperature">
                                 <div class="temperature-hint">
                                     <span class="hint-label">保守</span>
                                     <span class="hint-desc">控制AI回复的随机性。较低值使回复更确定、一致；较高值使回复更有创意、多样。</span>
@@ -5207,7 +5180,7 @@
                                 :disabled="backupExporting || backupImporting">
                                 <i class="fas fa-file-import"></i> 从备份文件恢复
                             </button>
-                            <input type="file" accept=".json,application/json" ref="soulosBackupFileInput" style="display:none" @change="handleSoulOsBackupImport">
+                            <input name="sp_field_143" id="sp-field-143" type="file" accept=".json,application/json" ref="soulosBackupFileInput" style="display:none" @change="handleSoulOsBackupImport">
                         </div>
                     </div>
                 </div>
@@ -5220,7 +5193,7 @@
                             <div class="console-card-header"><span>软件分片</span></div>
                             <div class="console-card-body">
                                 <label v-for="(seg, appKey) in segmentedImportPackage.segments.apps" :key="appKey" style="display:flex; gap:8px; align-items:center; margin:6px 0;">
-                                    <input type="checkbox" v-model="segmentedImportAppSelections[appKey]">
+                                    <input name="sp_field_144" id="sp-field-144" type="checkbox" v-model="segmentedImportAppSelections[appKey]">
                                     <span>{{ appKey }}</span>
                                 </label>
                             </div>
@@ -5229,7 +5202,7 @@
                             <div class="console-card-header"><span>角色分片</span></div>
                             <div class="console-card-body">
                                 <label v-for="(seg, roleId) in segmentedImportPackage.segments.roles" :key="roleId" style="display:flex; gap:8px; align-items:center; margin:6px 0;">
-                                    <input type="checkbox" v-model="segmentedImportRoleSelections[roleId]">
+                                    <input name="sp_field_145" id="sp-field-145" type="checkbox" v-model="segmentedImportRoleSelections[roleId]">
                                     <span>{{ seg.name || roleId }}</span>
                                 </label>
                             </div>
@@ -5277,26 +5250,6 @@
                 <div style="width: 40px;"></div>
             </div>
             <div class="app-content theme-content">
-                <!-- SoulPocket 账号 -->
-                <div class="card theme-card theme-account-card">
-                    <div class="theme-card-header">
-                        <i class="fas fa-user-circle"></i>
-                        <span>SoulPocket 账号</span>
-                    </div>
-                    <div class="theme-account-body">
-                        <p v-if="isLoggedIn && discordUser" class="theme-account-status">
-                            已登录 Discord：<strong>{{ discordUser.global_name || discordUser.username || '用户' }}</strong>
-                            <span v-if="discordUser.discriminator && discordUser.discriminator !== '0'" class="theme-account-disc">#{{ discordUser.discriminator }}</span>
-                        </p>
-                        <p v-else-if="isGuest" class="theme-account-status">当前为<strong>游客模式</strong>（仅 Chat 与 Dock 可用）</p>
-                        <p v-else class="theme-account-status">未登录</p>
-                        <button type="button" class="theme-account-exit-btn" @click="onSoulPocketAccountExit">
-                            切换账号 / 退出
-                        </button>
-                        <p class="theme-account-hint">退出后将返回登录页，可再次游客进入</p>
-                    </div>
-                </div>
-
                 <!-- 锁屏设置卡片 -->
                 <div class="card theme-card">
                     <div class="theme-card-header">
@@ -5321,7 +5274,7 @@
                                 <div class="setting-desc">请设置四位数字密码</div>
                             </div>
                             <div class="password-setting">
-                                <input type="password" class="password-input" v-model="passwordSetting" placeholder="输入4位数字" maxlength="4" @input="validatePassword">
+                                <input name="sp_field_146" id="sp-field-146" type="password" class="password-input" v-model="passwordSetting" placeholder="输入4位数字" maxlength="4" @input="validatePassword">
                                 <button class="password-save-btn" @click="savePassword" :disabled="!isPasswordValid">保存</button>
                             </div>
                         </div>
@@ -5347,7 +5300,7 @@
                                 </div>
                                 <div class="font-actions">
                                     <div class="font-import">
-                                        <input type="file" accept=".ttf" @change="importCustomFont" ref="fontFileInput" style="display: none;">
+                                        <input name="sp_field_147" id="sp-field-147" type="file" accept=".ttf" @change="importCustomFont" ref="fontFileInput" style="display: none;">
                                         <button class="font-import-btn" @click="showFontImportDialog = true">导入字体</button>
                                     </div>
                                     <button class="font-save-btn" @click="saveFont">保存</button>
@@ -5360,11 +5313,11 @@
                                         <div class="font-import-form">
                                             <div class="form-group">
                                                 <label>字体名称</label>
-                                                <input type="text" v-model="newFontName" placeholder="输入字体名称">
+                                                <input name="sp_field_148" id="sp-field-148" type="text" v-model="newFontName" placeholder="输入字体名称">
                                             </div>
                                             <div class="form-group">
                                                 <label>字体链接 (TTF格式)</label>
-                                                <input type="text" v-model="newFontUrl" placeholder="输入TTF字体链接">
+                                                <input name="sp_field_149" id="sp-field-149" type="text" v-model="newFontUrl" placeholder="输入TTF字体链接">
                                             </div>
                                             <div class="form-actions">
                                                 <button class="cancel-btn" @click="showFontImportDialog = false">取消</button>
@@ -5381,7 +5334,7 @@
                                 <div class="setting-desc">设置锁屏界面的个性签名</div>
                             </div>
                             <div class="signature-setting">
-                                <input type="text" class="signature-input" v-model="signatureSetting" placeholder="输入个性签名">
+                                <input name="sp_field_150" id="sp-field-150" type="text" class="signature-input" v-model="signatureSetting" placeholder="输入个性签名">
                                 <button class="signature-save-btn" @click="saveSignature">保存</button>
                             </div>
                         </div>
@@ -5391,7 +5344,7 @@
                                 <div class="setting-desc">设置锁屏界面的背景图片</div>
                             </div>
                             <div class="lock-wallpaper-setting">
-                                <input type="text" class="lock-wallpaper-input" v-model="lockWallpaperInput" placeholder="输入图片URL">
+                                <input name="sp_field_151" id="sp-field-151" type="text" class="lock-wallpaper-input" v-model="lockWallpaperInput" placeholder="输入图片URL">
                                 <button class="lock-wallpaper-save-btn" @click="saveLockWallpaper">保存</button>
                             </div>
                         </div>
@@ -5401,7 +5354,7 @@
                                 <div class="setting-desc">设置锁屏界面的日期时间颜色</div>
                             </div>
                             <div class="lock-color-setting">
-                                <input type="color" class="lock-color-input" v-model="lockDateTimeColor">
+                                <input name="sp_field_152" id="sp-field-152" type="color" class="lock-color-input" v-model="lockDateTimeColor">
                                 <button class="lock-color-save-btn" @click="saveLockDateTimeColor">保存</button>
                             </div>
                         </div>
@@ -5474,7 +5427,7 @@
 
                                 <div class="font-actions">
                                     <div class="font-import">
-                                        <input
+                                        <input name="sp_field_153" id="sp-field-153"
                                             ref="globalFontFileInput"
                                             type="file"
                                             accept=".ttf"
@@ -5496,7 +5449,7 @@
                                 <div class="setting-desc">设置主界面背景图片</div>
                             </div>
                             <div class="lock-wallpaper-setting">
-                                <input
+                                <input name="sp_field_154" id="sp-field-154"
                                     type="text"
                                     class="lock-wallpaper-input"
                                     v-model="homeWallpaperInput"
@@ -5551,7 +5504,7 @@
                                 <div class="setting-desc">设置主界面/全局文字颜色</div>
                             </div>
                             <div class="lock-color-setting">
-                                <input type="color" class="lock-color-input" v-model="homeTextColorInput">
+                                <input name="sp_field_155" id="sp-field-155" type="color" class="lock-color-input" v-model="homeTextColorInput">
                                 <button class="lock-color-save-btn" @click="saveHomeTextColor">保存</button>
                             </div>
                         </div>
@@ -5732,7 +5685,7 @@
                         </div>
                         <div class="games-ai-picker">
                             <div class="games-kicker">游戏搭子</div>
-                            <select v-model="gameAiCharacterId" class="console-select">
+                            <select name="sp_field_156" id="sp-field-156" v-model="gameAiCharacterId" class="console-select">
                                 <option :value="null">默认 AI 搭子</option>
                                 <option v-for="char in characters" :key="char.id" :value="char.id">
                                     {{ char.nickname || char.name || '未命名角色' }}
@@ -5742,7 +5695,7 @@
                         </div>
 
                     <div v-if="games.currentGame.id === 'werewolf'" class="games-mode-panel">
-                        <input v-model="playerName" type="text" placeholder="输入玩家名" class="lock-wallpaper-input">
+                        <input name="sp_field_157" id="sp-field-157" v-model="playerName" type="text" placeholder="输入玩家名" class="lock-wallpaper-input">
                         <div class="games-actions-row">
                             <button class="console-btn console-btn-secondary" @click="joinGame">加入</button>
                             <button class="console-btn console-btn-primary" @click="startGameSession">开始</button>
@@ -5829,7 +5782,7 @@
                             <div class="games-kicker">问题格挑战</div>
                             <div class="games-prompt-text">{{ ludoQuestionCard.question }}</div>
                             <div class="games-chat-input-row">
-                                <input
+                                <input name="sp_field_158" id="sp-field-158"
                                     v-model="ludoAnswerInput"
                                     @keyup.enter="submitLudoAnswer"
                                     type="text"
@@ -5861,7 +5814,7 @@
                             </div>
                         </div>
                         <div class="games-chat-input-row">
-                            <input
+                            <input name="sp_field_159" id="sp-field-159"
                                 v-model="playerMessage"
                                 @keyup.enter="sendMessage"
                                 type="text"
@@ -5934,9 +5887,9 @@
                 <div class="card">
                     <div class="card-title">情侣空间</div>
                     <div style="display:flex; flex-direction:column; gap:8px;">
-                        <input v-model="nest.nestTitle" class="lock-wallpaper-input" placeholder="空间名称">
-                        <input v-model="nest.anniversaryDate" type="date" class="lock-wallpaper-input">
-                        <textarea v-model="nest.dailyNote" class="lock-wallpaper-input" style="min-height:64px;" placeholder="今日想对Ta说..."></textarea>
+                        <input name="sp_field_160" id="sp-field-160" v-model="nest.nestTitle" class="lock-wallpaper-input" placeholder="空间名称">
+                        <input name="sp_field_161" id="sp-field-161" v-model="nest.anniversaryDate" type="date" class="lock-wallpaper-input">
+                        <textarea name="sp_field_162" id="sp-field-162" v-model="nest.dailyNote" class="lock-wallpaper-input" style="min-height:64px;" placeholder="今日想对Ta说..."></textarea>
                     </div>
                     <div style="margin-top:10px; font-size:13px; color:#666;">
                         和 {{ nest.partnerName }} 在一起第 {{ nest.daysTogether }} 天 · Love Score {{ nest.loveScore }}
@@ -5950,7 +5903,7 @@
                 <div class="card">
                     <div class="card-title">回忆相册</div>
                     <div style="display:flex; gap:8px;">
-                        <input v-model="nest.memoryInput" @keyup.enter="nest.addMemory(nest.memoryInput)" class="lock-wallpaper-input" placeholder="记录一个瞬间...">
+                        <input name="sp_field_163" id="sp-field-163" v-model="nest.memoryInput" @keyup.enter="nest.addMemory(nest.memoryInput)" class="lock-wallpaper-input" placeholder="记录一个瞬间...">
                         <button class="console-btn console-btn-primary" @click="nest.addMemory(nest.memoryInput)">添加</button>
                     </div>
                     <div style="margin-top:10px; display:flex; flex-direction:column; gap:8px; max-height:180px; overflow:auto;">
@@ -5964,12 +5917,12 @@
                 <div class="card">
                     <div class="card-title">愿望清单（{{ nest.completedWishCount }}/{{ nest.wishes.length }}）</div>
                     <div style="display:flex; gap:8px;">
-                        <input v-model="nest.wishInput" @keyup.enter="nest.addWish" class="lock-wallpaper-input" placeholder="比如：一起看海">
+                        <input name="sp_field_164" id="sp-field-164" v-model="nest.wishInput" @keyup.enter="nest.addWish" class="lock-wallpaper-input" placeholder="比如：一起看海">
                         <button class="console-btn console-btn-primary" @click="nest.addWish">添加</button>
                     </div>
                     <div style="margin-top:10px; display:flex; flex-direction:column; gap:8px; max-height:160px; overflow:auto;">
                         <label v-for="w in nest.wishes" :key="w.id" style="display:flex; align-items:center; gap:8px; font-size:13px; color:#333;">
-                            <input type="checkbox" :checked="w.done" @change="nest.toggleWish(w.id)">
+                            <input name="sp_field_165" id="sp-field-165" type="checkbox" :checked="w.done" @change="nest.toggleWish(w.id)">
                             <span :style="{ textDecoration: w.done ? 'line-through' : 'none', opacity: w.done ? 0.6 : 1 }">{{ w.text }}</span>
                         </label>
                     </div>
@@ -5978,13 +5931,13 @@
                 <div class="card">
                     <div class="card-title">约会计划（{{ nest.completedPlanCount }}/{{ nest.plans.length }}）</div>
                     <div style="display:flex; gap:8px;">
-                        <input v-model="nest.planInput" class="lock-wallpaper-input" placeholder="计划内容">
-                        <input v-model="nest.planDateInput" type="date" class="lock-wallpaper-input" style="max-width:140px;">
+                        <input name="sp_field_166" id="sp-field-166" v-model="nest.planInput" class="lock-wallpaper-input" placeholder="计划内容">
+                        <input name="sp_field_167" id="sp-field-167" v-model="nest.planDateInput" type="date" class="lock-wallpaper-input" style="max-width:140px;">
                         <button class="console-btn console-btn-primary" @click="nest.addPlan">加</button>
                     </div>
                     <div style="margin-top:10px; display:flex; flex-direction:column; gap:8px; max-height:180px; overflow:auto;">
                         <label v-for="p in nest.plans" :key="p.id" style="display:flex; align-items:center; gap:8px; font-size:13px; color:#333; padding:6px 0;">
-                            <input type="checkbox" :checked="p.done" @change="nest.togglePlan(p.id)">
+                            <input name="sp_field_168" id="sp-field-168" type="checkbox" :checked="p.done" @change="nest.togglePlan(p.id)">
                             <span :style="{ textDecoration: p.done ? 'line-through' : 'none', opacity: p.done ? 0.6 : 1 }">{{ p.date }} · {{ p.text }}</span>
                         </label>
                     </div>
@@ -6023,7 +5976,7 @@
                 <div class="photo-widget-edit-body">
                     <div class="photo-widget-edit-field">
                         <label>第一行</label>
-                        <input 
+                        <input name="sp_field_169" id="sp-field-169" 
                             type="text" 
                             v-model="photoWidgetEditText1" 
                             placeholder="请输入第一行文字"
@@ -6032,7 +5985,7 @@
                     </div>
                     <div class="photo-widget-edit-field">
                         <label>第二行</label>
-                        <input 
+                        <input name="sp_field_170" id="sp-field-170" 
                             type="text" 
                             v-model="photoWidgetEditText2" 
                             placeholder="请输入第二行文字"
@@ -6059,7 +6012,7 @@
                 <div class="photo-widget-edit-body">
                     <div class="photo-widget-edit-field">
                         <label>{{ currentCapsuleType === 'black' ? '黑色胶囊' : '灰色胶囊' }}文字</label>
-                        <input 
+                        <input name="sp_field_171" id="sp-field-171" 
                             type="text" 
                             v-model="capsuleEditText" 
                             placeholder="请输入文字"
@@ -6089,7 +6042,7 @@
                             currentDashboardTextType === 'weekday' ? '星期文字' : 
                             currentDashboardTextType === 'weather' ? '天气文字' : '口号文字' 
                         }}</label>
-                        <input 
+                        <input name="sp_field_172" id="sp-field-172" 
                             type="text" 
                             v-model="dashboardEditText" 
                             placeholder="请输入文字"
@@ -6143,7 +6096,7 @@
         <div class="call-widget-editor" v-if="showCallWidgetEdit">
             <div class="call-widget-editor-content">
                 <h3>编辑通话小组件文字</h3>
-                <input 
+                <input name="sp_field_173" id="sp-field-173" 
                     type="text" 
                     v-model="callWidgetEditInput" 
                     class="call-widget-edit-input"
