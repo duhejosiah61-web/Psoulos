@@ -9,7 +9,7 @@
     padding: 10px 10px 0;
     background: #f4f5f9;
     min-height: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", sans-serif;
+    font-family: 'Georgia', 'Times New Roman', 'Songti SC', 'STSong', 'Noto Serif SC', serif;
 }
 .peek-app.dark {
     background: #0f1014;
@@ -122,8 +122,8 @@
     background: radial-gradient(circle at 10% 0%, #e0e7ff 0%, #f3e8ff 50%, #ffe4e6 100%);
 }
 .peek-phone-screen.dark {
-    /* 深色高级磨砂壁纸 */
-    background: radial-gradient(circle at 0% 0%, #2a2a35 0%, #101217 60%, #000000 100%);
+    /* 美拉德暖色壁纸 */
+    background: linear-gradient(135deg, #F0EAE1 0%, #E5D5C5 50%, #D4B89F 100%);
 }
 
 /* 状态栏 */
@@ -139,7 +139,7 @@
     z-index: 10;
     letter-spacing: 0.03em;
 }
-.peek-phone-screen.dark .peek-statusbar { color: #ffffff; }
+.peek-phone-screen.dark .peek-statusbar { color: #4A3B32; }
 .peek-status-right { display: flex; align-items: center; gap: 6px; font-size: 11px; opacity: 0.9; }
 
 /* 主屏内容区 */
@@ -167,8 +167,8 @@
     text-shadow: 0 2px 10px rgba(255,255,255,0.5);
 }
 .peek-phone-screen.dark .peek-widget-greeting {
-    color: #ffffff;
-    text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    color: #3D2C23;
+    text-shadow: 0 2px 10px rgba(255,255,255,0.4);
 }
 .peek-home-headline .peek-widget-date {
     font-size: 12px;
@@ -177,7 +177,7 @@
     text-shadow: 0 1px 4px rgba(255,255,255,0.3);
 }
 .peek-phone-screen.dark .peek-home-headline .peek-widget-date {
-    color: rgba(255,255,255,0.6);
+    color: rgba(74, 59, 50, 0.7);
     text-shadow: none;
 }
 
@@ -203,10 +203,10 @@
 .peek-widget-card:active { transform: scale(0.96); }
 
 .peek-phone-screen.dark .peek-widget-card {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.12);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.1);
-    color: #ffffff;
+    background: rgba(255, 255, 255, 0.5);
+    border-color: rgba(255, 255, 255, 0.7);
+    box-shadow: 0 8px 24px rgba(140, 106, 83, 0.15), inset 0 1px 2px rgba(255, 255, 255, 0.9);
+    color: #4A3B32;
 }
 .peek-widget-card-title {
     font-size: 12px;
@@ -216,10 +216,10 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
-.peek-phone-screen.dark .peek-widget-card-title { color: rgba(255, 255, 255, 0.5); }
+.peek-phone-screen.dark .peek-widget-card-title { color: rgba(74, 59, 50, 0.6); }
 .peek-widget-weather-value { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
 .peek-widget-card-sub { margin-top: 6px; font-size: 11px; color: rgba(0,0,0,0.4); font-weight: 500; }
-.peek-phone-screen.dark .peek-widget-card-sub { color: rgba(255,255,255,0.4); }
+.peek-phone-screen.dark .peek-widget-card-sub { color: rgba(74, 59, 50, 0.5); }
 
 /* 应用网格与图标 - 现代高质感风格 */
 .peek-home-grid {
@@ -232,6 +232,7 @@
     padding: 12px 4px 0;
 }
 .peek-app-icon {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -245,8 +246,8 @@
     text-shadow: 0 1px 4px rgba(255,255,255,0.5);
 }
 .peek-phone-screen.dark .peek-app-icon {
-    color: #ffffff;
-    text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+    color: #3D2C23;
+    text-shadow: 0 1px 4px rgba(255,255,255,0.6);
 }
 /* 核心图标优化：不再是死板的单色块，而是半透明晶体感 */
 .peek-app-icon i {
@@ -265,10 +266,10 @@
     transition: transform 0.2s ease, filter 0.2s ease;
 }
 .peek-phone-screen.dark .peek-app-icon i {
-    background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.02) 100%);
-    color: #ffffff;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    box-shadow: 0 6px 16px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.2);
+    background: linear-gradient(135deg, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.3) 100%);
+    color: #4A3B32;
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    box-shadow: 0 6px 16px rgba(140, 106, 83, 0.15), inset 0 1px 2px rgba(255,255,255,0.9);
 }
 .peek-app-icon:active i { transform: scale(0.9); filter: brightness(0.9); }
 .peek-app-label { opacity: 0.9; }
@@ -288,11 +289,12 @@
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
 }
 .peek-phone-screen.dark .peek-dock {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.12);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    background: rgba(255, 255, 255, 0.5);
+    border-color: rgba(255, 255, 255, 0.6);
+    box-shadow: 0 10px 30px rgba(140, 106, 83, 0.15);
 }
 .peek-dock-item {
+    position: relative;
     width: 46px;
     height: 46px;
     display: inline-flex;
@@ -333,8 +335,7 @@
 .peek-app-badge {
     position: absolute;
     top: -4px;
-    right: 48%;
-    transform: translateX(50%);
+    right: 4px;
     min-width: 18px;
     height: 18px;
     padding: 0 5px;
@@ -364,8 +365,8 @@
     border-bottom: 1px solid rgba(0,0,0,0.05);
 }
 .peek-phone-screen.dark .peek-app-nav {
-    background: rgba(20, 20, 25, 0.85);
-    border-bottom-color: rgba(255,255,255,0.08);
+    background: rgba(248, 245, 240, 0.85); /* Light glass */
+    border-bottom-color: rgba(140, 106, 83, 0.1);
 }
 .peek-app-back {
     padding: 8px 12px;
@@ -379,13 +380,22 @@
 .peek-app-title { font-size: 17px; font-weight: 700; letter-spacing: 0.02em; }
 .peek-app-body {
     flex: 1;
-    min-height: 0;
     overflow-y: auto;
-    padding: 16px;
     background: #f2f2f7;
+    position: relative;
+    -webkit-overflow-scrolling: touch;
 }
-.peek-phone-screen.dark .peek-app-body { background: #000; }
-
+.peek-phone-screen.dark .peek-app-body {
+    background: #F8F5F0; /* Warm off-white */
+    color: #2D1E15; /* Deep espresso text */
+}
+.peek-app-body::-webkit-scrollbar {
+    display: none;
+}
+.peek-app-body {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+}
 /* 锁屏界面 (保留逻辑，进行质感升级) */
 .peek-lockscreen {
     flex: 1;
@@ -465,72 +475,190 @@
 
 /* 强制所有文本颜色在 Dark 模式下可见 */
 .peek-phone-screen.dark .peek-app-body {
-    color: #fff;
+    color: #2D1E15;
 }
 
-/* 微信/消息 (Messages) */
-.peek-app-im {
+/* 微信/消息 (Messages) - Maillard / Vintage Warm Style */
+.peek-retro-im {
     display: flex;
     flex-direction: column;
-    gap: 16px;
-    padding: 10px 0;
+    height: 100%;
+    font-family: 'Georgia', 'Times New Roman', 'Songti SC', 'STSong', 'Noto Serif SC', serif;
+    background: #F8F5F0; /* Warm off-white background */
+    color: #4A3B32; /* Deep warm brown text */
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    overflow: hidden;
 }
-.peek-chat-msg-row {
+
+/* Header */
+.peek-retro-header {
+    background: #8C6A53; /* Caramel / Coffee brown */
+    color: #FFF9F2;
+    padding: 14px 16px;
+    font-weight: 600;
+    font-size: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 10px rgba(140, 106, 83, 0.15);
+    letter-spacing: 0.5px;
+    z-index: 10;
+}
+.peek-retro-back {
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    opacity: 0.9;
+}
+
+/* Inbox List */
+.peek-retro-inbox {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow-y: auto;
+}
+.peek-retro-inbox-list {
+    display: flex;
+    flex-direction: column;
+}
+.peek-retro-inbox-item {
+    display: flex;
+    padding: 16px;
+    border-bottom: 1px solid #EBE4DA;
+    gap: 14px;
+    align-items: center;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+.peek-retro-inbox-item:hover {
+    background: #F0EAE1;
+}
+.peek-retro-avatar-box {
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, #D4B89F, #BA9A83);
+    border-radius: 14px; /* Soft squircle */
+    color: #FFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: bold;
+    flex-shrink: 0;
+    box-shadow: 0 2px 6px rgba(186, 154, 131, 0.2);
+}
+.peek-retro-inbox-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+.peek-retro-inbox-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.peek-retro-name {
+    font-weight: 600;
+    font-size: 16px;
+    color: #3D2C23;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.peek-retro-time {
+    font-size: 12px;
+    color: #A38C7D;
+}
+.peek-retro-inbox-bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.peek-retro-preview {
+    font-size: 14px;
+    color: #7A6355;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-right: 10px;
+}
+.peek-retro-unread {
+    background: #C25B4E; /* Warm brick red for unread */
+    color: #FFF;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-weight: bold;
+    font-size: 11px;
+}
+
+/* Chat Thread */
+.peek-retro-thread {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+    background: #F8F5F0;
+}
+.peek-retro-thread-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+.peek-retro-msg-row {
     display: flex;
     gap: 12px;
     align-items: flex-end;
 }
-.peek-chat-msg-row.self {
+.peek-retro-msg-row.self {
     flex-direction: row-reverse;
 }
-.peek-chat-avatar {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    background: linear-gradient(135deg, #a78bfa, #f472b6);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #fff;
-    font-weight: bold;
-    font-size: 16px;
-    flex-shrink: 0;
-    margin-bottom: 20px;
-}
-.peek-chat-bubble-wrap {
-    max-width: 75%;
+.peek-retro-bubble-wrap {
+    max-width: 72%;
     display: flex;
     flex-direction: column;
 }
-.peek-chat-msg-row.self .peek-chat-bubble-wrap {
+.peek-retro-msg-row.self .peek-retro-bubble-wrap {
     align-items: flex-end;
 }
-.peek-chat-sender-name {
-    font-size: 11px;
-    color: #888;
-    margin-bottom: 4px;
-    margin-left: 2px;
-}
-.peek-chat-bubble {
-    background: #2c2c2e;
-    color: #fff;
-    padding: 10px 14px;
-    border-radius: 18px;
+.peek-retro-bubble {
+    background: #FFF;
+    color: #4A3B32;
+    padding: 12px 16px;
+    border-radius: 20px;
     border-bottom-left-radius: 4px;
     font-size: 15px;
-    line-height: 1.4;
+    line-height: 1.5;
     word-break: break-word;
+    box-shadow: 0 2px 8px rgba(140, 106, 83, 0.08);
 }
-.peek-chat-msg-row.self .peek-chat-bubble {
-    background: #0b93f6; /* iOS Blue */
-    color: #fff;
-    border-bottom-left-radius: 18px;
+.peek-retro-msg-row.self .peek-retro-bubble {
+    background: #D5B495; /* Warm creamy latte/caramel */
+    color: #2D1E15;
+    border-radius: 20px;
+    border-bottom-left-radius: 20px;
     border-bottom-right-radius: 4px;
+    box-shadow: 0 2px 8px rgba(213, 180, 149, 0.2);
 }
-.peek-chat-time {
-    font-size: 10px;
-    color: #666;
-    margin-top: 4px;
+.peek-retro-msg-time {
+    font-size: 11px;
+    margin-top: 6px;
+    color: #B3A194;
+    padding: 0 4px;
+}
+.peek-retro-empty {
+    padding: 40px 20px;
+    text-align: center;
+    font-weight: 500;
+    color: #A38C7D;
+    font-size: 14px;
 }
 
 /* 相册 (Album) */
@@ -559,6 +687,10 @@
     color: rgba(255, 255, 255, 0.9);
     text-shadow: 0 1px 4px rgba(0,0,0,0.8);
     position: relative;
+}
+.peek-phone-screen.dark .peek-album-glass {
+    background: linear-gradient(135deg, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.3) 100%);
+    box-shadow: 0 8px 32px rgba(140, 106, 83, 0.1), inset 0 1px 2px rgba(255,255,255,0.5);
 }
 .peek-album-glass::after {
     content: '';
@@ -595,25 +727,27 @@
     border-radius: 12px;
     padding: 16px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-    border-left: 3px solid #ffd60a; /* Apple Notes Yellow */
+    border-left: 3px solid #D5B495; /* Maillard warm accent */
 }
+.peek-phone-screen.dark .peek-note-card { background: #FFF; border-left-color: #D5B495; box-shadow: 0 2px 10px rgba(140, 106, 83, 0.08); }
 .peek-note-title {
     margin: 0 0 6px 0;
     font-size: 18px;
     font-weight: 700;
-    color: #fff;
+    color: #2D1E15;
     line-height: 1.3;
 }
 .peek-note-mood {
     font-size: 12px;
-    color: #ffd60a;
+    color: #D5B495;
     margin-bottom: 8px;
 }
+.peek-phone-screen.dark .peek-note-mood { color: #D5B495; }
 .peek-note-body {
     margin: 0;
     font-size: 14px;
     line-height: 1.5;
-    color: #ebebf5;
+    color: #4A3B32;
     white-space: pre-wrap;
 }
 
@@ -635,10 +769,15 @@
     justify-content: center;
     margin-bottom: 8px;
 }
+.peek-phone-screen.dark .peek-browser-searchbar {
+    background: #E8D8C8;
+    border-color: transparent;
+    color: #2D1E15;
+}
 .peek-browser-history-title {
     font-size: 20px;
     font-weight: bold;
-    color: #fff;
+    color: #2D1E15;
     margin-top: 8px;
     margin-bottom: 4px;
 }
@@ -648,6 +787,9 @@
     gap: 12px;
     padding: 12px 0;
     border-bottom: 1px solid #2c2c2e;
+}
+.peek-phone-screen.dark .peek-browser-item {
+    border-bottom-color: rgba(140, 106, 83, 0.1);
 }
 .peek-browser-item:last-child {
     border-bottom: none;
@@ -663,6 +805,11 @@
     color: #8e8e93;
     flex-shrink: 0;
 }
+.peek-phone-screen.dark .peek-browser-icon {
+    background: #FFF;
+    color: #BA6D48;
+    box-shadow: 0 2px 8px rgba(140, 106, 83, 0.1);
+}
 .peek-browser-content {
     flex: 1;
     min-width: 0;
@@ -675,6 +822,9 @@
     text-overflow: ellipsis;
     margin-bottom: 2px;
 }
+.peek-phone-screen.dark .peek-browser-title {
+    color: #2D1E15;
+}
 .peek-browser-url {
     font-size: 12px;
     color: #8e8e93;
@@ -682,3 +832,308 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
+.peek-phone-screen.dark .peek-browser-url {
+    color: #8C6A53;
+}
+
+/* =========================================================
+   新增：高保真相册“已隐藏”底部栏
+   ========================================================= */
+.peek-app-album-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+.peek-app-album {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    padding: 2px;
+    flex-shrink: 0;
+}
+.peek-album-hidden-section {
+    margin-top: 16px;
+    padding: 0 16px;
+}
+.peek-album-hidden-title {
+    font-size: 16px;
+    font-weight: bold;
+    margin-bottom: 8px;
+    color: #1c1c1e;
+}
+.peek-phone-screen.dark .peek-album-hidden-title {
+    color: #fff;
+}
+.peek-album-hidden-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+.peek-phone-screen.dark .peek-album-hidden-item {
+    border-bottom-color: rgba(255,255,255,0.05);
+}
+.peek-album-hidden-icon {
+    width: 24px;
+    font-size: 18px;
+    color: #007aff;
+    margin-right: 12px;
+    text-align: center;
+}
+.peek-album-hidden-text {
+    flex: 1;
+    font-size: 15px;
+    color: #007aff;
+}
+.peek-album-hidden-count {
+    font-size: 14px;
+    color: #8e8e93;
+}
+
+/* =========================================================
+   新增：高保真支付宝/账单 UI
+   ========================================================= */
+.peek-app-bank {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+.peek-bank-header {
+    background: linear-gradient(135deg, #CFA58A, #8C6A53);
+    border-radius: 16px;
+    padding: 20px;
+    color: #fff;
+    box-shadow: 0 8px 16px rgba(140, 106, 83, 0.2);
+}
+.peek-bank-title {
+    font-size: 13px;
+    opacity: 0.8;
+}
+.peek-bank-balance {
+    font-size: 32px;
+    font-weight: 700;
+    margin: 8px 0;
+}
+.peek-bank-sub {
+    font-size: 12px;
+    opacity: 0.9;
+}
+.peek-bank-list {
+    background: #fff;
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+}
+.peek-phone-screen.dark .peek-bank-list {
+    background: #FFF;
+    box-shadow: 0 2px 10px rgba(140, 106, 83, 0.08);
+}
+.peek-bank-list-title {
+    font-size: 15px;
+    font-weight: bold;
+    margin-bottom: 12px;
+    color: #1c1c1e;
+}
+.peek-phone-screen.dark .peek-bank-list-title {
+    color: #2D1E15;
+}
+.peek-bank-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+.peek-phone-screen.dark .peek-bank-item {
+    border-bottom-color: rgba(255,255,255,0.05);
+}
+.peek-bank-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+.peek-bank-item-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.peek-bank-item-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(186, 109, 72, 0.15);
+    color: #BA6D48;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+}
+.peek-bank-item-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: #1c1c1e;
+    margin-bottom: 2px;
+}
+.peek-phone-screen.dark .peek-bank-item-title {
+    color: #2D1E15;
+}
+.peek-bank-item-time {
+    font-size: 11px;
+    color: #8e8e93;
+}
+.peek-bank-item-amount {
+    font-size: 16px;
+    font-weight: bold;
+    color: #1c1c1e;
+}
+.peek-phone-screen.dark .peek-bank-item-amount {
+    color: #2D1E15;
+}
+.peek-bank-item-amount.income {
+    color: #ff4d4f; /* Income is typically red in China */
+}
+.peek-phone-screen.dark .peek-bank-item-amount.income {
+    color: #ff4d4f;
+}
+
+/* =========================================================
+   新增：抓包推送通知 UI (Push Notification)
+   ========================================================= */
+.peek-push-notification {
+    position: absolute;
+    top: -100px;
+    left: 10px;
+    right: 10px;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 20px;
+    padding: 12px 16px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    z-index: 100;
+    transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    opacity: 0;
+    cursor: pointer;
+}
+.peek-phone-screen.dark .peek-push-notification {
+    background: rgba(30, 30, 30, 0.85);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    color: #fff;
+}
+.peek-push-notification.show {
+    top: 45px;
+    opacity: 1;
+}
+.peek-push-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    font-size: 12px;
+}
+.peek-push-app {
+    font-weight: 600;
+    color: #1c1c1e;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.peek-phone-screen.dark .peek-push-app {
+    color: #fff;
+}
+.peek-push-time {
+    color: #8e8e93;
+}
+.peek-push-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.peek-push-title {
+    font-size: 14px;
+    font-weight: bold;
+}
+.peek-push-text {
+    font-size: 14px;
+    line-height: 1.4;
+    opacity: 0.9;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* =========================================================
+   新增：全应用高保真 UI (Todo, Calendar, Health, Mail, Map)
+   ========================================================= */
+
+/* --- Todo (待办) --- */
+.peek-todo-header { font-size: 28px; font-weight: 800; padding: 20px 16px 10px; color: #1c1c1e; }
+.peek-phone-screen.dark .peek-todo-header { color: #2D1E15; }
+.peek-todo-list { padding: 0 16px 20px; }
+.peek-todo-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-bottom: 0.5px solid rgba(0,0,0,0.1); }
+.peek-phone-screen.dark .peek-todo-item { border-bottom-color: rgba(255,255,255,0.1); }
+.peek-todo-checkbox { font-size: 20px; color: #c7c7cc; padding-top: 2px; }
+.peek-todo-item.done .peek-todo-checkbox { color: #8C6A53; }
+.peek-todo-content { flex: 1; }
+.peek-todo-title { font-size: 16px; color: #1c1c1e; }
+.peek-phone-screen.dark .peek-todo-title { color: #2D1E15; }
+.peek-todo-item.done .peek-todo-title { text-decoration: line-through; color: #8e8e93; }
+.peek-todo-due { font-size: 13px; color: #8B3A33; margin-top: 4px; }
+
+/* --- Calendar (日历) --- */
+.peek-calendar-header { font-size: 28px; font-weight: 800; padding: 20px 16px 10px; color: #BA6D48; }
+.peek-calendar-timeline { padding: 0 16px 20px; display: flex; flex-direction: column; gap: 16px; }
+.peek-calendar-item { display: flex; gap: 12px; }
+.peek-calendar-time-col { width: 45px; font-size: 13px; color: #8e8e93; font-weight: 600; text-align: right; padding-top: 4px; }
+.peek-calendar-event-card { flex: 1; background: rgba(186, 109, 72, 0.1); border-left: 4px solid #BA6D48; padding: 10px 12px; border-radius: 6px; }
+.peek-phone-screen.dark .peek-calendar-event-card { background: rgba(186, 109, 72, 0.08); }
+.peek-calendar-event-title { font-size: 15px; font-weight: 600; color: #1c1c1e; margin-bottom: 4px; }
+.peek-phone-screen.dark .peek-calendar-event-title { color: #2D1E15; }
+.peek-calendar-event-loc { font-size: 12px; color: #BA6D48; opacity: 0.8; }
+
+/* --- Health (健康) --- */
+.peek-health-header { font-size: 28px; font-weight: 800; padding: 20px 16px 10px; color: #1c1c1e; }
+.peek-phone-screen.dark .peek-health-header { color: #2D1E15; }
+.peek-health-cards { padding: 0 16px 20px; display: flex; flex-direction: column; gap: 16px; }
+.peek-health-card { background: #fff; border-radius: 16px; padding: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.05); }
+.peek-phone-screen.dark .peek-health-card { background: #FFF; box-shadow: 0 2px 12px rgba(140, 106, 83, 0.08); }
+.peek-health-card-header { font-size: 15px; font-weight: 600; color: #1c1c1e; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+.peek-phone-screen.dark .peek-health-card-header { color: #2D1E15; }
+.peek-health-value { font-size: 32px; font-weight: 800; color: #1c1c1e; }
+.peek-phone-screen.dark .peek-health-value { color: #2D1E15; }
+.peek-health-unit { font-size: 16px; color: #8e8e93; font-weight: 600; margin-left: 4px; }
+.peek-health-sub { font-size: 13px; color: #8e8e93; margin-top: 8px; background: rgba(0,0,0,0.05); padding: 8px; border-radius: 8px; }
+.peek-phone-screen.dark .peek-health-sub { background: rgba(255,255,255,0.05); }
+
+/* --- Mail (邮件) --- */
+.peek-mail-header { font-size: 28px; font-weight: 800; padding: 20px 16px 10px; color: #1c1c1e; }
+.peek-phone-screen.dark .peek-mail-header { color: #2D1E15; }
+.peek-mail-list { padding: 0 16px 20px; }
+.peek-mail-item { display: flex; gap: 12px; padding: 16px 0; border-bottom: 0.5px solid rgba(0,0,0,0.1); }
+.peek-phone-screen.dark .peek-mail-item { border-bottom-color: rgba(255,255,255,0.1); }
+.peek-mail-dot { width: 10px; height: 10px; border-radius: 50%; background: transparent; margin-top: 4px; flex-shrink: 0; }
+.peek-mail-dot.unread { background: #D5B495; }
+.peek-mail-content { flex: 1; overflow: hidden; }
+.peek-mail-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+.peek-mail-from { font-size: 16px; font-weight: 600; color: #1c1c1e; }
+.peek-phone-screen.dark .peek-mail-from { color: #2D1E15; }
+.peek-mail-time { font-size: 13px; color: #8e8e93; }
+.peek-mail-subject { font-size: 14px; font-weight: 500; color: #1c1c1e; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.peek-phone-screen.dark .peek-mail-subject { color: #2D1E15; }
+.peek-mail-preview { font-size: 14px; color: #8e8e93; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* --- Map (地图) --- */
+.peek-app-map { display: flex; flex-direction: column; height: 100%; position: relative; }
+.peek-map-mock-bg { flex: 1; background: #e5e5ea; display: flex; align-items: center; justify-content: center; font-size: 48px; color: #c7c7cc; }
+.peek-phone-screen.dark .peek-map-mock-bg { background: #E8D8C8; color: #A38C7D; }
+.peek-map-panel { height: 50%; background: #fff; border-radius: 20px 20px 0 0; padding: 20px 16px; box-shadow: 0 -4px 20px rgba(0,0,0,0.1); position: relative; z-index: 2; margin-top: -20px; overflow-y: auto; }
+.peek-phone-screen.dark .peek-map-panel { background: #FFF; box-shadow: 0 -4px 20px rgba(140, 106, 83, 0.15); }
+.peek-map-panel-title { font-size: 20px; font-weight: 700; color: #1c1c1e; margin-bottom: 16px; }
+.peek-phone-screen.dark .peek-map-panel-title { color: #2D1E15; }
+.peek-map-item { display: flex; gap: 16px; align-items: center; padding: 12px 0; border-bottom: 0.5px solid rgba(0,0,0,0.1); }
+.peek-phone-screen.dark .peek-map-item { border-bottom-color: rgba(255,255,255,0.1); }
+.peek-map-icon { width: 40px; height: 40px; border-radius: 50%; background: rgba(186, 109, 72, 0.15); color: #BA6D48; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+.peek-map-info { flex: 1; }
+.peek-map-place { font-size: 16px; font-weight: 500; color: #1c1c1e; margin-bottom: 4px; }
+.peek-phone-screen.dark .peek-map-place { color: #2D1E15; }
+.peek-map-desc { font-size: 13px; color: #8e8e93; }

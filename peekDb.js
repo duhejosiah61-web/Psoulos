@@ -61,7 +61,7 @@ export async function putPhoneState(charId, state) {
     const db = await openPeekDb();
     const tx = db.transaction([STORE_PHONE], 'readwrite');
     const store = tx.objectStore(STORE_PHONE);
-    const doc = { ...(state || {}), charId: id, updatedAt: Date.now() };
+    const doc = { ...(JSON.parse(JSON.stringify(state || {}))), charId: id, updatedAt: Date.now() };
     store.put(doc);
     await txDone(tx);
 }
@@ -79,7 +79,7 @@ export async function putGlobalState(state) {
     const db = await openPeekDb();
     const tx = db.transaction([STORE_GLOBAL], 'readwrite');
     const store = tx.objectStore(STORE_GLOBAL);
-    store.put({ id: 'global', data: state || {}, updatedAt: Date.now() });
+    store.put({ id: 'global', data: JSON.parse(JSON.stringify(state || {})), updatedAt: Date.now() });
     await txDone(tx);
 }
 

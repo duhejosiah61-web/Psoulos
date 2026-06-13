@@ -12,14 +12,13 @@ const APP_DEFS = [
     { id: 'wallet', name: '钱包', icon: 'fa-wallet' },
     { id: 'calendar', name: '日历', icon: 'fa-calendar-days' },
     { id: 'health', name: '健康', icon: 'fa-heart-pulse' },
-    { id: 'mail', name: '邮件', icon: 'fa-envelope' },
-    { id: 'bank', name: '银行卡', icon: 'fa-credit-card' }
+    { id: 'mail', name: '邮件', icon: 'fa-envelope' }
 ];
 
 const DOCK_APPS = [
-    { id: 'messages', name: '微信', icon: 'fa-comments' },
+    { id: 'messages', name: '消息', icon: 'fa-comments' },
     { id: 'album', name: '照片', icon: 'fa-image' },
-    { id: 'browser', name: 'Safari', icon: 'fa-compass' },
+    { id: 'browser', name: '浏览', icon: 'fa-globe' },
     { id: 'diary', name: '备忘录', icon: 'fa-note-sticky' }
 ];
 
@@ -162,6 +161,10 @@ export function usePeek(charactersRef, activeProfileRef, soulLinkMessagesRef, so
     const peekSearch = ref('');
     const peekDark = ref(true); // Forced dark mode
 
+    const showCaughtNotification = ref(false);
+    const caughtNotificationText = ref('');
+    const dismissCaughtNotification = () => { showCaughtNotification.value = false; };
+
     const peekSelectedCharacter = computed(() => {
         const chars = Array.isArray(charactersRef?.value) ? charactersRef.value : [];
         return chars.find((c) => String(c.id) === String(peekSelectedCharacterId.value)) || null;
@@ -179,6 +182,52 @@ export function usePeek(charactersRef, activeProfileRef, soulLinkMessagesRef, so
         const now = new Date();
         peekStatusTime.value = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
     };
+
+    const triggerCaughtMechanic = async () => {
+        const char = peekSelectedCharacter.value;
+        const profile = activeProfileRef?.value || null;
+        if (!char || !profile || showCaughtNotification.value) return;
+
+        // 【冷却机制】每 12 小时最多触发一次抓包，节省 API
+        const CAUGHT_COOLDOWN = 12 * 60 * 60 * 1000;
+        const lastCaughtTsStr = localStorage.getItem('peek_caught_last_ts');
+        const lastCaughtTs = lastCaughtTsStr ? Number(lastCaughtTsStr) : 0;
+        if (Date.now() - lastCaughtTs < CAUGHT_COOLDOWN) {
+            return; // 还在冷却中
+        }
+
+        const persona = char.description || char.personality || char.summary || '';
+        const prompt = `玩家正在偷偷翻看角色"${char.nickname || char.name}"的手机。请扮演该角色，发现玩家在偷看后，给玩家发一条“抓包”的微信消息。
+角色设定：${persona}
+要求：绝对符合人设（如傲娇、病娇等），一句话（20字以内），极其具有真实感和互动感。只输出这条消息的纯文本，不要任何解释和引号。`;
+        try {
+            const content = await callAI(
+                profile,
+                [ { role: 'user', content: prompt } ],
+                { temperature: 0.8, max_tokens: 100 }
+            );
+            if (content) {
+                caughtNotificationText.value = content.trim().replace(/^["']|["']$/g, '');
+                showCaughtNotification.value = true;
+                localStorage.setItem('peek_caught_last_ts', Date.now().toString());
+                setTimeout(() => { showCaughtNotification.value = false; }, 6000);
+            }
+        } catch (err) {
+            console.error("Caught mechanic error:", err);
+        }
+    };
+
+    let innerAppTimer = null;
+    watch(peekInnerApp, (newVal) => {
+        if (innerAppTimer) clearTimeout(innerAppTimer);
+        if (newVal !== 'home' && !peekLocked.value) {
+            // 在特定 App 停留超过 5 秒才有可能触发抓包
+            innerAppTimer = setTimeout(() => {
+                triggerCaughtMechanic();
+            }, randomInt(5000, 8000));
+        }
+    });
+
     onMounted(() => {
         tickStatus();
         statusTick = setInterval(tickStatus, 1000);
@@ -387,7 +436,7 @@ export function usePeek(charactersRef, activeProfileRef, soulLinkMessagesRef, so
         return all.map((x) => x.line);
     };
 
-    const peekWidgetUnreadCount = computed(() => Math.min(peekMixedChatMessages.value.length, 99));
+    const peekWidgetUnreadCount = computed(() => peekChatInbox.value.reduce((sum, c) => sum + (c.unread || 0), 0));
     const peekWidgetFirstNote = computed(() => peekNotes.value[0] || null);
     const peekWidgetPhotos = computed(() => peekPhotos.value.slice(0, 3));
 
@@ -438,10 +487,11 @@ export function usePeek(charactersRef, activeProfileRef, soulLinkMessagesRef, so
             .filter((m) => m && !m.isSystem && !m.isHidden && (m.sender === 'user' || m.sender === 'ai'))
             .map((m, idx) => ({
                 id: m.id || m.timestamp || `peek_msg_${idx}`,
-                sender: m.sender,
+                sender: m.sender === 'user' ? 'other' : 'self',
                 text: formatPeekMessageText(m),
                 at: formatPeekAt(m.timestamp),
-                ts: Number(m.timestamp || 0) || 0
+                ts: Number(m.timestamp || 0) || 0,
+                contactName: '玩家'
             }))
             .slice(-80);
     });
@@ -452,28 +502,74 @@ export function usePeek(charactersRef, activeProfileRef, soulLinkMessagesRef, so
             .map((m, idx) => {
                 const rawAt = String(m.at || '');
                 const parsedTs = Number(m.ts || 0) || 0;
+                const contactName = String(m.app || '未知联系人').trim();
                 return {
                     id: m.id || `peek_external_${idx}`,
-                    sender: m.sender === 'user' ? 'user' : 'ai',
-                    text: m.text ? `${m.app ? `【${m.app}】` : ''} ${m.text}`.trim() : (m.app || '[消息]'),
+                    sender: m.sender === 'self' ? 'self' : 'other',
+                    text: m.text ? String(m.text).trim() : '[消息]',
                     at: rawAt,
-                    ts: parsedTs
+                    ts: parsedTs,
+                    contactName
                 };
             })
-            .slice(-50);
+            .slice(-150);
     });
-    const peekMixedChatMessages = computed(() => {
-        const all = [...peekSoulChatMessages.value, ...peekExternalChatMessages.value];
-        all.sort((a, b) => {
-            const ta = Number(a.ts || 0);
-            const tb = Number(b.ts || 0);
-            if (ta && tb) return ta - tb;
-            if (ta && !tb) return -1;
-            if (!ta && tb) return 1;
-            return 0;
-        });
-        return all.slice(-120);
+
+    const peekActiveChatContact = ref(null);
+
+    const peekChatInbox = computed(() => {
+        const inboxMap = new Map();
+        
+        const soulMsgs = peekSoulChatMessages.value;
+        if (soulMsgs.length > 0) {
+            const lastMsg = soulMsgs[soulMsgs.length - 1];
+            inboxMap.set('玩家', {
+                contactName: '玩家',
+                lastMessageText: lastMsg.text,
+                lastMessageTime: lastMsg.at,
+                lastMessageTs: lastMsg.ts,
+                unread: 0
+            });
+        }
+
+        const extMsgs = peekExternalChatMessages.value;
+        for (const m of extMsgs) {
+            const existing = inboxMap.get(m.contactName);
+            if (!existing || m.ts > existing.lastMessageTs) {
+                inboxMap.set(m.contactName, {
+                    contactName: m.contactName,
+                    lastMessageText: m.text,
+                    lastMessageTime: m.at,
+                    lastMessageTs: m.ts,
+                    unread: m.sender === 'other' ? 1 : 0
+                });
+            } else if (m.sender === 'other' && m.ts === existing.lastMessageTs) {
+                 existing.unread = 1;
+            }
+        }
+
+        const arr = Array.from(inboxMap.values());
+        arr.sort((a, b) => b.lastMessageTs - a.lastMessageTs);
+        return arr;
     });
+
+    const peekActiveChatMessages = computed(() => {
+        const contact = peekActiveChatContact.value;
+        if (!contact) return [];
+        if (contact === '玩家') {
+            return peekSoulChatMessages.value;
+        }
+        return peekExternalChatMessages.value
+            .filter(m => m.contactName === contact)
+            .sort((a, b) => a.ts - b.ts);
+    });
+
+    const openPeekChat = (contactName) => {
+        peekActiveChatContact.value = contactName;
+    };
+    const closePeekChat = () => {
+        peekActiveChatContact.value = null;
+    };
 
     const collectLinkedSignals = (char) => {
         const charName = char?.nickname || char?.name || 'TA';
@@ -576,7 +672,7 @@ export function usePeek(charactersRef, activeProfileRef, soulLinkMessagesRef, so
                 const prompt = `你是角色手机数据的“私密生成器”，专门生成用于满足玩家“查岗/偷看手机”心理的私密数据。请仅返回 JSON，不要 markdown。
 输出结构:
 {
-  "socialMessages":[{"id":"m1","app":"联系人或群名","text":"对话摘要","at":"HH:mm","ts":1710000000000}],
+  "socialMessages":[{"id":"m1","app":"联系人或群名","sender":"other","text":"对话摘要","at":"HH:mm","ts":1710000000000}],
   "todoItems":[{"id":"t1","text":"...","due":"YYYY-MM-DD","done":false,"ts":1710000000000}],
   "calendarEvents":[{"id":"c1","title":"...","at":"YYYY-MM-DD HH:mm","location":"...","ts":1710000000000}],
   "wallet":{"balance":1234,"records":[{"id":"w1","item":"...","amount":-12,"at":"09:00","note":"...","ts":1710000000000}]},
@@ -584,10 +680,18 @@ export function usePeek(charactersRef, activeProfileRef, soulLinkMessagesRef, so
   "mailThreads":[{"id":"e1","from":"...","subject":"...","preview":"...","at":"HH:mm","unread":true,"ts":1710000000000}],
   "diaryEntries":[{"id":"d1","title":"...","mood":"...","content":"..."}],
   "bankAccount":{"balance":1234,"monthlySpend":456,"records":[{"id":"b1","item":"...","amount":-12,"at":"09:00","ts":1710000000000}]},
-  "mapTracks":[{"id":"m1","place":"...","at":"08:30","note":"...","ts":1710000000000}]
+  "mapTracks":[{"id":"m1","place":"...","at":"08:30","note":"...","ts":1710000000000}],
+  "photos":[{"id":"p1","description":"...","bgColor":"#...","bgColor2":"#..."}],
+  "browserHistory":[{"id":"b1","title":"...","url":"..."}]
 }
-角色: ${JSON.stringify({ id: char.id, name: char.nickname || char.name || 'TA' })}
-联动数据: ${JSON.stringify(signals)}
+角色: ${JSON.stringify({ 
+  id: char.id, 
+  name: char.nickname || char.name || 'TA', 
+  persona: char.description || char.personality || char.summary || '',
+  scenario: char.scenario || char.context || '',
+  worldLore: char.worldLore || char.worldbook || char.lore || char.creator_notes || ''
+})}
+联动数据(包含玩家与角色在Mate/Music/Chat等应用的交互): ${JSON.stringify(signals)}
 已有数据摘要（避免重复 id）：${JSON.stringify(existingSummary)}`;
                 const diaryPromptBlock = `
 上次数据生成时间戳: ${String(lastCursorTs)}
@@ -596,11 +700,12 @@ export function usePeek(charactersRef, activeProfileRef, soulLinkMessagesRef, so
 ${chatTranscriptForPrompt || '（无增量聊天内容）'}
 
 【极其重要的内容生成指令】：
-我们正在模拟玩家“查岗”或偷看角色手机的情境。生成的内容必须充满**私密性、戏剧张力、以及背后的小动作**，满足玩家的窥探欲。
-1) **社交消息 (socialMessages)**：生成角色在跟闺蜜/兄弟/同事或者神秘人聊天的记录。必须包含对刚刚聊天记录中事件的“背后评价”或吐槽。例如：“他今天怪怪的”、“不知送她什么好，帮我选选”、“气死我了”等等。
-2) **私密备忘录/草稿 (diaryEntries)**：生成没敢发出去的矫情话、草稿、黑历史，或者记录关于玩家的私密小情绪（吃醋、占有欲、患得患失）。
-3) **照片盲盒/搜索痕迹**：在日记或消息里，用文字假装图片或浏览记录（例如：“[浏览器记录] 对象生气了怎么哄”、“[隐藏相册] 偷拍的睡颜”）。
-4) 保持符合角色人设，切忌机械化。要有隐秘的爱意、吃醋、或者是生活中的纠结。每个模块都不要太长，但信息量要大！所有输出必须是合法 JSON。
+我们正在模拟玩家“查岗”或偷看角色手机的情境。生成的内容必须真实自然，既要包含与玩家互动的隐藏反应，**更要包含角色独立的生活和世界观**。
+1) **独立的生活轨迹 (极度重要)**：角色的世界里不只有玩家！仔细阅读角色的【人设、世界观(worldLore/scenario)】。在社交消息、备忘录、日历、待办、消费记录中，必须**大量生成**关于他/她的私人生活、工作/学业、家庭、兴趣爱好、其他社交圈子（同事、父母、老同学等）的内容。展现一个有血有肉、有自己事情在忙的独立个体。
+2) **跨应用数据联动 (隐藏情趣)**：阅读上面的【联动数据】和【聊天增量记录】。如果玩家与角色有互动，在角色广阔的日常记录中，可以**偶尔（不要每条都是）**夹杂几条对这些互动的“背后评价”、“隐藏反应”或“私密情绪”。例如：备忘录写了一大堆工作烦恼后，顺带加一句“不过今天陪宝宝跑步挺开心”。
+3) **社交消息 (socialMessages)**：生成角色跟别人（父母、死党、同事、老板、发小等）的聊天记录。展现他/她在外人面前的不同面貌或社交生活。注意："sender"字段表示消息是谁发的，角色自己发填 "self"，对方发填 "other"。
+4) **私密备忘录 (diaryEntries)**：日常的随笔、对生活/世界的吐槽，以及偶尔流露出的关于玩家的私密情绪（吃醋、占有欲等）。
+5) **深度符合人设与世界观**：严格遵循角色的世界观设定（如古代、科幻、奇幻等），所有事件和名词必须符合其世界观。病娇/傲娇/高冷等性格必须极其精准。所有输出必须是合法 JSON。
 `;
                 const finalPrompt = prompt + diaryPromptBlock;
                 let content;
@@ -730,6 +835,8 @@ ${chatTranscriptForPrompt || '（无增量聊天内容）'}
                 const incomingDiary = Array.isArray(payload.diaryEntries) ? payload.diaryEntries : [];
                 const incomingBank = payload.bankAccount || { balance: null, monthlySpend: null, records: [] };
                 const incomingMap = Array.isArray(payload.mapTracks) ? payload.mapTracks : [];
+                const incomingPhotos = Array.isArray(payload.photos) ? payload.photos : [];
+                const incomingBrowserHistory = Array.isArray(payload.browserHistory) ? payload.browserHistory : [];
 
                 const incomingCounts = {
                     social: incomingSocial.length,
@@ -741,7 +848,9 @@ ${chatTranscriptForPrompt || '（无增量聊天内容）'}
                     mail: incomingMail.length,
                     diary: incomingDiary.length,
                     bankRecords: Array.isArray(incomingBank?.records) ? incomingBank.records.length : 0,
-                    map: incomingMap.length
+                    map: incomingMap.length,
+                    photos: incomingPhotos.length,
+                    browserHistory: incomingBrowserHistory.length
                 };
 
                 if (incomingSocial.length > 0) {
@@ -783,6 +892,8 @@ ${chatTranscriptForPrompt || '（无增量聊天内容）'}
                 };
 
                 peekMapTracks.value = mergeById(peekMapTracks.value, incomingMap);
+                peekPhotos.value = mergeById(peekPhotos.value, incomingPhotos);
+                peekBrowserHistory.value = mergeById(peekBrowserHistory.value, incomingBrowserHistory);
 
                 peekAiLastGeneratedAt.value = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
                 setCursorTs('diaryTs', nowTs);
@@ -863,20 +974,26 @@ ${chatTranscriptForPrompt || '（无增量聊天内容）'}
         st.apps.mailThreads = Array.isArray(peekMailThreads.value) ? peekMailThreads.value : [];
     };
 
+    const isRebuilding = ref(false);
     const rebuildCharacterData = async (char) => {
-        const charId = String(char?.id || '');
-        if (!charId) return;
-        const cached = await getPhoneState(charId);
-        if (cached && typeof cached === 'object') {
-            phoneState.value = cached;
+        isRebuilding.value = true;
+        try {
+            const charId = String(char?.id || '');
+            if (!charId) return;
+            const cached = await getPhoneState(charId);
+            if (cached && typeof cached === 'object') {
+                phoneState.value = cached;
+                syncRefsFromPhoneState();
+                const lastGen = Number(cached?.meta?.lastGeneratedAt || 0);
+                peekAiLastGeneratedAt.value = lastGen ? formatTs(lastGen).slice(-5) : '';
+                return;
+            }
+            phoneState.value = createDefaultPhoneState(char);
             syncRefsFromPhoneState();
-            const lastGen = Number(cached?.meta?.lastGeneratedAt || 0);
-            peekAiLastGeneratedAt.value = lastGen ? formatTs(lastGen).slice(-5) : '';
-            return;
+            await putPhoneState(charId, phoneState.value);
+        } finally {
+            isRebuilding.value = false;
         }
-        phoneState.value = createDefaultPhoneState(char);
-        syncRefsFromPhoneState();
-        await putPhoneState(charId, phoneState.value);
     };
 
     const selectPeekCharacter = (id) => {
@@ -887,10 +1004,12 @@ ${chatTranscriptForPrompt || '（无增量聊天内容）'}
 
     const openPeekInnerApp = (appId) => {
         peekInnerApp.value = appId || 'home';
+        peekActiveChatContact.value = null; // reset chat on open
     };
 
     const closePeekInnerApp = () => {
         peekInnerApp.value = 'home';
+        peekActiveChatContact.value = null; // reset chat on close
     };
 
     const getPeekAppName = (appId) => {
@@ -987,7 +1106,6 @@ ${chatTranscriptForPrompt || '（无增量聊天内容）'}
 
     watch(
         [
-            peekSelectedCharacterId,
             peekMessages,
             peekCalls,
             peekNotes,
@@ -1005,6 +1123,7 @@ ${chatTranscriptForPrompt || '（无增量聊天内容）'}
             peekAiLastGeneratedAt
         ],
         () => {
+            if (isRebuilding.value) return;
             const charId = String(peekSelectedCharacterId.value || '');
             if (!charId || !phoneState.value) return;
             syncPhoneStateFromRefs();
@@ -1066,7 +1185,11 @@ ${chatTranscriptForPrompt || '（无增量聊天内容）'}
         peekMessages,
         peekSoulChatMessages,
         peekExternalChatMessages,
-        peekMixedChatMessages,
+        peekActiveChatContact,
+        peekChatInbox,
+        peekActiveChatMessages,
+        openPeekChat,
+        closePeekChat,
         peekCalls,
         peekNotes,
         peekPhotos,
@@ -1080,6 +1203,9 @@ ${chatTranscriptForPrompt || '（无增量聊天内容）'}
         peekFormatAmount,
         generatePeekLinkedData,
         unlockPeek,
+        showCaughtNotification,
+        caughtNotificationText,
+        dismissCaughtNotification,
         lockPeek,
         peekPasscodeInput,
         peekLockHint,
