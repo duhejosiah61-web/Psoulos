@@ -1,0 +1,254 @@
+/* 锁屏毛玻璃背景 */
+.lock-screen-background-blur {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    z-index: 999;
+    transition: opacity 0.3s ease-out;
+}
+
+/* 锁屏界面 */
+.lockscreen {
+    width: 100%;
+    min-height: 100vh;
+    background-size: cover;
+    background-position: center;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding: 20px 0 calc(80px + env(safe-area-inset-bottom));
+    box-sizing: border-box;
+    z-index: 1000;
+    transition: transform 0.3s ease-out;
+    touch-action: none;
+    pointer-events: none;
+    /* 全局现代字体栈 - 干净、不土 */
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.lockscreen * {
+    touch-action: manipulation;
+}
+
+.lockscreen > * {
+    pointer-events: none;
+}
+
+.lock-password,
+.lock-password *,
+.lock-bottom-controls,
+.lock-bottom-controls * {
+    pointer-events: auto;
+}
+
+.lock-password {
+    position: relative;
+    z-index: 2;
+}
+
+.lock-bottom-controls {
+    pointer-events: auto;
+}
+
+/* 密码输入区域 */
+.lock-password {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 15px 0 20px;
+}
+
+.lock-password-input {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.lock-password-dot {
+    width: 14px;
+    height: 14px;
+    border: 1px solid rgba(0, 0, 0, 0.4);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.5);
+    transition: all 0.2s ease;
+}
+
+.lock-password-dot.active {
+    background: #000000;
+    border-color: #000000;
+}
+
+/* iOS 风格键盘 */
+.lock-password-keyboard {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    max-width: 300px;
+}
+
+.lock-password-row {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+.lock-password-key {
+    width: 60px;
+    height: 60px;
+    background: rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 0.5px solid rgba(255, 255, 255, 0.6);
+    border-radius: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    font-weight: 450;
+    color: #1c1c1e;
+    cursor: pointer;
+    transition: 0.06s linear;
+    font-family: inherit; /* 继承全局字体 */
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.04);
+}
+
+.lock-password-key:active {
+    background: rgba(255, 255, 255, 0.85);
+    transform: scale(0.94);
+}
+
+.lock-password-key i {
+    font-size: 22px;
+}
+
+.lock-password-key-confirm {
+    font-size: 16px;
+    font-weight: 500;
+}
+
+/* 主时间显示 - 字体更现代 */
+.lock-time {
+    text-align: center;
+    margin: 8% 0 4%;
+    animation: fadeIn 0.8s ease-out;
+}
+
+.lock-date {
+    font-size: 18px;
+    font-weight: 430;   /* 稍细，不笨重 */
+    margin-bottom: 12px;
+    letter-spacing: 0.3px;
+    opacity: 0.75;
+    animation: slideUp 0.6s ease-out 0.1s both;
+    font-family: inherit;
+}
+
+.lock-clock {
+    font-size: 3.4rem;   /* 比之前略大一点但依旧轻盈 */
+    font-weight: 500;    /* 半粗但干净 */
+    margin: 6px 0;
+    letter-spacing: 0;
+    animation: slideUp 0.6s ease-out 0.2s both;
+    font-family: inherit;
+}
+
+.lock-signature {
+    font-size: 16px;
+    font-weight: 400;
+    margin-top: 16px;
+    font-style: normal;
+    opacity: 0.7;
+    line-height: 1.3;
+    max-width: 70%;
+    margin-left: auto;
+    margin-right: auto;
+    animation: slideUp 0.6s ease-out 0.3s both;
+    font-family: inherit;
+}
+
+/* 动画 */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 底部操作按钮 */
+.lock-bottom-controls {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: env(safe-area-inset-bottom);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: 0 6%;
+    margin: 0;
+    z-index: 5;
+}
+
+.lock-bottom-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 8px rgba(0, 0, 0, 0.05);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 0.5px solid rgba(255, 255, 255, 0.5);
+}
+
+.lock-bottom-btn i {
+    font-size: 18px;
+    color: #1c1c1e;
+}
+
+.lock-unlock-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.lock-unlock-circle {
+    width: 64px;
+    height: 64px;
+    border: 0.5px solid rgba(0, 0, 0, 0.3);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(12px);
+}
+
+.lock-unlock-circle:active {
+    transform: scale(0.94);
+    background: rgba(255, 255, 255, 0.9);
+}
+
+.lock-unlock-circle::before,
+.lock-unlock-circle::after {
+    display: none;
+}
