@@ -1,5 +1,5 @@
 // 摆烂版 sw.js：只满足安装条件，不缓存任何文件
-const SW_VERSION = 'v4_20260728_fix_empty_bubble';
+const SW_VERSION = 'v5_20260728_remove_typing_bubble';
 
 // 1. 安装时，立刻接管，不等待
 self.addEventListener('install', event => {
