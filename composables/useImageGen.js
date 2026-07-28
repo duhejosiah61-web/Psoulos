@@ -109,7 +109,7 @@ export function useImageGen({ addConsoleLog } = {}) {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed.novelai && (parsed.novelai.model === 'nai-diffusion-4-5-full' || !parsed.novelai.model)) {
+        if (parsed.novelai && !parsed.novelai.model) {
           parsed.novelai.model = 'nai-diffusion-4-full';
         }
         return deepMerge(JSON.parse(JSON.stringify(DEFAULT_CONFIG)), parsed);
@@ -234,43 +234,28 @@ export function useImageGen({ addConsoleLog } = {}) {
     }
 
     const cleanToken = cfg.apiKey.trim().replace(/^Bearer\s+/i, '');
-
-    let targetEndpoint = 'https://image.novelai.net/ai/generate-image';
-    if (cfg.endpointType === 'official_api') {
-      targetEndpoint = 'https://api.novelai.net/ai/generate-image';
-    } else if (cfg.endpointType === 'proxy' && cfg.proxyUrl) {
-      let pUrl = cfg.proxyUrl.trim();
-      if (!pUrl.includes('/ai/generate-image') && !pUrl.includes('/generate-image')) {
-        pUrl = pUrl.replace(/\/+$/, '') + '/ai/generate-image';
-      }
-      targetEndpoint = pUrl;
-    }
-
-    let fetchUrl = targetEndpoint;
-    if (cfg.endpointType !== 'proxy' && cfg.useCorsProxy && cfg.corsProxyUrl) {
-      fetchUrl = cfg.corsProxyUrl.trim() + encodeURIComponent(targetEndpoint);
-    }
+    const fetchUrl = 'https://image.novelai.net/ai/generate-image';
 
     const fullPositive = [cfg.positivePrompt, userPrompt].filter(Boolean).join(', ');
     const fullNegative = [cfg.negativePrompt, extraNeg].filter(Boolean).join(', ');
     const seedNum = cfg.seed === -1 ? Math.floor(Math.random() * 999999999) : Math.abs(Number(cfg.seed) || 123456);
 
-    let modelName = cfg.model || 'nai-diffusion-4-full';
-    if (modelName === 'nai-diffusion-4-5-full') modelName = 'nai-diffusion-4-full';
+    let modelName = cfg.model || 'nai-diffusion-4-5-full';
 
     const width = Math.floor((cfg.width || 832) / 64) * 64;
     const height = Math.floor((cfg.height || 1216) / 64) * 64;
-    const isV4 = modelName.includes('v4') || modelName.includes('diffusion-4');
+
+    const isV45 = modelName === 'nai-diffusion-4-5-full' || modelName === 'nai-diffusion-4-5-curated';
+    const isV4 = isV45 || modelName === 'nai-diffusion-4-full' || modelName === 'nai-diffusion-4-curated';
 
     const parametersObj = {
       width,
       height,
       scale: Number(cfg.cfgScale) || 5.0,
-      sampler: cfg.sampler || 'k_euler',
+      sampler: cfg.sampler || 'k_euler_ancestral',
       steps: Number(cfg.steps) || 28,
       seed: seedNum,
       n_samples: 1,
-      uc: fullNegative,
       qualityToggle: !!cfg.qualityTags,
       noise_schedule: cfg.noiseSchedule || 'karras',
       cfg_rescale: Number(cfg.cfgRescale) || 0,
@@ -279,7 +264,7 @@ export function useImageGen({ addConsoleLog } = {}) {
       controlnet_strength: 1.0,
       legacy: false,
       add_original_image: false,
-      params_version: 3
+      params_version: isV4 ? 4 : 3
     };
 
     if (isV4) {
@@ -300,26 +285,13 @@ export function useImageGen({ addConsoleLog } = {}) {
         use_order: true
       };
     } else {
+      parametersObj.uc = fullNegative;
       if (cfg.smea) parametersObj.sm = true;
       if (cfg.smeaDyn) parametersObj.sm_dyn = true;
     }
 
-    if (cfg.vibeTransfer && cfg.vibeTransfer.enabled && cfg.vibeTransfer.imageUrl) {
-      const rawB64 = cfg.vibeTransfer.imageUrl.replace(/^data:[^;]+;base64,/, '');
-      const str = Number(cfg.vibeTransfer.strength) || 0.5;
-      const info = Number(cfg.vibeTransfer.infoExtracted) || 1.0;
-
-      parametersObj.vibe_transfer = {
-        images: [rawB64],
-        information_extracted: [info],
-        reference_strength: [str]
-      };
-      parametersObj.reference_image = rawB64;
-      parametersObj.reference_strength = str;
-      parametersObj.reference_information_extracted = info;
-
-      log('已在 NovelAI 请求中附加 Vibe Transfer 参考图数据', 'info');
-    }
+    // Temporarily disable vibe_transfer
+    // if (cfg.vibeTransfer && cfg.vibeTransfer.enabled && cfg.vibeTransfer.imageUrl) { ... }
 
     const payload = {
       action: 'generate',
@@ -328,7 +300,8 @@ export function useImageGen({ addConsoleLog } = {}) {
       parameters: parametersObj
     };
 
-    log(`发送 NovelAI (${modelName}) 请求 -> ${fetchUrl}`, 'info');
+    console.log("NAI MODEL:", modelName);
+    console.log("NAI PAYLOAD:", JSON.stringify(payload, null, 2));
 
     let res;
     try {
@@ -341,20 +314,34 @@ export function useImageGen({ addConsoleLog } = {}) {
         body: JSON.stringify(payload)
       });
     } catch (netErr) {
-      throw new Error(`网络或跨域(CORS)拦截错误: ${netErr.message}。建议在控制台中勾选 [CORS 跨域中转] 或使用自定义中转反代。`);
+      throw new Error(`网络或跨域(CORS)拦截错误: ${netErr.message}`);
     }
 
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
       let failHint = `NovelAI 请求失败 [HTTP ${res.status}]: ${errText.slice(0, 250)}`;
-      if (res.status === 500) {
-        failHint += ' (提示: NAI 官方 V4 节点正忙或账号权限受限，推荐在连线设置中将模型切为 [nai-diffusion-3 (V3)] 或开启跨域中转尝试)。';
-      }
       throw new Error(failHint);
     }
 
     const contentType = res.headers.get('content-type') || '';
     const arrayBuffer = await res.arrayBuffer();
+
+    if (contentType.includes('application/zip') || contentType.includes('application/x-zip-compressed')) {
+      try {
+        const JSZip = (await import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm')).default;
+        const zip = await JSZip.loadAsync(arrayBuffer);
+        const files = Object.keys(zip.files);
+        for (const filename of files) {
+          if (filename.endsWith('.png')) {
+            const base64 = await zip.file(filename).async('base64');
+            return `data:image/png;base64,${base64}`;
+          }
+        }
+        throw new Error('ZIP 中未找到 PNG 图像');
+      } catch (err) {
+        throw new Error(`解压ZIP失败: ${err.message}`);
+      }
+    }
 
     if (contentType.includes('application/json') || isJsonBuffer(arrayBuffer)) {
       try {
@@ -364,11 +351,8 @@ export function useImageGen({ addConsoleLog } = {}) {
         if (json.images?.[0]) return json.images[0].startsWith('data:') ? json.images[0] : `data:image/png;base64,${json.images[0]}`;
         if (json.data?.[0]?.b64_json) return `data:image/png;base64,${json.data[0].b64_json}`;
         if (json.data?.[0]?.url) return json.data[0].url;
-        if (json.errorMessage || json.message || json.error) {
-          throw new Error(`NovelAI 接口返回错误: ${json.errorMessage || json.message || json.error}`);
-        }
       } catch (e) {
-        if (e.message.startsWith('NovelAI 接口返回错误')) throw e;
+        // ignore
       }
     }
 
