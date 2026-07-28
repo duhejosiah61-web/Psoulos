@@ -276,6 +276,18 @@ export function useImageGen({ addConsoleLog } = {}) {
           use_order: true
         }
       };
+
+      if (cfg.vibeTransfer && cfg.vibeTransfer.enabled && cfg.vibeTransfer.imageUrl) {
+        const base64Data = cfg.vibeTransfer.imageUrl.split(',')[1] || cfg.vibeTransfer.imageUrl;
+        parametersObj.reference_image_multiple = [
+          {
+            image: base64Data,
+            strength: cfg.vibeTransfer.strength !== undefined ? Number(cfg.vibeTransfer.strength) : 0.5,
+            information_extracted: cfg.vibeTransfer.infoExtracted !== undefined ? Number(cfg.vibeTransfer.infoExtracted) : 1.0
+          }
+        ];
+        console.log('NAI PAYLOAD: reference_image_multiple 存在。');
+      }
     } else if (isV3) {
       parametersObj = {
         width,
