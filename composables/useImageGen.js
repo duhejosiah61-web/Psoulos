@@ -32,9 +32,7 @@ const DEFAULT_CONFIG = {
     dynamicThresholding: false,
     vibeTransfer: {
       enabled: false,
-      imageUrl: '',
-      strength: 0.5,
-      infoExtracted: 1.0
+      json: null
     },
     positivePrompt: 'masterpiece, best quality, ultra-detailed, highly aesthetic',
     negativePrompt: 'lowres, bad quality, bad anatomy, error, missing fingers, extra digit, jpeg artifacts'
@@ -144,41 +142,26 @@ export function useImageGen({ addConsoleLog } = {}) {
   async function handleVibeFileUpload(file) {
     if (!file) return;
     try {
-      if (file.name.endsWith('.naiv4vibe') || file.type === 'application/json') {
+      if (file.name.endsWith('.naiv4vibe') || file.type === 'application/json' || file.name.endsWith('.json')) {
         const text = await file.text();
-        try {
-          const json = JSON.parse(text);
-          const b64 = json.image || json.base64 || json.vibe_image || json.vibe;
-          if (b64) {
-            const dataUrl = b64.startsWith('data:') ? b64 : `data:image/png;base64,${b64}`;
-            imageGenConfig.novelai.vibeTransfer.imageUrl = dataUrl;
-            imageGenConfig.novelai.vibeTransfer.enabled = true;
-            if (json.strength !== undefined) imageGenConfig.novelai.vibeTransfer.strength = Number(json.strength);
-            log('成功解析并导入 .naiv4vibe 预设画风包！', 'success');
-            return;
-          }
-        } catch (e) {
-          /* fallback */
-        }
-      }
-
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        imageGenConfig.novelai.vibeTransfer.imageUrl = e.target.result;
+        const json = JSON.parse(text);
+        
+        imageGenConfig.novelai.vibeTransfer.json = json;
         imageGenConfig.novelai.vibeTransfer.enabled = true;
-        log('画风/垫图参考图片上传成功！', 'success');
-      };
-      reader.readAsDataURL(file);
+        log('成功解析并导入 NovelAI Vibe JSON 预设！', 'success');
+      } else {
+        throw new Error('请上传 NovelAI 官网导出的 Vibe JSON 或 .naiv4vibe 文件。不支持直接上传图片。');
+      }
     } catch (err) {
-      log('解析参考图文件失败: ' + err.message, 'error');
-      alert('解析参考图文件失败：' + err.message);
+      log('解析 Vibe JSON 失败: ' + err.message, 'error');
+      alert('解析 Vibe JSON 失败：' + err.message);
     }
   }
 
   function removeVibeImage() {
-    imageGenConfig.novelai.vibeTransfer.imageUrl = '';
+    imageGenConfig.novelai.vibeTransfer.json = null;
     imageGenConfig.novelai.vibeTransfer.enabled = false;
-    log('参考图已清空', 'info');
+    log('Vibe JSON 预设已清空', 'info');
   }
 
   /**
@@ -279,25 +262,16 @@ export function useImageGen({ addConsoleLog } = {}) {
 
       console.log("VIBE STATUS", {
         enabled: cfg.vibeTransfer?.enabled,
-        hasImage: !!cfg.vibeTransfer?.imageUrl,
-        strength: cfg.vibeTransfer?.strength,
-        info: cfg.vibeTransfer?.infoExtracted
+        hasJson: !!cfg.vibeTransfer?.json
       });
 
       if (
         cfg.vibeTransfer &&
         cfg.vibeTransfer.enabled &&
-        cfg.vibeTransfer.imageUrl
+        cfg.vibeTransfer.json
       ) {
-        const base64Data = cfg.vibeTransfer.imageUrl
-          .replace(/^data:image\/\w+;base64,/, '')
-          .trim();
-
-        parametersObj.reference_image_multiple = base64Data;
-
-        console.log("VIBE ATTACHED", {
-          length: base64Data.length
-        });
+        Object.assign(parametersObj, cfg.vibeTransfer.json);
+        console.log("VIBE ATTACHED", Object.keys(cfg.vibeTransfer.json));
       }
     } else if (isV3) {
       parametersObj = {
