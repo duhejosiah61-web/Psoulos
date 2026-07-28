@@ -5345,6 +5345,9 @@
                                 <div style="font-size: 12px; color: #10ac84; background: rgba(16,172,132,0.1); padding: 8px 12px; border-radius: 6px; margin-bottom: 10px;">
                                     <i class="fas fa-check-circle"></i> 免 Key 渠道：无需填写任何 API Key，开箱即可免费出图！
                                 </div>
+                                <button class="console-btn console-btn-secondary console-btn-full" @click="openImageGenSettingsModal('pollinations')">
+                                    <i class="fas fa-sliders-h"></i> 调整 Pollinations 高级生成设定 ({{ imageGenConfig.pollinations.width }}x{{ imageGenConfig.pollinations.height }} >)
+                                </button>
                             </div>
 
                             <!-- NovelAI 详情 -->
@@ -5372,8 +5375,8 @@
                                         <option value="nai-diffusion-3">nai-diffusion-3 (V3 Anime)</option>
                                     </select>
                                 </div>
-                                <button class="console-btn console-btn-secondary console-btn-full" @click="showNovelAiSettingsModal = true" style="margin-bottom: 10px;">
-                                    <i class="fas fa-sliders-h"></i> 调整 NovelAI 高级生成设定 (832x1216 >)
+                                <button class="console-btn console-btn-secondary console-btn-full" @click="openImageGenSettingsModal('novelai')" style="margin-bottom: 10px;">
+                                    <i class="fas fa-sliders-h"></i> 调整 NovelAI 高级生成设定 ({{ imageGenConfig.novelai.width }}x{{ imageGenConfig.novelai.height }} >)
                                 </button>
                             </div>
 
@@ -5394,6 +5397,9 @@
                                         <option value="dall-e-2">DALL-E 2</option>
                                     </select>
                                 </div>
+                                <button class="console-btn console-btn-secondary console-btn-full" @click="openImageGenSettingsModal('openai')">
+                                    <i class="fas fa-sliders-h"></i> 调整 DALL-E 高级生成设定 ({{ imageGenConfig.openai.size }} >)
+                                </button>
                             </div>
 
                             <!-- Gemini 详情 -->
@@ -5402,6 +5408,9 @@
                                     <label class="console-label">Google Gemini API Key</label>
                                     <input type="password" class="console-input" placeholder="输入 Gemini API Key" v-model="imageGenConfig.gemini.apiKey">
                                 </div>
+                                <button class="console-btn console-btn-secondary console-btn-full" @click="openImageGenSettingsModal('gemini')">
+                                    <i class="fas fa-sliders-h"></i> 调整 Gemini Imagen 高级生成设定 ({{ imageGenConfig.gemini.aspectRatio }} >)
+                                </button>
                             </div>
 
                             <!-- 自定义 详情 -->
@@ -5414,6 +5423,9 @@
                                     <label class="console-label">API Key (可选)</label>
                                     <input type="password" class="console-input" placeholder="sk-..." v-model="imageGenConfig.custom.apiKey">
                                 </div>
+                                <button class="console-btn console-btn-secondary console-btn-full" @click="openImageGenSettingsModal('custom')">
+                                    <i class="fas fa-sliders-h"></i> 调整 自定义高级生成设定 ({{ imageGenConfig.custom.width }}x{{ imageGenConfig.custom.height }} >)
+                                </button>
                             </div>
 
                             <!-- 测试生图区 -->
@@ -6728,113 +6740,230 @@
             </div>
         </div>
 
-        <!-- NovelAI 高级生成设定 Modal -->
-        <div v-if="showNovelAiSettingsModal && imageGenConfig" class="art-savearchive-overlay" @click.self="showNovelAiSettingsModal = false">
+        <!-- 多渠道生图高级生成设定 Modal -->
+        <div v-if="showImageGenSettingsModal && imageGenConfig" class="art-savearchive-overlay" @click.self="showImageGenSettingsModal = false">
             <div class="art-savearchive-panel novelai-modal-panel">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 10px;">
-                    <div style="font-family: 'Georgia', 'Songti SC', serif; font-size: 18px; font-weight: bold; color: #333;">NovelAI 生成设置</div>
-                    <i class="fas fa-times" @click="showNovelAiSettingsModal = false" style="cursor: pointer; font-size: 18px; color: #888;"></i>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 10px;">
+                    <div style="font-family: 'Georgia', 'Songti SC', serif; font-size: 17px; font-weight: bold; color: #333;">生图高级生成设定</div>
+                    <i class="fas fa-times" @click="showImageGenSettingsModal = false" style="cursor: pointer; font-size: 18px; color: #888;"></i>
                 </div>
-                <div style="max-height: 65vh; overflow-y: auto; padding-right: 6px;">
-                    <!-- 图像尺寸 -->
-                    <div class="console-form-group">
-                        <label class="console-label">图像尺寸 (Resolution)</label>
-                        <select class="console-select" :value="`${imageGenConfig.novelai.width}x${imageGenConfig.novelai.height}`" @change="val => { const [w, h] = val.target.value.split('x').map(Number); imageGenConfig.novelai.width = w; imageGenConfig.novelai.height = h; }">
-                            <option value="832x1216">832 x 1216 (竖屏 3:4 - 推荐人像)</option>
-                            <option value="1024x1024">1024 x 1024 (正方形 1:1)</option>
-                            <option value="1216x832">1216 x 832 (横屏 4:3 - 推荐风景)</option>
-                            <option value="512x768">512 x 768 (标准竖屏)</option>
-                            <option value="1024x1536">1024 x 1536 (超清竖向画幅)</option>
-                        </select>
-                        <div style="font-size: 11px; color: #999; margin-top: 2px;">建议使用模型推荐的尺寸以获得最佳细节效果</div>
-                    </div>
 
-                    <!-- 采样步数 (Steps) -->
-                    <div class="console-form-group">
-                        <label class="console-label">采样步数 (Steps): {{ imageGenConfig.novelai.steps }}</label>
-                        <input type="range" class="console-slider" min="1" max="50" step="1" v-model.number="imageGenConfig.novelai.steps">
-                        <div style="font-size: 11px; color: #999;">推荐值：28（越高细节越丰富）</div>
-                    </div>
+                <!-- 渠道切换 Tab bar -->
+                <div class="image-gen-modal-tabs" style="display: flex; gap: 6px; margin-bottom: 14px; overflow-x: auto; padding-bottom: 4px;">
+                    <button class="channel-chip" style="padding: 5px 10px; font-size: 12px;" :class="{ active: imageGenModalTab === 'pollinations' }" @click="imageGenModalTab = 'pollinations'">
+                        <i class="fas fa-leaf"></i> Pollinations
+                    </button>
+                    <button class="channel-chip" style="padding: 5px 10px; font-size: 12px;" :class="{ active: imageGenModalTab === 'novelai' }" @click="imageGenModalTab = 'novelai'">
+                        <i class="fas fa-paint-brush"></i> NovelAI
+                    </button>
+                    <button class="channel-chip" style="padding: 5px 10px; font-size: 12px;" :class="{ active: imageGenModalTab === 'openai' }" @click="imageGenModalTab = 'openai'">
+                        <i class="fas fa-robot"></i> DALL-E
+                    </button>
+                    <button class="channel-chip" style="padding: 5px 10px; font-size: 12px;" :class="{ active: imageGenModalTab === 'gemini' }" @click="imageGenModalTab = 'gemini'">
+                        <i class="fas fa-sparkles"></i> Gemini
+                    </button>
+                    <button class="channel-chip" style="padding: 5px 10px; font-size: 12px;" :class="{ active: imageGenModalTab === 'custom' }" @click="imageGenModalTab = 'custom'">
+                        <i class="fas fa-sliders-h"></i> 自定义
+                    </button>
+                </div>
 
-                    <!-- 提示词相关性 (CFG Scale) -->
-                    <div class="console-form-group">
-                        <label class="console-label">提示词相关性 (CFG Scale): {{ imageGenConfig.novelai.cfgScale }}</label>
-                        <input type="range" class="console-slider" min="1" max="20" step="0.5" v-model.number="imageGenConfig.novelai.cfgScale">
-                        <div style="font-size: 11px; color: #999;">推荐值：5.0（控制AI遵从提示词的严格程度）</div>
-                    </div>
+                <div style="max-height: 60vh; overflow-y: auto; padding-right: 6px;">
 
-                    <!-- 采样器 (Sampler) -->
-                    <div class="console-form-group">
-                        <label class="console-label">采样器 (Sampler)</label>
-                        <select class="console-select" v-model="imageGenConfig.novelai.sampler">
-                            <option value="k_euler">Euler (标准极速)</option>
-                            <option value="k_dpmpp_2m">DPM++ 2M (推荐 - 细节丰富)</option>
-                            <option value="k_dpmpp_sde">DPM++ SDE (艺术质感)</option>
-                            <option value="ddim">DDIM</option>
-                        </select>
-                    </div>
-
-                    <!-- 噪声调度 (Noise Schedule) -->
-                    <div class="console-form-group">
-                        <label class="console-label">噪声调度 (Noise Schedule)</label>
-                        <select class="console-select" v-model="imageGenConfig.novelai.noiseSchedule">
-                            <option value="karras">Karras (推荐 - 平滑质感)</option>
-                            <option value="native">Native (原生)</option>
-                            <option value="exponential">Exponential</option>
-                        </select>
-                    </div>
-
-                    <!-- 随机种子 (Seed) -->
-                    <div class="console-form-group">
-                        <label class="console-label">随机种子 (Seed)</label>
-                        <input type="number" class="console-input" placeholder="-1 表示随机" v-model.number="imageGenConfig.novelai.seed">
-                        <div style="font-size: 11px; color: #999;">-1 为随机。固定种子可复现相同的画风或构图。</div>
-                    </div>
-
-                    <!-- 选项开关组 -->
-                    <div style="display: flex; flex-direction: column; gap: 10px; margin: 14px 0; background: rgba(0,0,0,0.03); padding: 12px; border-radius: 8px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <span style="font-size: 13px; font-weight: 500;">Quality Tags (优质画质词开关)</span>
-                            <div class="setting-toggle" @click="imageGenConfig.novelai.qualityTags = !imageGenConfig.novelai.qualityTags">
-                                <div class="toggle-slider" :class="{ active: imageGenConfig.novelai.qualityTags }">
-                                    <div class="toggle-thumb"></div>
+                    <!-- 1. Pollinations 参数 -->
+                    <div v-if="imageGenModalTab === 'pollinations'">
+                        <div class="console-form-group">
+                            <label class="console-label">图像尺寸 (Resolution)</label>
+                            <select class="console-select" :value="`${imageGenConfig.pollinations.width}x${imageGenConfig.pollinations.height}`" @change="val => { const [w, h] = val.target.value.split('x').map(Number); imageGenConfig.pollinations.width = w; imageGenConfig.pollinations.height = h; }">
+                                <option value="832x1216">832 x 1216 (3:4 - 推荐人像)</option>
+                                <option value="1024x1024">1024 x 1024 (1:1 正方形)</option>
+                                <option value="1216x832">1216 x 832 (4:3 横屏)</option>
+                                <option value="1080x1920">1080 x 1920 (9:16 壁纸)</option>
+                            </select>
+                        </div>
+                        <div class="console-form-group">
+                            <label class="console-label">模型选择 (Model)</label>
+                            <select class="console-select" v-model="imageGenConfig.pollinations.model">
+                                <option value="flux">FLUX.1 (推荐 - 高清通用)</option>
+                                <option value="flux-realism">FLUX Realism (真实写实)</option>
+                                <option value="any-dark">Any Dark (暗黑二次元)</option>
+                                <option value="turbo">Turbo (极速)</option>
+                            </select>
+                        </div>
+                        <div class="console-form-group">
+                            <label class="console-label">随机种子 (Seed)</label>
+                            <input type="number" class="console-input" placeholder="-1 表示随机" v-model.number="imageGenConfig.pollinations.seed">
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 10px; margin: 12px 0; background: rgba(0,0,0,0.03); padding: 12px; border-radius: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-size: 13px; font-weight: 500;">No Logo (隐去水印)</span>
+                                <div class="setting-toggle" @click="imageGenConfig.pollinations.nologo = !imageGenConfig.pollinations.nologo">
+                                    <div class="toggle-slider" :class="{ active: imageGenConfig.pollinations.nologo }">
+                                        <div class="toggle-thumb"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-size: 13px; font-weight: 500;">Enhance Prompt (GPT 自动扩写提示词)</span>
+                                <div class="setting-toggle" @click="imageGenConfig.pollinations.enhance = !imageGenConfig.pollinations.enhance">
+                                    <div class="toggle-slider" :class="{ active: imageGenConfig.pollinations.enhance }">
+                                        <div class="toggle-thumb"></div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <span style="font-size: 13px; font-weight: 500;">Variety+ (增强画面多样性)</span>
-                            <div class="setting-toggle" @click="imageGenConfig.novelai.variety = !imageGenConfig.novelai.variety">
-                                <div class="toggle-slider" :class="{ active: imageGenConfig.novelai.variety }">
-                                    <div class="toggle-thumb"></div>
-                                </div>
-                            </div>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <span style="font-size: 13px; font-weight: 500;">SMEA 算法优化</span>
-                            <div class="setting-toggle" @click="imageGenConfig.novelai.smea = !imageGenConfig.novelai.smea">
-                                <div class="toggle-slider" :class="{ active: imageGenConfig.novelai.smea }">
-                                    <div class="toggle-thumb"></div>
-                                </div>
-                            </div>
+                        <div class="console-form-group">
+                            <label class="console-label">默认正面提示词 (Positive Prompts)</label>
+                            <textarea class="console-input" rows="2" v-model="imageGenConfig.pollinations.positivePrompt"></textarea>
                         </div>
                     </div>
 
-                    <!-- 正面提示词预设 -->
-                    <div class="console-form-group">
-                        <label class="console-label">默认正面提示词 (Positive Prompts)</label>
-                        <textarea class="console-input" rows="2" v-model="imageGenConfig.novelai.positivePrompt"></textarea>
+                    <!-- 2. NovelAI 参数 -->
+                    <div v-else-if="imageGenModalTab === 'novelai'">
+                        <div class="console-form-group">
+                            <label class="console-label">图像尺寸 (Resolution)</label>
+                            <select class="console-select" :value="`${imageGenConfig.novelai.width}x${imageGenConfig.novelai.height}`" @change="val => { const [w, h] = val.target.value.split('x').map(Number); imageGenConfig.novelai.width = w; imageGenConfig.novelai.height = h; }">
+                                <option value="832x1216">832 x 1216 (竖屏 3:4 - 推荐人像)</option>
+                                <option value="1024x1024">1024 x 1024 (正方形 1:1)</option>
+                                <option value="1216x832">1216 x 832 (横屏 4:3 - 推荐风景)</option>
+                                <option value="512x768">512 x 768 (标准竖屏)</option>
+                                <option value="1024x1536">1024 x 1536 (超清竖向画幅)</option>
+                            </select>
+                        </div>
+                        <div class="console-form-group">
+                            <label class="console-label">采样步数 (Steps): {{ imageGenConfig.novelai.steps }}</label>
+                            <input type="range" class="console-slider" min="1" max="50" step="1" v-model.number="imageGenConfig.novelai.steps">
+                        </div>
+                        <div class="console-form-group">
+                            <label class="console-label">提示词相关性 (CFG Scale): {{ imageGenConfig.novelai.cfgScale }}</label>
+                            <input type="range" class="console-slider" min="1" max="20" step="0.5" v-model.number="imageGenConfig.novelai.cfgScale">
+                        </div>
+                        <div class="console-form-group">
+                            <label class="console-label">采样器 (Sampler)</label>
+                            <select class="console-select" v-model="imageGenConfig.novelai.sampler">
+                                <option value="k_euler">Euler (标准极速)</option>
+                                <option value="k_dpmpp_2m">DPM++ 2M (推荐 - 细节丰富)</option>
+                                <option value="k_dpmpp_sde">DPM++ SDE (艺术质感)</option>
+                                <option value="ddim">DDIM</option>
+                            </select>
+                        </div>
+                        <div class="console-form-group">
+                            <label class="console-label">噪声调度 (Noise Schedule)</label>
+                            <select class="console-select" v-model="imageGenConfig.novelai.noiseSchedule">
+                                <option value="karras">Karras (推荐 - 平滑质感)</option>
+                                <option value="native">Native (原生)</option>
+                                <option value="exponential">Exponential</option>
+                            </select>
+                        </div>
+                        <div class="console-form-group">
+                            <label class="console-label">随机种子 (Seed)</label>
+                            <input type="number" class="console-input" placeholder="-1 表示随机" v-model.number="imageGenConfig.novelai.seed">
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 10px; margin: 12px 0; background: rgba(0,0,0,0.03); padding: 12px; border-radius: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-size: 13px; font-weight: 500;">Quality Tags (优质画质词开关)</span>
+                                <div class="setting-toggle" @click="imageGenConfig.novelai.qualityTags = !imageGenConfig.novelai.qualityTags">
+                                    <div class="toggle-slider" :class="{ active: imageGenConfig.novelai.qualityTags }">
+                                        <div class="toggle-thumb"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-size: 13px; font-weight: 500;">Variety+ (增强画面多样性)</span>
+                                <div class="setting-toggle" @click="imageGenConfig.novelai.variety = !imageGenConfig.novelai.variety">
+                                    <div class="toggle-slider" :class="{ active: imageGenConfig.novelai.variety }">
+                                        <div class="toggle-thumb"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="console-form-group">
+                            <label class="console-label">默认正面提示词 (Positive Prompts)</label>
+                            <textarea class="console-input" rows="2" v-model="imageGenConfig.novelai.positivePrompt"></textarea>
+                        </div>
+                        <div class="console-form-group">
+                            <label class="console-label">默认反向提示词 (Negative Prompts)</label>
+                            <textarea class="console-input" rows="2" v-model="imageGenConfig.novelai.negativePrompt"></textarea>
+                        </div>
                     </div>
 
-                    <!-- 反向提示词预设 -->
-                    <div class="console-form-group">
-                        <label class="console-label">默认反向提示词 (Negative Prompts)</label>
-                        <textarea class="console-input" rows="2" v-model="imageGenConfig.novelai.negativePrompt"></textarea>
+                    <!-- 3. OpenAI DALL-E 参数 -->
+                    <div v-else-if="imageGenModalTab === 'openai'">
+                        <div class="console-form-group">
+                            <label class="console-label">生图模型 (Model)</label>
+                            <select class="console-select" v-model="imageGenConfig.openai.model">
+                                <option value="dall-e-3">DALL-E 3 (推荐 - 高清细节)</option>
+                                <option value="dall-e-2">DALL-E 2</option>
+                            </select>
+                        </div>
+                        <div class="console-form-group">
+                            <label class="console-label">图像尺寸 (Size)</label>
+                            <select class="console-select" v-model="imageGenConfig.openai.size">
+                                <option value="1024x1024">1024 x 1024 (正方形 1:1)</option>
+                                <option value="1024x1792">1024 x 1792 (竖屏人像 9:16)</option>
+                                <option value="1792x1024">1792 x 1024 (横屏风景 16:9)</option>
+                            </select>
+                        </div>
+                        <div class="console-form-group">
+                            <label class="console-label">生成画质 (Quality)</label>
+                            <select class="console-select" v-model="imageGenConfig.openai.quality">
+                                <option value="standard">Standard (标准)</option>
+                                <option value="hd">HD (超高清细节)</option>
+                            </select>
+                        </div>
+                        <div class="console-form-group">
+                            <label class="console-label">艺术风格 (Style)</label>
+                            <select class="console-select" v-model="imageGenConfig.openai.style">
+                                <option value="vivid">Vivid (鲜艳戏剧化)</option>
+                                <option value="natural">Natural (自然真实)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- 4. Gemini Imagen 参数 -->
+                    <div v-else-if="imageGenModalTab === 'gemini'">
+                        <div class="console-form-group">
+                            <label class="console-label">Imagen 模型 (Model)</label>
+                            <select class="console-select" v-model="imageGenConfig.gemini.model">
+                                <option value="imagen-3.0-generate-002">Imagen 3.0 Generate 002 (推荐)</option>
+                                <option value="imagen-3.0-fast-generate-001">Imagen 3.0 Fast Generate</option>
+                            </select>
+                        </div>
+                        <div class="console-form-group">
+                            <label class="console-label">画幅比例 (Aspect Ratio)</label>
+                            <select class="console-select" v-model="imageGenConfig.gemini.aspectRatio">
+                                <option value="1:1">1:1 (正方形)</option>
+                                <option value="3:4">3:4 (竖屏)</option>
+                                <option value="4:3">4:3 (横屏)</option>
+                                <option value="9:16">9:16 (手机全屏)</option>
+                                <option value="16:9">16:9 (宽屏)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- 5. 自定义 / 反代 参数 -->
+                    <div v-else-if="imageGenModalTab === 'custom'">
+                        <div class="console-form-group">
+                            <label class="console-label">默认尺寸 (Width x Height)</label>
+                            <div style="display: flex; gap: 8px;">
+                                <input type="number" class="console-input" placeholder="宽" v-model.number="imageGenConfig.custom.width" style="flex: 1;">
+                                <span style="align-self: center;">x</span>
+                                <input type="number" class="console-input" placeholder="高" v-model.number="imageGenConfig.custom.height" style="flex: 1;">
+                            </div>
+                        </div>
+                        <div class="console-form-group">
+                            <label class="console-label">模型名称 (Model)</label>
+                            <input type="text" class="console-input" placeholder="dall-e-3 / sd-webui" v-model="imageGenConfig.custom.model">
+                        </div>
+                        <div class="console-form-group">
+                            <label class="console-label">默认正面提示词 (Positive Prompts)</label>
+                            <textarea class="console-input" rows="2" v-model="imageGenConfig.custom.positivePrompt"></textarea>
+                        </div>
                     </div>
                 </div>
 
                 <div style="display: flex; gap: 10px; margin-top: 16px;">
                     <button class="art-savearchive-btn art-savearchive-btn-cancel" @click="resetImageGenConfig" style="flex: 1;">恢复默认</button>
-                    <button class="art-savearchive-btn art-savearchive-btn-save" @click="saveImageGenConfig(); showNovelAiSettingsModal = false" style="flex: 2;">保存设置</button>
+                    <button class="art-savearchive-btn art-savearchive-btn-save" @click="saveImageGenConfig(); showImageGenSettingsModal = false" style="flex: 2;">保存设置</button>
                 </div>
             </div>
         </div>

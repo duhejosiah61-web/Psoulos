@@ -43,6 +43,7 @@ const DEFAULT_CONFIG = {
     height: 1216,
     seed: -1,
     nologo: true,
+    enhance: true,
     positivePrompt: 'masterpiece, highly detailed, aesthetic anime art style',
     negativePrompt: 'blurry, low quality, distortion'
   },
@@ -51,33 +52,41 @@ const DEFAULT_CONFIG = {
     apiKey: '',
     endpoint: 'https://api.openai.com/v1',
     model: 'dall-e-3',
-    quality: 'standard',
-    style: 'vivid',
+    quality: 'standard', // 'standard' | 'hd'
+    style: 'vivid', // 'vivid' | 'natural'
     size: '1024x1024'
   },
 
   gemini: {
     apiKey: '',
     model: 'imagen-3.0-generate-002',
-    aspectRatio: '1:1'
+    aspectRatio: '1:1',
+    safetyFilter: 'block_none'
   },
 
   grok: {
     apiKey: '',
     endpoint: 'https://api.x.ai/v1',
-    model: 'grok-2-vision'
+    model: 'grok-2-vision',
+    aspectRatio: '3:4'
   },
 
   custom: {
     apiKey: '',
     endpoint: '',
-    model: ''
+    model: 'dall-e-3',
+    width: 832,
+    height: 1216,
+    positivePrompt: 'masterpiece, high quality',
+    negativePrompt: 'lowres, bad quality'
   }
 };
 
 export function useImageGen({ addConsoleLog } = {}) {
   const imageGenConfig = reactive(loadConfig());
-  const showNovelAiSettingsModal = ref(false);
+  const showImageGenSettingsModal = ref(false);
+  const showNovelAiSettingsModal = showImageGenSettingsModal; // 兼容兼容项
+  const imageGenModalTab = ref('novelai');
   const isGeneratingTestImage = ref(false);
   const testImageResult = ref('');
   const testPromptInput = ref('1girl, solo, masterpiece, looking at viewer, soft lighting');
@@ -85,6 +94,11 @@ export function useImageGen({ addConsoleLog } = {}) {
   function log(msg, type = 'info') {
     if (addConsoleLog) addConsoleLog(`[生图服务] ${msg}`, type);
     else console.log(`[ImageGen ${type}]`, msg);
+  }
+
+  function openImageGenSettingsModal(channel = null) {
+    imageGenModalTab.value = channel || imageGenConfig.activeChannel || 'novelai';
+    showImageGenSettingsModal.value = true;
   }
 
   function loadConfig() {
@@ -123,10 +137,6 @@ export function useImageGen({ addConsoleLog } = {}) {
 
   /**
    * 核心生图入口函数
-   * @param {object} options
-   * @param {string} options.prompt - 用户提示词/故事场景
-   * @param {string} [options.negativePrompt] - 补充反向词
-   * @returns {Promise<string>} 返回图片的 URL 或 Base64 DataURL
    */
   async function generateImage({ prompt, negativePrompt = '' } = {}) {
     if (!imageGenConfig.enabled) {
@@ -145,7 +155,7 @@ export function useImageGen({ addConsoleLog } = {}) {
     } else if (channel === 'gemini') {
       return await generateViaGemini(prompt);
     } else if (channel === 'custom') {
-      return await generateViaCustom(prompt);
+      return await generateViaCustom(prompt, negativePrompt);
     } else {
       return await generateViaPollinations(prompt, negativePrompt);
     }
@@ -159,8 +169,9 @@ export function useImageGen({ addConsoleLog } = {}) {
     const model = cfg.model || 'flux';
     const width = cfg.width || 832;
     const height = cfg.height || 1216;
+    const enhance = cfg.enhance !== false ? 'true' : 'false';
 
-    const imgUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(finalPrompt)}?width=${width}&height=${height}&seed=${seed}&model=${model}&nologo=${cfg.nologo ? 'true' : 'false'}`;
+    const imgUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(finalPrompt)}?width=${width}&height=${height}&seed=${seed}&model=${model}&nologo=${cfg.nologo ? 'true' : 'false'}&enhance=${enhance}`;
 
     log(`Pollinations 生图 URL 已生成: ${imgUrl}`, 'success');
     return imgUrl;
@@ -217,7 +228,6 @@ export function useImageGen({ addConsoleLog } = {}) {
       throw new Error(`NovelAI 请求失败 [${res.status}]: ${errText.slice(0, 200)}`);
     }
 
-    // NovelAI 原生返回二进制 zip/png
     const blob = await res.blob();
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -287,21 +297,26 @@ export function useImageGen({ addConsoleLog } = {}) {
   }
 
   // Custom / OpenAI-Compatible 引擎
-  async function generateViaCustom(userPrompt) {
+  async function generateViaCustom(userPrompt, extraNeg = '') {
     const cfg = imageGenConfig.custom;
     if (!cfg.endpoint) throw new Error('自定义 API 地址未填写');
     const endpoint = cfg.endpoint.replace(/\/+$/, '') + '/images/generations';
 
+    const fullPositive = [cfg.positivePrompt, userPrompt].filter(Boolean).join(', ');
+
     const headers = { 'Content-Type': 'application/json' };
     if (cfg.apiKey) headers['Authorization'] = `Bearer ${cfg.apiKey.trim()}`;
+
+    const sizeStr = `${cfg.width || 832}x${cfg.height || 1216}`;
 
     const res = await fetch(endpoint, {
       method: 'POST',
       headers,
       body: JSON.stringify({
         model: cfg.model || 'dall-e-3',
-        prompt: userPrompt,
+        prompt: fullPositive,
         n: 1,
+        size: sizeStr,
         response_format: 'url'
       })
     });
@@ -334,7 +349,10 @@ export function useImageGen({ addConsoleLog } = {}) {
 
   return {
     imageGenConfig,
+    showImageGenSettingsModal,
     showNovelAiSettingsModal,
+    imageGenModalTab,
+    openImageGenSettingsModal,
     isGeneratingTestImage,
     testImageResult,
     testPromptInput,

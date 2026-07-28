@@ -4442,7 +4442,10 @@ ${styleGuide}
             showSegmentedImportPanel, segmentedImportPackage, segmentedImportAppSelections, segmentedImportRoleSelections, closeSegmentedImportPanel, confirmSegmentedImport,
             // Image Gen
             imageGenConfig: imageGen.imageGenConfig,
+            showImageGenSettingsModal: imageGen.showImageGenSettingsModal,
             showNovelAiSettingsModal: imageGen.showNovelAiSettingsModal,
+            imageGenModalTab: imageGen.imageGenModalTab,
+            openImageGenSettingsModal: imageGen.openImageGenSettingsModal,
             isGeneratingTestImage: imageGen.isGeneratingTestImage,
             testImageResult: imageGen.testImageResult,
             testPromptInput: imageGen.testPromptInput,
