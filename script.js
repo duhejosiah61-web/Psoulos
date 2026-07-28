@@ -19,6 +19,7 @@ import { useChatSettings } from './composables/useChatSettings.js';
 import { useChat } from './composables/useChat.js';
 import { useAttachment } from './composables/useAttachment.js';
 import { useConsole } from './composables/useConsole.js';
+import { useImageGen } from './composables/useImageGen.js';
 import { useWorkshop } from './composables/useWorkshop.js';
 import { useHome } from './composables/useHome.js';
 import { callAI } from './api.js';
@@ -462,6 +463,8 @@ export function setupApp() {
             mergeById,
             pickLocalStorageByPrefixes
         } = consoleModule;
+
+        const imageGen = useImageGen({ addConsoleLog });
 
         const saveToStorage = (key, data) => {
             try { localStorage.setItem(key, JSON.stringify(data)); }
@@ -4437,6 +4440,16 @@ ${styleGuide}
             backupExporting, backupImporting, backupLastSavedHint, soulosBackupFileInput,
             downloadSoulOsBackup, downloadSegmentedBackup, saveSoulOsBackupSlotOnly, restoreSoulOsFromSlot, triggerSoulOsBackupImport, handleSoulOsBackupImport,
             showSegmentedImportPanel, segmentedImportPackage, segmentedImportAppSelections, segmentedImportRoleSelections, closeSegmentedImportPanel, confirmSegmentedImport,
+            // Image Gen
+            imageGenConfig: imageGen.imageGenConfig,
+            showNovelAiSettingsModal: imageGen.showNovelAiSettingsModal,
+            isGeneratingTestImage: imageGen.isGeneratingTestImage,
+            testImageResult: imageGen.testImageResult,
+            testPromptInput: imageGen.testPromptInput,
+            saveImageGenConfig: imageGen.saveConfig,
+            resetImageGenConfig: imageGen.resetConfigToDefault,
+            generateImage: imageGen.generateImage,
+            testGenerateImage: imageGen.testGenerateImage,
             // Workshop App
             activeWorkshopTab,
             switchWorkshopTab,

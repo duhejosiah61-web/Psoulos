@@ -912,3 +912,62 @@
     font-size: 12px;
     text-align: center;
 }
+
+/* 图像生成渠道 & 高级设定组件样式 */
+.image-gen-channel-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.channel-chip {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 10px;
+    background: rgba(0, 0, 0, 0.04);
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #444;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.channel-chip:hover {
+    background: rgba(0, 0, 0, 0.08);
+}
+
+.channel-chip.active {
+    background: #6c5ce7;
+    color: #ffffff;
+    border-color: #6c5ce7;
+    box-shadow: 0 2px 8px rgba(108, 92, 231, 0.3);
+}
+
+.channel-config-panel {
+    background: rgba(0, 0, 0, 0.02);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 10px;
+}
+
+.novelai-modal-panel {
+    max-width: 440px;
+    width: 90vw;
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+}
+
+.image-gen-test-preview {
+    text-align: center;
+    background: rgba(0,0,0,0.03);
+    border-radius: 8px;
+    padding: 10px;
+}

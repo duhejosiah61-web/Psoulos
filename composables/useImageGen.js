@@ -1,0 +1,356 @@
+// composables/useImageGen.js — Psoulos 图像生成配置与多渠道生图引擎
+import { ref, reactive, watch } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
+
+const STORAGE_KEY = 'soulos_image_gen_config';
+
+const DEFAULT_CONFIG = {
+  enabled: true,
+  readWorldBook: true,
+  activeChannel: 'pollinations', // 'novelai' | 'pollinations' | 'openai' | 'gemini' | 'grok' | 'custom'
+
+  novelai: {
+    apiKey: '',
+    endpointType: 'official', // 'official' | 'proxy'
+    proxyUrl: '',
+    model: 'nai-diffusion-4-5-full',
+    width: 832,
+    height: 1216,
+    steps: 28,
+    cfgScale: 5.0,
+    sampler: 'k_euler',
+    noiseSchedule: 'karras',
+    seed: -1,
+    ucPreset: 'Preset 0 - Heavy',
+    smea: false,
+    smeaDyn: false,
+    cfgRescale: 0,
+    undesiredStrength: 1.0,
+    qualityTags: true,
+    variety: true,
+    dynamicThresholding: false,
+    vibeTransfer: {
+      enabled: false,
+      imageUrl: '',
+      strength: 0.5
+    },
+    positivePrompt: 'masterpiece, best quality, ultra-detailed, highly aesthetic',
+    negativePrompt: 'lowres, bad quality, bad anatomy, error, missing fingers, extra digit, jpeg artifacts'
+  },
+
+  pollinations: {
+    model: 'flux', // 'flux' | 'flux-realism' | 'any-dark' | 'turbo'
+    width: 832,
+    height: 1216,
+    seed: -1,
+    nologo: true,
+    positivePrompt: 'masterpiece, highly detailed, aesthetic anime art style',
+    negativePrompt: 'blurry, low quality, distortion'
+  },
+
+  openai: {
+    apiKey: '',
+    endpoint: 'https://api.openai.com/v1',
+    model: 'dall-e-3',
+    quality: 'standard',
+    style: 'vivid',
+    size: '1024x1024'
+  },
+
+  gemini: {
+    apiKey: '',
+    model: 'imagen-3.0-generate-002',
+    aspectRatio: '1:1'
+  },
+
+  grok: {
+    apiKey: '',
+    endpoint: 'https://api.x.ai/v1',
+    model: 'grok-2-vision'
+  },
+
+  custom: {
+    apiKey: '',
+    endpoint: '',
+    model: ''
+  }
+};
+
+export function useImageGen({ addConsoleLog } = {}) {
+  const imageGenConfig = reactive(loadConfig());
+  const showNovelAiSettingsModal = ref(false);
+  const isGeneratingTestImage = ref(false);
+  const testImageResult = ref('');
+  const testPromptInput = ref('1girl, solo, masterpiece, looking at viewer, soft lighting');
+
+  function log(msg, type = 'info') {
+    if (addConsoleLog) addConsoleLog(`[生图服务] ${msg}`, type);
+    else console.log(`[ImageGen ${type}]`, msg);
+  }
+
+  function loadConfig() {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return deepMerge(JSON.parse(JSON.stringify(DEFAULT_CONFIG)), parsed);
+      }
+    } catch (e) {
+      console.error('Failed to load image gen config:', e);
+    }
+    return JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+  }
+
+  function saveConfig() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(imageGenConfig));
+      log('生图配置已成功保存', 'success');
+    } catch (e) {
+      log('保存生图配置失败：' + e.message, 'error');
+    }
+  }
+
+  function resetConfigToDefault() {
+    Object.assign(imageGenConfig, JSON.parse(JSON.stringify(DEFAULT_CONFIG)));
+    saveConfig();
+    log('生图设置已恢复默认', 'warn');
+  }
+
+  watch(imageGenConfig, () => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(imageGenConfig));
+    } catch (e) { /* ignore */ }
+  }, { deep: true });
+
+  /**
+   * 核心生图入口函数
+   * @param {object} options
+   * @param {string} options.prompt - 用户提示词/故事场景
+   * @param {string} [options.negativePrompt] - 补充反向词
+   * @returns {Promise<string>} 返回图片的 URL 或 Base64 DataURL
+   */
+  async function generateImage({ prompt, negativePrompt = '' } = {}) {
+    if (!imageGenConfig.enabled) {
+      throw new Error('生图功能未启用，请在控制台中开启。');
+    }
+
+    const channel = imageGenConfig.activeChannel;
+    log(`开始使用 [${channel.toUpperCase()}] 渠道生成图片...`, 'info');
+
+    if (channel === 'pollinations') {
+      return await generateViaPollinations(prompt, negativePrompt);
+    } else if (channel === 'novelai') {
+      return await generateViaNovelAI(prompt, negativePrompt);
+    } else if (channel === 'openai') {
+      return await generateViaOpenAI(prompt);
+    } else if (channel === 'gemini') {
+      return await generateViaGemini(prompt);
+    } else if (channel === 'custom') {
+      return await generateViaCustom(prompt);
+    } else {
+      return await generateViaPollinations(prompt, negativePrompt);
+    }
+  }
+
+  // Pollinations.ai 引擎 (免费无需 Key)
+  async function generateViaPollinations(userPrompt, extraNeg = '') {
+    const cfg = imageGenConfig.pollinations;
+    const finalPrompt = [cfg.positivePrompt, userPrompt].filter(Boolean).join(', ');
+    const seed = cfg.seed === -1 ? Math.floor(Math.random() * 1000000) : cfg.seed;
+    const model = cfg.model || 'flux';
+    const width = cfg.width || 832;
+    const height = cfg.height || 1216;
+
+    const imgUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(finalPrompt)}?width=${width}&height=${height}&seed=${seed}&model=${model}&nologo=${cfg.nologo ? 'true' : 'false'}`;
+
+    log(`Pollinations 生图 URL 已生成: ${imgUrl}`, 'success');
+    return imgUrl;
+  }
+
+  // NovelAI 引擎
+  async function generateViaNovelAI(userPrompt, extraNeg = '') {
+    const cfg = imageGenConfig.novelai;
+    if (!cfg.apiKey) {
+      throw new Error('NovelAI API Key 未填写，请在控制台设置。');
+    }
+
+    const endpoint = cfg.endpointType === 'proxy' && cfg.proxyUrl
+      ? cfg.proxyUrl
+      : 'https://image.novelai.net/ai/generate-image';
+
+    const fullPositive = [cfg.positivePrompt, userPrompt].filter(Boolean).join(', ');
+    const fullNegative = [cfg.negativePrompt, extraNeg].filter(Boolean).join(', ');
+    const seed = cfg.seed === -1 ? Math.floor(Math.random() * 999999999) : cfg.seed;
+
+    const payload = {
+      action: 'generate',
+      input: fullPositive,
+      model: cfg.model || 'nai-diffusion-4-5-full',
+      parameters: {
+        width: cfg.width || 832,
+        height: cfg.height || 1216,
+        scale: cfg.cfgScale || 5.0,
+        sampler: cfg.sampler || 'k_euler',
+        steps: cfg.steps || 28,
+        seed: seed,
+        n_samples: 1,
+        uc: fullNegative,
+        qualityToggle: cfg.qualityTags,
+        noise_schedule: cfg.noiseSchedule || 'karras',
+        smea: cfg.smea,
+        smea_dyn: cfg.smeaDyn,
+        uncond_scale: cfg.undesiredStrength || 1.0,
+        cfg_rescale: cfg.cfgRescale || 0
+      }
+    };
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${cfg.apiKey.trim()}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`NovelAI 请求失败 [${res.status}]: ${errText.slice(0, 200)}`);
+    }
+
+    // NovelAI 原生返回二进制 zip/png
+    const blob = await res.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  // OpenAI DALL-E 引擎
+  async function generateViaOpenAI(userPrompt) {
+    const cfg = imageGenConfig.openai;
+    if (!cfg.apiKey) throw new Error('OpenAI API Key 未填写');
+    const endpoint = (cfg.endpoint || 'https://api.openai.com/v1').replace(/\/+$/, '') + '/images/generations';
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${cfg.apiKey.trim()}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: cfg.model || 'dall-e-3',
+        prompt: userPrompt,
+        n: 1,
+        size: cfg.size || '1024x1024',
+        quality: cfg.quality || 'standard',
+        style: cfg.style || 'vivid',
+        response_format: 'b64_json'
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(`OpenAI 生图失败: ${err.error?.message || res.statusText}`);
+    }
+
+    const data = await res.json();
+    if (data.data && data.data[0]) {
+      const item = data.data[0];
+      if (item.b64_json) return `data:image/png;base64,${item.b64_json}`;
+      if (item.url) return item.url;
+    }
+    throw new Error('OpenAI 返回结果无效');
+  }
+
+  // Gemini / Imagen 引擎
+  async function generateViaGemini(userPrompt) {
+    const cfg = imageGenConfig.gemini;
+    if (!cfg.apiKey) throw new Error('Gemini API Key 未填写');
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${cfg.model || 'imagen-3.0-generate-002'}:predict?key=${cfg.apiKey.trim()}`;
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        instances: [{ prompt: userPrompt }],
+        parameters: { sampleCount: 1, aspectRatio: cfg.aspectRatio || '1:1' }
+      })
+    });
+
+    if (!res.ok) throw new Error(`Gemini Imagen生图错误 [${res.status}]`);
+    const data = await res.json();
+    const b64 = data.predictions?.[0]?.bytesBase64Encoded;
+    if (b64) return `data:image/png;base64,${b64}`;
+    throw new Error('Gemini 未能生成有效图片数据');
+  }
+
+  // Custom / OpenAI-Compatible 引擎
+  async function generateViaCustom(userPrompt) {
+    const cfg = imageGenConfig.custom;
+    if (!cfg.endpoint) throw new Error('自定义 API 地址未填写');
+    const endpoint = cfg.endpoint.replace(/\/+$/, '') + '/images/generations';
+
+    const headers = { 'Content-Type': 'application/json' };
+    if (cfg.apiKey) headers['Authorization'] = `Bearer ${cfg.apiKey.trim()}`;
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model: cfg.model || 'dall-e-3',
+        prompt: userPrompt,
+        n: 1,
+        response_format: 'url'
+      })
+    });
+
+    if (!res.ok) throw new Error(`自定义生图请求失败: HTTP ${res.status}`);
+    const data = await res.json();
+    if (data.data?.[0]?.url) return data.data[0].url;
+    if (data.data?.[0]?.b64_json) return `data:image/png;base64,${data.data[0].b64_json}`;
+    throw new Error('自定义接口未返回有效图片 URL');
+  }
+
+  // 控制台一键测试生图
+  async function testGenerateImage() {
+    if (isGeneratingTestImage.value) return;
+    isGeneratingTestImage.value = true;
+    testImageResult.value = '';
+    log('开始执行测试生图...', 'info');
+
+    try {
+      const url = await generateImage({ prompt: testPromptInput.value || '1girl, masterpiece, solo' });
+      testImageResult.value = url;
+      log('测试生图生成成功！', 'success');
+    } catch (e) {
+      log('测试生图失败: ' + e.message, 'error');
+      alert('测试生图失败：' + e.message);
+    } finally {
+      isGeneratingTestImage.value = false;
+    }
+  }
+
+  return {
+    imageGenConfig,
+    showNovelAiSettingsModal,
+    isGeneratingTestImage,
+    testImageResult,
+    testPromptInput,
+    saveConfig,
+    resetConfigToDefault,
+    generateImage,
+    testGenerateImage
+  };
+}
+
+function deepMerge(target, source) {
+  for (const key of Object.keys(source)) {
+    if (source[key] instanceof Object && key in target && target[key] instanceof Object) {
+      Object.assign(source[key], deepMerge(target[key], source[key]));
+    }
+  }
+  Object.assign(target || {}, source);
+  return target;
+}
