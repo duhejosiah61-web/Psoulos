@@ -24,6 +24,9 @@ export function useChat(
     const soulLinkMessages = ref({});
     const soulLinkGroups = ref([]);
     const isAiTyping = ref(false);
+    watch(soulLinkActiveChat, () => {
+        isAiTyping.value = false;
+    });
     const focusedOsMessageId = ref(null);
     const editingMessageId = ref(null);
     const rightnowPresetId = ref(null);

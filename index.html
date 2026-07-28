@@ -1250,7 +1250,7 @@
                                 </div>
                                 <div v-else>
                                     <div v-if="soulLinkActiveChatType === 'group' && msg.senderName && !msg.isSystem" class="group-sender-name">{{ msg.senderName }}</div>
-                                    <div class="bubble">
+                                    <div v-if="msg.isCallMessage || msg.messageType || (msg.text && msg.text.trim()) || msg.replyTo" class="bubble">
                                         <div v-if="msg.replyTo" class="reply-quote">
                                             <div class="reply-quote-content">
                                                 <div class="reply-quote-sender">{{ msg.replyTo.sender === 'user' ? '我' : (msg.replyTo.senderName || currentChatName) }}</div>
