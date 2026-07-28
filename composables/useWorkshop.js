@@ -28,18 +28,13 @@ export function useWorkshop({
   const swipedWorldbookId = ref(null);
   const swipedPresetId = ref(null);
   const expandedEntryIds = ref(new Set());
-  const showWorldbookImport = ref(false);
-  const importWorldbookName = ref('');
-  const importFile = ref(null);
-  const importMode = ref('replace');
   const showBatchDeleteDialog = ref(false);
   const batchDeleteType = ref('characters');
   const batchDeleteSelections = ref([]);
   const newTagInput = ref('');
   const characterImportInput = ref(null);
   const presetImportInput = ref(null);
-
-  let worldbookImportInputEl = null;
+  const worldbookImportInput = ref(null);
 
   const saveCharacters = () => {
     try {
@@ -569,17 +564,8 @@ export function useWorkshop({
   const toggleSwipeWorldbook = (id) => {
     swipedWorldbookId.value = swipedWorldbookId.value === id ? null : id;
   };
-  const openWorldbookImport = () => {
-    showWorldbookImport.value = true;
-    importWorldbookName.value = '';
-    importFile.value = null;
-    importMode.value = 'replace';
-    worldbookImportInputEl = null;
-  };
-  const handleFileUpload = (event) => {
-    const file = event.target.files[0];
-    worldbookImportInputEl = event.target;
-    if (file) importFile.value = file;
+  const triggerWorldbookImport = () => {
+    worldbookImportInput.value?.click();
   };
 
   const readTextFile = (file) => {
@@ -614,52 +600,31 @@ export function useWorkshop({
     return entries;
   };
 
-  const importWorldbook = async () => {
-    if (!importWorldbookName.value || !importFile.value) return;
+  const handleWorldbookImport = async (event) => {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
     try {
-      let textContent = '';
-      const f = importFile.value;
-      if (f.type === 'text/plain') {
-        textContent = await readTextFile(f);
-      } else if (
-        f.type === 'application/msword' ||
-        f.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-      ) {
-        textContent = await readTextFile(f);
-      } else {
-        if (addConsoleLog) addConsoleLog('不支持的文件类型', 'error');
-        return;
-      }
+      let textContent = await readTextFile(file);
       const wbEntries = parseWorldbookContent(textContent);
-      const existingWorldbook = worldbooks.value.find(wb => wb.name === importWorldbookName.value);
-      let worldbook;
-      if (existingWorldbook && importMode.value === 'append') {
-        worldbook = existingWorldbook;
-        worldbook.entries = [...worldbook.entries, ...wbEntries];
-      } else {
-        const newWorldbook = {
-          id: existingWorldbook ? existingWorldbook.id : `worldbook_${Date.now()}`,
-          name: importWorldbookName.value,
-          description: `从文件 ${f.name} 导入`,
-          category: 'global',
-          globalEnabled: true,
-          entries: wbEntries
-        };
-        if (existingWorldbook) {
-          const index = worldbooks.value.findIndex(wb => wb.id === existingWorldbook.id);
-          worldbooks.value[index] = newWorldbook;
-        } else {
-          worldbooks.value.unshift(newWorldbook);
-        }
-        worldbook = newWorldbook;
-      }
+      
+      const wbName = file.name.replace(/\.[^.]+$/, '');
+      const newWorldbook = {
+        id: `worldbook_${Date.now()}`,
+        name: wbName,
+        description: `从文件 ${file.name} 导入`,
+        category: 'global',
+        globalEnabled: true,
+        entries: wbEntries
+      };
+      worldbooks.value.unshift(newWorldbook);
       saveWorldbooks();
-      showWorldbookImport.value = false;
-      openWorldbookEditor(worldbook);
-      if (addConsoleLog) addConsoleLog(`成功导入世界书: ${importWorldbookName.value}`, 'success');
-    } catch (error) {
-      console.error('导入世界书失败:', error);
-      if (addConsoleLog) addConsoleLog(`导入世界书失败: ${error.message}`, 'error');
+      if (addConsoleLog) addConsoleLog(`成功导入世界书: ${wbName}`, 'success');
+      alert(`成功导入世界书: ${wbName}`);
+    } catch (e) {
+      if (addConsoleLog) addConsoleLog(`导入世界书失败: ${e.message}`, 'error');
+      alert(`导入世界书失败: ${e.message}`);
+    } finally {
+      event.target.value = '';
     }
   };
 
@@ -945,10 +910,10 @@ export function useWorkshop({
     activeWorldbookEntryId,
     activeWorldbookEntry,
     swipedWorldbookId, swipedPresetId, expandedEntryIds,
-    showWorldbookImport, importWorldbookName, importFile, importMode,
+
     showBatchDeleteDialog, batchDeleteType, batchDeleteSelections,
     batchDeleteTitle, batchDeleteItems, isAllBatchSelected, selectedBatchCount,
-    newTagInput, characterImportInput, presetImportInput,
+    newTagInput, characterImportInput, presetImportInput, worldbookImportInput,
 
     addNewCharacter, deleteCharacter, openDossier, saveDossier, cancelDossier,
     addTag, removeTag, addKv, removeKv, addOpeningLine, removeOpeningLine,
@@ -957,7 +922,7 @@ export function useWorkshop({
     addNewWorldbook, deleteWorldbook, deleteCurrentWorldbook,
     openWorldbookEditor, saveWorldbookEditor, cancelWorldbookEditor,
     addWorldbookEntry, deleteWorldbookEntry, toggleEntryExpand, isEntryExpanded,
-    toggleSwipeWorldbook, toggleGlobalWorldbook, openWorldbookImport, handleFileUpload, importWorldbook,
+    toggleSwipeWorldbook, toggleGlobalWorldbook, triggerWorldbookImport, handleWorldbookImport,
 
     addNewPreset, deletePreset, deleteCurrentPreset,
     openPresetEditor, savePresetEditor, cancelPresetEditor,

@@ -26,6 +26,7 @@ export function useChat(
     const isAiTyping = ref(false);
     const focusedOsMessageId = ref(null);
     const editingMessageId = ref(null);
+    const rightnowPresetId = ref(null);
     const novelMode = ref(localStorage.getItem('soulos_novel_mode') === 'true');
     watch(novelMode, (val) => {
         try {
@@ -216,6 +217,10 @@ export function useChat(
             const group = soulLinkGroups.value.find(g => String(g.id) === String(soulLinkActiveChat.value));
             return group && Array.isArray(group.history) ? group.history : [];
         }
+        if (isRightnowMode.value) {
+            const slotSuffix = rightnowActiveSlot.value ? `_${rightnowActiveSlot.value}` : '';
+            return rightnowMessages.value[`${soulLinkActiveChat.value}${slotSuffix}`] || [];
+        }
         return soulLinkMessages.value[soulLinkActiveChat.value] || [];
     };
 
@@ -236,7 +241,8 @@ export function useChat(
         if (soulLinkActiveChatType.value === 'group') {
             soulLinkGroups.value = [...soulLinkGroups.value];
         } else {
-            soulLinkMessages.value = { ...soulLinkMessages.value };
+            if (isRightnowMode.value) rightnowMessages.value = { ...rightnowMessages.value };
+            else soulLinkMessages.value = { ...soulLinkMessages.value };
         }
     };
 
@@ -245,7 +251,11 @@ export function useChat(
             // 保存群聊到 IndexedDB 由外部实现
             if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
         } else {
-            if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
+            if (isRightnowMode.value) {
+                saveRightnowMessages();
+            } else {
+                if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
+            }
         }
     };
 
@@ -339,10 +349,16 @@ export function useChat(
             group.lastMessage = msg.text || '';
             group.lastTime = new Date(msg.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         } else {
-            if (!soulLinkMessages.value[soulLinkActiveChat.value]) {
-                soulLinkMessages.value[soulLinkActiveChat.value] = [];
+            if (isRightnowMode.value) {
+                const slotSuffix = rightnowActiveSlot.value ? `_${rightnowActiveSlot.value}` : '';
+                const key = `${soulLinkActiveChat.value}${slotSuffix}`;
+                rightnowMessages.value[key] = [...(rightnowMessages.value[key] || []), msg];
+            } else {
+                if (!soulLinkMessages.value[soulLinkActiveChat.value]) {
+                    soulLinkMessages.value[soulLinkActiveChat.value] = [];
+                }
+                soulLinkMessages.value[soulLinkActiveChat.value].push(msg);
             }
-            soulLinkMessages.value[soulLinkActiveChat.value].push(msg);
         }
         persistActiveChat();
         scrollToBottom();
@@ -396,9 +412,16 @@ export function useChat(
             group.lastTime = new Date(msg.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
         } else {
-            if (!soulLinkMessages.value[chatId]) soulLinkMessages.value[chatId] = [];
-            soulLinkMessages.value[chatId].push(msg);
-            if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
+            if (isRightnowMode.value) {
+                const slotSuffix = rightnowActiveSlot.value ? `_${rightnowActiveSlot.value}` : '';
+                const key = `${chatId}${slotSuffix}`;
+                rightnowMessages.value[key] = [...(rightnowMessages.value[key] || []), msg];
+                saveRightnowMessages();
+            } else {
+                if (!soulLinkMessages.value[chatId]) soulLinkMessages.value[chatId] = [];
+                soulLinkMessages.value[chatId].push(msg);
+                if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
+            }
         }
         if (externalTrigger.openedApp?.value === 'chat' && String(soulLinkActiveChat.value) === String(chatId) && soulLinkActiveChatType.value === chatType) {
             scrollToBottom();
@@ -863,6 +886,7 @@ export function useChat(
         const getUserPronounInstruction = () => typeof chatSettings.getUserPronounInstruction === 'function' ? chatSettings.getUserPronounInstruction() : '';
         const getForeignBilingualConstraintPrompt = () => typeof chatSettings.getForeignBilingualConstraintPrompt === 'function' ? chatSettings.getForeignBilingualConstraintPrompt() : '';
         const buildTimeZonePromptBlock = () => chatSettings.buildTimeZonePromptBlock();
+        const buildTimeSensePromptBlock = () => typeof chatSettings.buildTimeSensePromptBlock === 'function' ? chatSettings.buildTimeSensePromptBlock() : '';
         const buildAiBusyDecisionPromptBlock = () => chatSettings.buildAiBusyDecisionPromptBlock();
         const buildSummaryPromptBlock = () => {
             const summaryText = typeof chatSettings.getLatestSummaryText === 'function'
@@ -873,9 +897,13 @@ export function useChat(
         const buildOfflineNovelPromptBlock = () => {
             const chatId = soulLinkActiveChat.value;
             const chatType = soulLinkActiveChatType.value;
-            const activePresetId = chatType === 'group'
-                ? null
-                : characters.value.find(c => String(c.id) === String(chatId))?.selectedPresetId ?? null;
+            
+            // If rightnowPresetId is not set in UI, fallback to the character's bound preset (for single chat)
+            let activePresetId = rightnowPresetId.value;
+            if (!activePresetId && chatType === 'character') {
+                activePresetId = characters.value.find(c => String(c.id) === String(chatId))?.selectedPresetId ?? null;
+            }
+            
             const activePreset = activePresetId != null
                 ? presets.value.find(p => String(p.id) === String(activePresetId))
                 : null;
@@ -886,9 +914,12 @@ export function useChat(
                 : '';
             const presetName = activePreset?.name || '未绑定预设';
             const baseInstruction = chatType === 'group'
-                ? '你正在进行线下群聊的小说写作。此模式不是聊天记录，而是连续正文。'
-                : '你正在进行线下单聊的小说写作。此模式不是聊天记录，而是连续正文。';
-            return `\n# 线下模式（最高优先级）\n${baseInstruction}\n\n${presetText ? `# 用户自定义预设《${presetName}》\n${presetText}\n\n` : ''}# 必须遵守\n1. 只输出小说正文，不要输出消息气泡感、列表感、解释、标签、Markdown 标题、[REPLY]、[OS]、“我：”“TA：”这种聊天格式。\n2. 用长段落写作，至少 3 段；每段要有动作、神态、语言、环境或心理中的至少两项。\n3. 单聊时采用第一人称或贴近视角的小说叙述；群聊时采用场景叙事，要让不同角色自然说话，不要像群消息刷屏。\n4. 对话必须嵌进叙事里，使用引号直接写出来，并配合动作、停顿、目光、情绪变化。\n5. 不要写“回复如下”“以下内容”“作为AI”“我来为你写”等提示语。\n6. 如果预设要求某种文风、视角、句长、禁忌、节奏，优先严格执行。\n7. 输出应当像真正的小说章节片段，而不是聊天记录改写。\n`;
+                ? '你正在进行线下群聊的语意扮演写作。此模式不是普通的聊天记录，而是带有沉浸感的连续叙事正文。'
+                : '你正在进行线下单聊的语意扮演写作。此模式不是普通的聊天记录，而是带有沉浸感的连续叙事正文。';
+            const activeStyle = rightnowActiveStyleId.value ? rightnowStylePresets.value.find(s => s.id === rightnowActiveStyleId.value) : null;
+            const styleText = activeStyle && activeStyle.content ? `\n# 文风与描写要求\n${activeStyle.content}\n\n` : '';
+
+            return `\n# 线下扮演模式（最高优先级）\n${baseInstruction}\n\n${presetText ? `# 用户自定义预设《${presetName}》\n${presetText}\n\n` : ''}${styleText}# 必须遵守的排版与交互规则\n1. 绝对不要输出 [REPLY]、[OS]、“我：”“TA：”等类似聊天软件的气泡格式。\n2. **必须包含丰富的互动与对话**：不要只写景物或心理，必须对用户的话作出明确回应（用第一人称或贴近视角）。\n3. **旁白与动作标记**：所有的动作、神态、环境等旁白描写**必须**用星号包围，例如：*他微微一笑，转过头去*。\n4. **对话标记**：所有的直接对话台词**必须**用中文双引号包围，例如：“你好啊。”\n5. **内心想法标记**：如果是人物内心的思考和想法，**必须**用括号包围，例如：（这到底是怎么回事……）\n6. 对话台词、内心想法和动作描写要交织在一起，呈现出语意扮演（Roleplay）般的质感（参考 Silly Tavern 风格）。\n7. 单次回复建议在 2-4 个段落，排版错落有致。\n`;
         };
 
         let systemPrompt = '';
@@ -899,7 +930,39 @@ export function useChat(
             systemPrompt += getForeignBilingualConstraintPrompt();
             systemPrompt += buildSummaryPromptBlock();
             systemPrompt += buildTimeZonePromptBlock();
+            systemPrompt += buildTimeSensePromptBlock();
             if (enableAiBusyDecision) systemPrompt += buildAiBusyDecisionPromptBlock();
+
+            // Inject Feed Memory for Group Chat
+            if (feed && feed.posts) {
+                const postsArr = feed.posts.value || feed.posts || [];
+                const memberNames = members.map(m => typeof m === 'string' ? m : (m.nickname || m.name || '成员')).filter(Boolean);
+                const relevantPosts = postsArr.filter(p => {
+                    if (!p) return false;
+                    if (memberNames.includes(p.author)) return true;
+                    if (p.author === '我' || p.author === 'Me') {
+                        return (p.comments && p.comments.some(c => memberNames.includes(c.author))) || 
+                               (p.likes && p.likes.some(l => memberNames.includes(l)));
+                    }
+                    return false;
+                }).slice(0, 3);
+                
+                if (relevantPosts.length > 0) {
+                    let feedText = '\n# 近期朋友圈动态（作为群成员与用户的共同记忆参考）\n';
+                    relevantPosts.forEach(p => {
+                        feedText += `【${p.author}的动态 (${p.time||'最近'})】 ${p.content || '[图片]'}\n`;
+                        if (p.likes && p.likes.length > 0) feedText += `  点赞: ${p.likes.join(', ')}\n`;
+                        if (p.comments && p.comments.length > 0) {
+                            feedText += `  评论区:\n`;
+                            p.comments.forEach(c => {
+                                feedText += `   - ${c.author}: ${c.content}\n`;
+                            });
+                        }
+                    });
+                    systemPrompt += `${feedText}\n`;
+                }
+            }
+
             systemPrompt += `# 群成员（你需要在他们之间切换口吻）\n`;
             if (members.length) {
                 members.forEach((member, idx) => {
@@ -929,8 +992,18 @@ export function useChat(
             if (blockedMemberNames.length) {
                 systemPrompt += `\n\n注意：用户已拉黑以下成员：${blockedMemberNames.join('、')}。除非用户直接问起，否则你不要主动提及他们，也不要替他们说话。`;
             }
-            systemPrompt += `\n# 群聊规则\n1. 回复简短口语化。\n2. 根据语境，你可以让一名或多名成员回复，甚至让他们互相抢话或争论。\n3. 必须在多名成员的回复之间严格使用 \`---\` 分隔。\n4. 格式：成员名: [REPLY]正式内容[/REPLY] [OS]内心独白[/OS]\n5. 附件语法（可随时使用）：\n   - 发送语音：[语音] 内容\n   - 发送图片：[图片] 画面描述\n   - 发送转账：[转账] 金额 附言\n   - 为用户下单外卖/购物：[购买: 物品名: 价格]\n   - 请求用户帮你买单：[帮买请求: 物品名: 价格]\n`;
-            systemPrompt += `\n现在开始回复。`;
+            if (isRightnowMode.value) {
+                systemPrompt += buildOfflineNovelPromptBlock();
+            } else {
+                systemPrompt += `\n# 群聊规则\n`;
+                systemPrompt += `1. 极度拟真：彻底打破“一句话+一个表情”的公式化回复。请像真人一样，有时只发短语，有时用 \`---\` 连发多条补充，有时只发一个表情或图片。\n`;
+                systemPrompt += `2. 根据语境，你可以让一名或多名成员回复，甚至让他们互相抢话或争论。\n`;
+                systemPrompt += `3. 必须在多名成员的回复之间，或者同一成员连发消息之间严格使用 \`---\` 分隔。\n`;
+                systemPrompt += `4. 格式：成员名: [REPLY]正式内容[/REPLY] [OS]内心独白[/OS]。注意：无论是否连发，每一段被 \`---\` 分隔的消息都必须包含独立的 [REPLY] 和 [OS] 标签！\n`;
+                systemPrompt += `5. 表情包使用极其克制：不要每句话都带表情。如果发表情，务必随机挑选，禁止重复使用同一个表情包！\n`;
+                systemPrompt += `6. 附件语法（可随时使用）：\n   - 发送表情包：[表情:表情名]\n   - 发送语音：[语音: 内容]\n   - 发送图片：[图片: 画面描述]\n   - 发送转账：[转账] 金额 附言\n   - 为用户下单外卖/购物：[购买: 物品名: 价格]\n   - 请求用户帮你买单：[帮买请求: 物品名: 价格]\n`;
+                systemPrompt += `\n现在开始回复。`;
+            }
         } else if (char && char.persona) {
             const charName = char.name || '角色';
             systemPrompt = `你正在通过 SoulLink 和朋友聊天。\n\n`;
@@ -938,12 +1011,43 @@ export function useChat(
             systemPrompt += getForeignBilingualConstraintPrompt();
             systemPrompt += buildSummaryPromptBlock();
             systemPrompt += buildTimeZonePromptBlock();
+            systemPrompt += buildTimeSensePromptBlock();
             if (enableAiBusyDecision) systemPrompt += buildAiBusyDecisionPromptBlock();
             const wbSummary = getMemberWorldbookSummary(char, history);
             if (wbSummary) systemPrompt += `${wbSummary}\n`;
             
             const presetSummary = getMemberPresetSummary(char);
             if (presetSummary) systemPrompt += `${presetSummary}\n`;
+
+            // Inject Feed Memory for Single Chat
+            if (feed && feed.posts) {
+                const postsArr = feed.posts.value || feed.posts || [];
+                const charName = char.nickname || char.name || 'TA';
+                const relevantPosts = postsArr.filter(p => {
+                    if (!p) return false;
+                    if (p.author === charName) return true;
+                    if (p.author === '我' || p.author === 'Me') {
+                        return (p.comments && p.comments.some(c => c.author === charName)) || 
+                               (p.likes && p.likes.includes(charName));
+                    }
+                    return false;
+                }).slice(0, 3);
+                
+                if (relevantPosts.length > 0) {
+                    let feedText = '\n# 近期朋友圈动态（作为你和用户的共同记忆参考，不需要每次都提，但可以知道发生了什么）\n';
+                    relevantPosts.forEach(p => {
+                        feedText += `【${p.author}的动态 (${p.time||'最近'})】 ${p.content || '[图片]'}\n`;
+                        if (p.likes && p.likes.length > 0) feedText += `  点赞: ${p.likes.join(', ')}\n`;
+                        if (p.comments && p.comments.length > 0) {
+                            feedText += `  评论区:\n`;
+                            p.comments.forEach(c => {
+                                feedText += `   - ${c.author}: ${c.content}\n`;
+                            });
+                        }
+                    });
+                    systemPrompt += `${feedText}\n`;
+                }
+            }
 
             systemPrompt += `# 你是谁\n你的名字是【${charName}】。\n${char.persona}\n\n`;
 
@@ -956,16 +1060,29 @@ export function useChat(
                 });
             }
             const stickerPrompt = availableStickers.length > 0
-                ? `\n你可以发送表情包！格式：[表情:表情名]。可用表情包有：${availableStickers.map(s => s.name).join('、')}。`
+                ? `\n- 发送表情包：[表情:表情名]（可用：${availableStickers.map(s => s.name).join('、')}）。注意：不要每次都发表情包，发的话一定要换着用，绝不要连续发同一个表情！`
                 : '';
 
             // 密码规则（略）
-            systemPrompt += `# 聊天风格\n1. 像真人聊天，简短（1-3句）。\n2. 不要暴露AI。\n3. 可用emoji。\n4. 如需连发多条用 "---" 分隔。\n\n# 附件语法（你可以随时使用以下功能）：\n- 发送语音：[语音: 内容]\n- 发送图片：[图片: 画面描述]\n- 发送转账：[转账] 金额 附言\n- 为对方下单外卖/购物：[购买: 物品名: 价格]\n- 请求对方帮你代付/购买：[帮买请求: 物品名: 价格]${stickerPrompt}\n`;
-            systemPrompt += `\n# 回复格式\n[REPLY]正式回复[/REPLY] [OS]内心独白[/OS]\n`;
-            systemPrompt += `\n现在请以${charName}的身份回复。`;
+            if (isRightnowMode.value) {
+                systemPrompt += buildOfflineNovelPromptBlock();
+            } else {
+                systemPrompt += `# 聊天风格\n`;
+                systemPrompt += `1. 极度拟真：彻底打破“一句话+一个表情”的公式化回复。你应当像真人一样，有时只发一句短语，有时连续发两三条消息（使用 "---" 分隔）来补充，有时只发一个表情或图片。\n`;
+                systemPrompt += `2. 表情包使用极其克制：不要每句话都带表情，多用纯文字交流。如果需要发表情，务必根据语境随机挑选，禁止重复使用同一个表情包！\n`;
+                systemPrompt += `3. 结合情绪和场景，灵活使用图片或语音。\n`;
+                systemPrompt += `4. 绝对不要暴露AI身份。\n\n`;
+                systemPrompt += `# 附件语法（你可以随时使用以下功能）：\n- 发送语音：[语音: 内容]\n- 发送图片：[图片: 画面描述]\n- 发送转账：[转账] 金额 附言\n- 为对方下单外卖/购物：[购买: 物品名: 价格]\n- 请求对方帮你代付/购买：[帮买请求: 物品名: 价格]${stickerPrompt}\n`;
+                systemPrompt += `\n# 回复格式\n[REPLY]正式回复[/REPLY] [OS]内心独白[/OS]\n注意：无论是否连发，每一段被 \`---\` 分隔的消息都必须包含独立的 [REPLY] 和 [OS] 标签！\n`;
+                systemPrompt += `\n现在请以${charName}的身份回复。`;
+            }
         } else {
-            systemPrompt = '你是一个友好的朋友，正在通过SoulLink聊天。请像真人一样自然、简短地对话，每次1-3句话即可。';
-            systemPrompt += '\n回复格式：[REPLY]正式内容[/REPLY] [OS]内心独白[/OS]。';
+            if (isRightnowMode.value) {
+                systemPrompt += buildOfflineNovelPromptBlock();
+            } else {
+                systemPrompt = '你是一个友好的朋友，正在通过SoulLink聊天。请像真人一样自然、简短地对话，每次1-3句话即可。';
+                systemPrompt += '\n回复格式：[REPLY]正式内容[/REPLY] [OS]内心独白[/OS]。';
+            }
         }
 
         const messagesPayload = [{ role: 'system', content: systemPrompt }];
@@ -982,6 +1099,17 @@ export function useChat(
                 role: 'user',
                 content: '（系统提示：用户已经有一段时间没说话了。请你主动寻找新话题或分享日常，直接给用户发一条消息。要求符合人设，自然且口语化。千万不要复述系统提示本身，也不要显得突兀。）'
             });
+        }
+
+        // 强力破解复读机及格式化
+        if (!isRightnowMode.value) {
+            const lastUserMsg = messagesPayload.slice().reverse().find(m => m.role === 'user');
+            const injectionText = '\n\n（系统强制指令：打破“一句话+一个表情”的僵化套路！你可以只发纯文字，或连发多条补充。不要每句话都带表情，禁止重复使用同一个表情包！注意：不论如何回复，必须严格保持 `[REPLY]正式内容[/REPLY] [OS]内心独白[/OS]` 的格式；如果要连发多条消息，每条消息之间用 `---` 分隔，并且每一条都要有独立的 REPLY 和 OS 标签！）';
+            if (lastUserMsg) {
+                lastUserMsg.content += injectionText;
+            } else {
+                messagesPayload.push({ role: 'user', content: injectionText });
+            }
         }
 
         isAiTyping.value = true;
@@ -1020,6 +1148,12 @@ export function useChat(
             };
             reply = extractContent(data) || extractContent(data?.data || data?.result) || '';
             reply = String(reply || '').trim();
+            
+            // Hide Chain of Thought (e.g. DeepSeek's <think> or Claude's <thought>)
+            reply = reply.replace(/<(think|thought)\b[^>]*>[\s\S]*?<\/\1>/gi, '');
+            reply = reply.replace(/<(think|thought)\b[^>]*>[\s\S]*$/gi, '');
+            reply = reply.trim();
+            
             if (!reply) reply = '模型已响应，但未返回可显示的内容。';
 
             // 处理帮买标记
@@ -1150,6 +1284,7 @@ export function useChat(
                                     amount: segment.amount,
                                     note: segment.note,
                                     transferStatus: 'received',
+                                    osContent: (offset === transferSegments.length - 1) ? (osContent || undefined) : undefined,
                                     timestamp: Date.now()
                                 });
                             } else {
@@ -1159,6 +1294,7 @@ export function useChat(
                                     senderName: parsed.senderName,
                                     senderAvatar,
                                     text: segment.content,
+                                    osContent: (offset === transferSegments.length - 1) ? (osContent || undefined) : undefined,
                                     timestamp: Date.now()
                                 });
                             }
@@ -1176,6 +1312,7 @@ export function useChat(
                             amount: transfer.amount,
                             note: transfer.note,
                             transferStatus: 'received',
+                            osContent: osContent || undefined,
                             timestamp: Date.now()
                         });
                         return;
@@ -1192,6 +1329,7 @@ export function useChat(
                                     messageType: 'image',
                                     imageUrl: null,
                                     text: formatAiImageText(segment.content, 'TA'),
+                                    osContent: (offset === segments.length - 1) ? (osContent || undefined) : undefined,
                                     timestamp: Date.now()
                                 });
                             } else {
@@ -1201,6 +1339,7 @@ export function useChat(
                                     senderName: parsed.senderName,
                                     senderAvatar,
                                     text: segment.content,
+                                    osContent: (offset === segments.length - 1) ? (osContent || undefined) : undefined,
                                     timestamp: Date.now()
                                 });
                             }
@@ -1217,6 +1356,7 @@ export function useChat(
                             messageType: 'image',
                             imageUrl: null,
                             text: formatAiImageText(imageDesc, 'TA'),
+                            osContent: osContent || undefined,
                             timestamp: Date.now()
                         });
                         return;
@@ -1234,6 +1374,7 @@ export function useChat(
                                     stickerUrl: segment.sticker.url,
                                     stickerName: segment.sticker.name,
                                     text: `[${segment.sticker.name}]`,
+                                    osContent: (offset === stickerSegments.length - 1) ? (osContent || undefined) : undefined,
                                     timestamp: Date.now()
                                 });
                             } else {
@@ -1243,6 +1384,7 @@ export function useChat(
                                     senderName: parsed.senderName,
                                     senderAvatar,
                                     text: segment.content,
+                                    osContent: (offset === stickerSegments.length - 1) ? (osContent || undefined) : undefined,
                                     timestamp: Date.now()
                                 });
                             }
@@ -1271,6 +1413,7 @@ export function useChat(
                                     amount: segment.amount,
                                     note: segment.note,
                                     transferStatus: 'received',
+                                    osContent: (offset === transferSegments.length - 1) ? (osContent || undefined) : undefined,
                                     timestamp: Date.now()
                                 });
                             } else {
@@ -1278,6 +1421,7 @@ export function useChat(
                                     id: Date.now() + index + offset,
                                     sender: 'ai',
                                     text: segment.content,
+                                    osContent: (offset === transferSegments.length - 1) ? (osContent || undefined) : undefined,
                                     timestamp: Date.now()
                                 });
                             }
@@ -1293,6 +1437,7 @@ export function useChat(
                             amount: transfer.amount,
                             note: transfer.note,
                             transferStatus: 'received',
+                            osContent: osContent || undefined,
                             timestamp: Date.now()
                         });
                         return;
@@ -1307,6 +1452,7 @@ export function useChat(
                                     messageType: 'image',
                                     imageUrl: null,
                                     text: formatAiImageText(segment.content, chatSettings.getActiveChatPronoun ? chatSettings.getActiveChatPronoun() : 'TA'),
+                                    osContent: (offset === segments.length - 1) ? (osContent || undefined) : undefined,
                                     timestamp: Date.now()
                                 });
                             } else {
@@ -1314,6 +1460,7 @@ export function useChat(
                                     id: Date.now() + index + offset,
                                     sender: 'ai',
                                     text: segment.content,
+                                    osContent: (offset === segments.length - 1) ? (osContent || undefined) : undefined,
                                     timestamp: Date.now()
                                 });
                             }
@@ -1389,6 +1536,7 @@ export function useChat(
                                     stickerUrl: segment.sticker.url,
                                     stickerName: segment.sticker.name,
                                     text: `[${segment.sticker.name}]`,
+                                    osContent: (offset === stickerSegments.length - 1) ? (osContent || undefined) : undefined,
                                     timestamp: Date.now()
                                 });
                             } else {
@@ -1396,6 +1544,7 @@ export function useChat(
                                     id: Date.now() + index + offset,
                                     sender: 'ai',
                                     text: segment.content,
+                                    osContent: (offset === stickerSegments.length - 1) ? (osContent || undefined) : undefined,
                                     timestamp: Date.now()
                                 });
                             }
@@ -1414,6 +1563,7 @@ export function useChat(
                                     transcription: segment.transcription,
                                     text: segment.transcription,
                                     voiceDuration: voiceDuration,
+                                    osContent: (offset === voiceSegments.length - 1) ? (osContent || undefined) : undefined,
                                     timestamp: Date.now()
                                 });
                             } else {
@@ -1421,6 +1571,7 @@ export function useChat(
                                     id: Date.now() + index + offset,
                                     sender: 'ai',
                                     text: segment.content,
+                                    osContent: (offset === voiceSegments.length - 1) ? (osContent || undefined) : undefined,
                                     timestamp: Date.now()
                                 });
                             }
@@ -1437,6 +1588,7 @@ export function useChat(
                             transcription: voice.transcription,
                             text: voice.transcription,
                             voiceDuration: voiceDuration,
+                            osContent: osContent || undefined,
                             timestamp: Date.now()
                         });
                         return;
@@ -1604,6 +1756,16 @@ export function useChat(
                     persistActiveChat();
                 }
                 break;
+            case 'regenerate':
+                if (index !== -1) {
+                    if (msg.sender === 'ai' || msg.sender === 'system') {
+                        chatMsgs.splice(index, 1);
+                        syncActiveChatState();
+                        persistActiveChat();
+                    }
+                    triggerSoulLinkAiReply({ skipBusySimulation: true });
+                }
+                break;
             case 'edit':
                 if (!msg.isRecalled) {
                     soulLinkInput.value = msg.text;
@@ -1634,80 +1796,157 @@ export function useChat(
         closeContextMenu();
     };
 
-    // ==================== 离线模式 ====================
-    const setChatOfflineMode = (chatId, isOffline) => {
-        chatOfflineModes.value[chatId] = isOffline;
-        saveChatOfflineModes();
+    // ==================== 离线模式 / Rightnow 模式 ====================
+    const isRightnowMode = ref(false);
+    const rightnowMessages = ref({});
+    const rightnowSlots = ref({});
+    const rightnowActiveSlot = ref(null);
+
+    const rightnowStylePresets = ref([]);
+    const rightnowActiveStyleId = ref(null);
+
+    const loadRightnowStyles = () => {
+        try {
+            const saved = localStorage.getItem('soulos_rightnow_styles');
+            if (saved) rightnowStylePresets.value = JSON.parse(saved);
+            const activeId = localStorage.getItem('soulos_rightnow_active_style_id');
+            if (activeId) rightnowActiveStyleId.value = activeId;
+        } catch(e) {}
+    };
+    
+    const saveRightnowStyles = () => {
+        try {
+            localStorage.setItem('soulos_rightnow_styles', JSON.stringify(rightnowStylePresets.value));
+            if (rightnowActiveStyleId.value) {
+                localStorage.setItem('soulos_rightnow_active_style_id', rightnowActiveStyleId.value);
+            } else {
+                localStorage.removeItem('soulos_rightnow_active_style_id');
+            }
+        } catch(e) {}
     };
 
-    const saveChatOfflineModes = () => {
+    const addRightnowStyle = (name, content) => {
+        const id = 'style_' + Date.now();
+        rightnowStylePresets.value.push({ id, content, name: name || ('预设 ' + (rightnowStylePresets.value.length + 1)) });
+        rightnowActiveStyleId.value = id;
+        saveRightnowStyles();
+        return id;
+    };
+    const updateRightnowStyle = (id, content, name) => {
+        const s = rightnowStylePresets.value.find(s => s.id === id);
+        if (s) {
+            if (content !== undefined) s.content = content;
+            if (name !== undefined) s.name = name;
+            saveRightnowStyles();
+        }
+    };
+    const deleteRightnowStyle = (id) => {
+        rightnowStylePresets.value = rightnowStylePresets.value.filter(s => s.id !== id);
+        if (rightnowActiveStyleId.value === id) {
+            rightnowActiveStyleId.value = rightnowStylePresets.value.length > 0 ? rightnowStylePresets.value[0].id : null;
+        }
+        saveRightnowStyles();
+    };
+    loadRightnowStyles();
+
+    const setRightnowMode = (active) => {
+        isRightnowMode.value = active;
+        if (!active) {
+            rightnowActiveSlot.value = null; // Exit transition page
+        }
+    };
+
+    const isOfflineMode = computed(() => isRightnowMode.value);
+
+    const loadRightnowSlots = () => {
         try {
-            localStorage.setItem('soulos_chat_offline_modes', JSON.stringify(chatOfflineModes.value));
+            const saved = localStorage.getItem('soulos_rightnow_slots');
+            if (saved) rightnowSlots.value = JSON.parse(saved);
+        } catch (e) {
+            rightnowSlots.value = {};
+        }
+    };
+    loadRightnowSlots();
+
+    const saveRightnowSlots = () => {
+        try {
+            localStorage.setItem('soulos_rightnow_slots', JSON.stringify(rightnowSlots.value));
         } catch (e) {}
     };
 
-    const loadChatOfflineModes = () => {
+    const loadRightnowMessages = () => {
         try {
-            const saved = localStorage.getItem('soulos_chat_offline_modes');
-            if (saved) chatOfflineModes.value = JSON.parse(saved);
+            const saved = localStorage.getItem('soulos_rightnow_messages');
+            if (saved) {
+                const loaded = JSON.parse(saved);
+                let migrated = false;
+                // Migration script
+                for (const key in loaded) {
+                    if (!key.includes('_')) { // Old character format
+                        const msgs = loaded[key];
+                        if (Array.isArray(msgs) && msgs.length > 0) {
+                            loaded[`${key}_slot_1`] = msgs;
+                            if (!rightnowSlots.value[key]) {
+                                rightnowSlots.value[key] = [{ id: 'slot_1', name: '默认存档', updatedAt: Date.now() }];
+                                migrated = true;
+                            }
+                        }
+                        delete loaded[key];
+                    }
+                }
+                rightnowMessages.value = loaded;
+                if (migrated) saveRightnowSlots();
+            }
         } catch (e) {
-            chatOfflineModes.value = {};
+            rightnowMessages.value = {};
         }
     };
-    loadChatOfflineModes();
+    loadRightnowMessages();
 
-    const isOfflineMode = computed(() => {
-        if (!soulLinkActiveChat.value) return false;
-        return chatOfflineModes.value[soulLinkActiveChat.value] || false;
-    });
+    const saveRightnowMessages = () => {
+        try {
+            localStorage.setItem('soulos_rightnow_messages', JSON.stringify(rightnowMessages.value));
+        } catch (e) {}
+    };
 
-    const toggleOfflineMode = () => {
-        if (!soulLinkActiveChat.value) return;
-        // 自动存档
-        let currentMessages = getActiveChatHistory();
-        if (currentMessages.length > 0) {
+    const clearRightnowHistory = () => {
+        if (confirm('确定要清空当前记录吗？')) {
             const chatId = soulLinkActiveChat.value;
-            const chatType = soulLinkActiveChatType.value;
-            let chatName = '';
-            if (chatType === 'group') {
-                const group = soulLinkGroups.value.find(g => String(g.id) === String(chatId));
-                chatName = group ? group.name : '群聊';
-            } else {
-                const char = characters.value.find(c => String(c.id) === String(chatId));
-                chatName = char ? (char.nickname || char.name) : '未知';
+            const slotId = rightnowActiveSlot.value;
+            if (chatId && slotId) {
+                rightnowMessages.value[`${chatId}_${slotId}`] = [];
+                saveRightnowMessages();
             }
-            const archive = {
-                id: `archive_${Date.now()}`,
-                chatType,
-                chatId,
-                chatName,
-                name: `自动存档 - ${isOfflineMode.value ? '线下' : '线上'}模式 - ${new Date().toLocaleString()}`,
-                description: `从${isOfflineMode.value ? '线下' : '线上'}模式切换时自动创建的存档`,
-                timestamp: Date.now(),
-                messages: [...currentMessages],
-                preview: currentMessages[currentMessages.length - 1]?.text || '无消息'
-            };
-            archivedChats.value.push(archive);
-            if (externalTrigger.saveArchivedChats) externalTrigger.saveArchivedChats();
-            // 清空当前聊天记录
-            if (chatType === 'group') {
-                const group = soulLinkGroups.value.find(g => String(g.id) === String(chatId));
-                if (group) group.history = [];
-                if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
-            } else {
-                soulLinkMessages.value[chatId] = [];
-                if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
-            }
-        }
-        if (isOfflineMode.value) {
-            setChatOfflineMode(soulLinkActiveChat.value, false);
-            sendOnlineModeGreeting();
-        } else {
-            setChatOfflineMode(soulLinkActiveChat.value, true);
-            prepareGreetingsForSelection();
-            showGreetingSelect.value = true;
         }
     };
+
+    const createRightnowSlot = (charId) => {
+        if (!rightnowSlots.value[charId]) {
+            rightnowSlots.value[charId] = [];
+        }
+        const newSlotId = 'slot_' + Date.now();
+        const slotCount = rightnowSlots.value[charId].length + 1;
+        rightnowSlots.value[charId].push({
+            id: newSlotId,
+            name: `存档 ${slotCount}`,
+            updatedAt: Date.now()
+        });
+        saveRightnowSlots();
+        return newSlotId;
+    };
+
+    const deleteRightnowSlot = (charId, slotId) => {
+        if (rightnowSlots.value[charId]) {
+            rightnowSlots.value[charId] = rightnowSlots.value[charId].filter(s => s.id !== slotId);
+            saveRightnowSlots();
+            delete rightnowMessages.value[`${charId}_${slotId}`];
+            saveRightnowMessages();
+        }
+    };
+
+    // Remove old toggleOfflineMode logic
+
+    // Old toggleOfflineMode removed
 
     const sendOnlineModeGreeting = () => {
         if (!soulLinkActiveChat.value) return;
@@ -2553,6 +2792,92 @@ ${charPersona ? `你的设定：${charPersona}\n` : ''}
         }
     };
 
+    const formatRightnowText = (text) => {
+        if (!text) return '';
+        
+        // Hide Chain of Thought (e.g. DeepSeek's <think> or Claude's <thought>)
+        let html = text;
+        html = html.replace(/<(think|thought)\b[^>]*>[\s\S]*?<\/\1>/gi, '');
+        // Also hide unclosed thought tags that might extend to the end of the message
+        html = html.replace(/<(think|thought)\b[^>]*>[\s\S]*$/gi, '');
+        
+        html = html.trim();
+        
+        const htmlTags = [];
+        const stashHtml = (match) => {
+            htmlTags.push(match);
+            return `__HTML_${htmlTags.length - 1}__`;
+        };
+        
+        // Stash <style> blocks completely so markdown doesn't mess with CSS
+        html = html.replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, stashHtml);
+        // Stash any HTML tags so markdown doesn't match inside attributes
+        html = html.replace(/<[^>]+>/g, stashHtml);
+        
+        // Define placeholders to prevent nested regex collisions
+        const placeholders = [];
+        const stash = (str) => {
+            placeholders.push(str);
+            return `__STASH_${placeholders.length - 1}__`;
+        };
+
+        // Format asterisks (Narration/Actions)
+        html = html.replace(/\*\*([^*]+)\*\*/g, (m, p1) => stash(`<strong style="color: #eeeeee;">${p1}</strong>`));
+        html = html.replace(/\*([^*]+)\*/g, (m, p1) => stash(`<span style="font-style: italic; color: #9e9e9e; font-size: 0.95em;">*${p1}*</span>`));
+        
+        // Format quotes (Dialogue)
+        html = html.replace(/(["“”][^"“”]+["“”])/g, (m, p1) => stash(`<span style="color: #ffffff; font-weight: 500; text-shadow: 0 0 8px rgba(255,255,255,0.2); letter-spacing: 1px;">${p1}</span>`));
+        
+        // Format parentheses (Inner thoughts)
+        html = html.replace(/([(（][^)）]+[)）])/g, (m, p1) => stash(`<span style="font-style: italic; color: #b9b0ff; text-shadow: 0 0 5px rgba(185,176,255,0.2);"> ${p1} </span>`));
+        
+        // Restore our markdown placeholders
+        placeholders.forEach((val, idx) => {
+            html = html.replace(`__STASH_${idx}__`, val);
+        });
+        
+        // Check if the text contains block HTML formatting from a preset
+        const hasBlockHtml = /<(div|p|style|section|article|table|ul|ol|h[1-6]|blockquote)\b/i.test(text);
+        
+        if (hasBlockHtml) {
+            // Advanced formatting: preset uses its own layout.
+            // Strip newlines directly adjacent to HTML tags to prevent unwanted <br> injections
+            html = html.replace(/(__HTML_\d+__)\s*\n\s*/g, '$1');
+            html = html.replace(/\s*\n\s*(__HTML_\d+__)/g, '$1');
+            // Any remaining newlines were intentionally placed between text, convert to <br>
+            html = html.replace(/\n/g, '<br>');
+        } else {
+            // Standard Novel formatting: text-indent 2em for each paragraph.
+            const indentSpacer = `<span style="display:inline-block; width:2em;"></span>`;
+            const paragraphs = html.split(/\n+/).map(p => p.trim()).filter(p => p !== '');
+            
+            let result = '';
+            let isFirstNonPure = true;
+            for (let i = 0; i < paragraphs.length; i++) {
+                const p = paragraphs[i];
+                const isPureHtml = /^(__HTML_\d+__)+$/.test(p);
+                
+                if (isPureHtml) {
+                    result += p;
+                } else {
+                    if (!isFirstNonPure) {
+                        result += '<br><br>';
+                    }
+                    result += indentSpacer + p;
+                    isFirstNonPure = false;
+                }
+            }
+            html = result;
+        }
+
+        // Restore original HTML tags
+        htmlTags.forEach((val, idx) => {
+            html = html.replace(`__HTML_${idx}__`, val);
+        });
+
+        return `<div style="word-break: break-word; line-height: 1.8;">${html}</div>`;
+    };
+
     // ==================== 导出 ====================
     return {
         // 状态
@@ -2576,13 +2901,18 @@ ${charPersona ? `你的设定：${charPersona}\n` : ''}
         // 计算属性
         activeGroupChat, isOfflineMode, currentChatName, currentChatAvatar,
         totalUnrepliedCount, activeChatTag, chatTags, displayChatCharacters, displayChatGroups,
+        
+        // Rightnow Mode Exports
+        isRightnowMode, rightnowMessages, rightnowSlots, rightnowActiveSlot, setRightnowMode, rightnowPresetId,
+        createRightnowSlot, deleteRightnowSlot,
+        rightnowStylePresets, rightnowActiveStyleId, saveRightnowStyles, addRightnowStyle, updateRightnowStyle, deleteRightnowStyle,
 
         // 方法
         sendSoulLinkMessage, triggerSoulLinkAiReply, pushMessageToActiveChat, pushMessageToTargetChat,
         getActiveChatHistory, getPendingUserMessages,
         markMessagesReplied, syncActiveChatState, persistActiveChat, scrollToBottom,
         onMessageContextMenu, onMessageTouchStart, onMessageTouchMove, onMessageTouchEnd,
-        handleContextAction, closeContextMenu, toggleOfflineMode, selectGreeting,
+        handleContextAction, closeContextMenu, selectGreeting,
         createNewGroup, toggleGroupMember, getAvailableCharactersForAdd, toggleAddMember,
         addMembersToGroup, removeGroupMember, addCustomMember, renameGroup, shakeCharacter, shakeGroupMember,
         openMemberEditor, closeMemberEditor, saveMemberEditor,
@@ -2594,13 +2924,12 @@ ${charPersona ? `你的设定：${charPersona}\n` : ''}
         startDragVideoSelf, getLastMessage, formatLastMsgTime, getUnrepliedCountForChar,
         getUnrepliedCountForGroup, formatUnreadCount, formatMessageDate, formatTime, shouldShowTimeDivider,
         getLastMsgTimestamp, togglePin,
-        // 辅助（外部可能需要）
-        setChatOfflineMode, saveChatOfflineModes, loadChatOfflineModes,
-        sendOnlineModeGreeting, prepareGreetingsForSelection,
+        
         // 内部函数暴露给外部（如翻译）
         parseReplyAndOs, buildSoulLinkReplyContext, extractAiTransfer, extractAiImageDescription,
         splitAiTransferSegments, splitAiImageSegments, splitAiVoiceSegments, extractAiVoice,
         extractStickersFromText, formatAiImageText, extractAiShoppingCard,
+        formatRightnowText,
         cleanup,
         // 存档相关（saveArchivedChats 由 script 注入 externalTrigger 时覆盖/或使用 persist）
         saveArchivedChats: () => {},

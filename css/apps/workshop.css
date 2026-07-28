@@ -648,8 +648,7 @@
 }
 
 /* 输入框样式 */
-.modal-content input[type="text"],
-.modal-content input[type="url"],
+.modal-content input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]),
 .modal-content textarea,
 .modal-content select {
     width: 100%;
@@ -984,6 +983,7 @@
     font-family: 'Inter', sans-serif;
     font-size: 14px;
     background: #FFFFFF;
+    color: #000000;
     box-shadow: 2px 2px 0px rgba(0,0,0,0.05);
 }
 
@@ -995,6 +995,7 @@
     font-family: 'Inter', sans-serif;
     font-size: 14px;
     background: #FFFFFF;
+    color: #000000;
     box-shadow: 2px 2px 0px rgba(0,0,0,0.05);
     resize: vertical;
     min-height: 80px;
@@ -1067,6 +1068,7 @@
     font-family: 'Inter', sans-serif;
     font-size: 14px;
     background: #FFFFFF;
+    color: #000000;
     box-shadow: 2px 2px 0px rgba(0,0,0,0.05);
 }
 
@@ -1078,6 +1080,7 @@
     font-family: 'Inter', sans-serif;
     font-size: 14px;
     background: #FFFFFF;
+    color: #000000;
     box-shadow: 2px 2px 0px rgba(0,0,0,0.05);
     resize: vertical;
     min-height: 80px;

@@ -451,6 +451,16 @@ export function useChatSettings(
         return `\n\n# 时差系统（已启用）\n用户当前本地时间：${userNow}\n你（角色）当前本地时间：${roleNow}\n规则：\n1. 你必须按双方时差来表达时间感知（如早安/晚安、是否打扰、作息建议）。\n2. 不要把双方当成同一时区。\n3. 除非用户要求，否则不要机械重复报时。\n`;
     };
 
+    const buildTimeSensePromptBlock = () => {
+        if (!timeSenseEnabled.value) return '';
+        if (timeZoneSystemEnabled.value) return ''; // 如果已经开了时差系统，它自己带了时间，不需要重复注入
+        const now = new Date();
+        const t = now.toLocaleString('zh-CN', { hour12: false });
+        const days = ['日', '一', '二', '三', '四', '五', '六'];
+        const d = days[now.getDay()];
+        return `\n\n# 时间感知系统（已启用）\n当前现实时间是：${t} 星期${d}\n规则：你已经接入了现实时间系统。在交流时，请自然地体现出对当前时间（如早晨、深夜、周末等）的认知，并让作息或话题符合当前的时间点。除非用户问，否则不要机械重复报时。\n`;
+    };
+
     const getUserPronounInstruction = () => {
         const pronounMap = {
             female: '用户是女性，请优先使用“她/小姐姐/女生”相关称呼。',
@@ -524,7 +534,7 @@ export function useChatSettings(
         loadChatSummaryState, saveChatSummaryState,
         getChatSummaryCursor, setChatSummaryCursor,
         getLatestSummaryText,
-        buildTimeZonePromptBlock, getUserPronounInstruction,
+        buildTimeZonePromptBlock, buildTimeSensePromptBlock, getUserPronounInstruction,
         getForeignBilingualConstraintPrompt, buildAiBusyDecisionPromptBlock,
         clearActiveMessageTimer, scheduleRoleActiveMessage, lastUserActiveAt,
         getTargetLangLabel,

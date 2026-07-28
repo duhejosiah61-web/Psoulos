@@ -736,10 +736,7 @@ export function setupApp() {
             swipedWorldbookId,
             swipedPresetId,
             expandedEntryIds,
-            showWorldbookImport,
-            importWorldbookName,
-            importFile,
-            importMode,
+            worldbookImportInput,
             showBatchDeleteDialog,
             batchDeleteType,
             batchDeleteSelections,
@@ -776,9 +773,8 @@ export function setupApp() {
             isEntryExpanded,
             toggleSwipeWorldbook,
             toggleGlobalWorldbook,
-            openWorldbookImport,
-            handleFileUpload,
-            importWorldbook,
+            triggerWorldbookImport,
+            handleWorldbookImport,
             addNewPreset,
             deletePreset,
             deleteCurrentPreset,
@@ -1649,7 +1645,7 @@ export function setupApp() {
         // --- SoulLink App State & Logic (useChat) ---
         // ==========================================================
 
-        const feed = reactive(useFeed(profiles, activeProfile));
+        const feed = reactive(useFeed(characters, userAvatar));
         const ember = reactive(useEmber(characters, activeProfile));
         const chatSettingsHolder = { current: null };
         const chatSettings = new Proxy({}, {
@@ -1720,10 +1716,19 @@ export function setupApp() {
             soulLinkMessages,
             soulLinkGroups,
             novelMode,
-            isOfflineMode,
-            setChatOfflineMode,
-            saveChatOfflineModes,
-            loadChatOfflineModes,
+            isRightnowMode,
+            rightnowMessages,
+            rightnowSlots,
+            rightnowActiveSlot,
+            setRightnowMode,
+            createRightnowSlot,
+            deleteRightnowSlot,
+            rightnowStylePresets,
+            rightnowActiveStyleId,
+            saveRightnowStyles,
+            addRightnowStyle,
+            updateRightnowStyle,
+            deleteRightnowStyle,
             pushMessageToActiveChat,
             pushMessageToTargetChat,
             getActiveChatHistory,
@@ -1813,7 +1818,6 @@ export function setupApp() {
             stickerImportText,
             newPackName,
             shouldShowTimeDivider,
-            toggleOfflineMode,
             selectGreeting,
             createNewGroup,
             toggleGroupMember,
@@ -1838,8 +1842,6 @@ export function setupApp() {
             currentChatName,
             currentChatAvatar,
             focusedOsMessageId,
-            prepareGreetingsForSelection,
-            sendOnlineModeGreeting,
             parseReplyAndOs,
             buildSoulLinkReplyContext,
             extractAiTransfer,
@@ -1850,8 +1852,15 @@ export function setupApp() {
             splitAiTransferSegments,
             splitAiImageSegments,
             splitAiVoiceSegments,
-            extractAiVoice
+            extractAiVoice,
+            formatRightnowText
         } = chat;
+
+        const rightnowActiveMessages = computed(() => {
+            if (!soulLinkActiveChat.value) return [];
+            const slotSuffix = rightnowActiveSlot.value ? `_${rightnowActiveSlot.value}` : '';
+            return rightnowMessages.value[`${soulLinkActiveChat.value}${slotSuffix}`] || [];
+        });
 
         const pixelEmojis = emojiList;
 
@@ -2404,6 +2413,36 @@ export function setupApp() {
             soulLinkTab.value = tab;
         };
 
+        const insertIntoRightnowFn = (prefix, suffix = '') => {
+            const input = document.getElementById('sp-field-rightnow-input');
+            if (input) {
+                const start = input.selectionStart || 0;
+                const end = input.selectionEnd || 0;
+                const text = soulLinkInput.value || '';
+                const selected = text.substring(start, end);
+                soulLinkInput.value = text.substring(0, start) + prefix + selected + suffix + text.substring(end);
+                
+                nextTick(() => {
+                    input.focus();
+                    if (selected === '' && suffix !== '') {
+                        input.setSelectionRange(start + prefix.length, start + prefix.length);
+                    } else {
+                        const newPos = start + prefix.length + selected.length + suffix.length;
+                        input.setSelectionRange(newPos, newPos);
+                    }
+                });
+            } else {
+                soulLinkInput.value = (soulLinkInput.value || '') + prefix + suffix;
+            }
+        };
+
+        const deleteCurrentChat = () => {
+            // Placeholder: Not implemented yet
+        };
+
+        const selectedCharForRightnow = ref(null);
+        const showRightnowSettings = ref(false);
+
         const activeChatMessages = computed(() => {
             if (!soulLinkActiveChat.value) return [];
             const blockedCharIds = new Set(
@@ -2419,7 +2458,9 @@ export function setupApp() {
                     return true;
                 });
             }
-            const messages = soulLinkMessages.value[soulLinkActiveChat.value] || [];
+            const slotSuffix = isRightnowMode.value ? (rightnowActiveSlot.value ? `_${rightnowActiveSlot.value}` : '') : '';
+            const key = soulLinkActiveChat.value + slotSuffix;
+            const messages = isRightnowMode.value ? (rightnowMessages.value[key] || []) : (soulLinkMessages.value[soulLinkActiveChat.value] || []);
             return messages.filter((m) => m && !m.isHidden && (m.isSystem || m.isCallMessage || m.messageType || String(m.text || '').replace(/\u200b/g, '').trim() || String(m.osContent || '').trim()));
         });
         const currentChatMessages = computed(() => activeChatMessages.value);
@@ -3733,6 +3774,7 @@ ${styleGuide}
         const onSendOrCall = () => {
             if (soulLinkInput.value && soulLinkInput.value.trim()) {
                 sendSoulLinkMessage();
+                triggerSoulLinkAiReply();
             } else {
                 chatSettings.lastUserActiveAt = Date.now();
                 triggerSoulLinkAiReply();
@@ -4111,6 +4153,11 @@ ${styleGuide}
                     messageTimeIntervalId = null;
                 }
             }
+            if (newVal === 'rightnow') {
+                setRightnowMode(true);
+            } else {
+                setRightnowMode(false);
+            }
         });
 
         onUnmounted(() => {
@@ -4143,10 +4190,27 @@ ${styleGuide}
             // SoulLink / Chat
             soulLinkTab, soulLinkActiveChat, soulLinkActiveChatType, soulLinkInput, soulLinkReplyTarget,
             soulLinkMessages, soulLinkGroups, activeGroupChat, activeChatMessages, currentChatMessages, recentChats,
+            selectedCharForRightnow, showRightnowSettings,
+            confirmDeleteRightnowSlot: (charId, slotId) => {
+                if (window.confirm('确定要删除这个存档吗？')) {
+                    chat.deleteRightnowSlot(charId, slotId);
+                }
+            },
+            confirmAddRightnowStyle: () => {
+                const name = window.prompt('请输入新预设的名称：', '新文风预设');
+                if (name) {
+                    chat.addRightnowStyle(name, '多描写人物的神态与动作。');
+                }
+            },
+            confirmDeleteRightnowStyle: (id) => {
+                if (window.confirm('确定要删除这个预设吗？')) {
+                    chat.deleteRightnowStyle(id);
+                }
+            },
             formatLastMsgTime, getLastMessage, formatMessageDate, closeAllPanels,
             getUnrepliedCountForChar, getUnrepliedCountForGroup, totalUnrepliedCount, formatUnreadCount,
             activeChatTag, chatTags, displayChatCharacters, displayChatGroups, getLastMsgTimestamp, togglePin,
-            emojiList, previewImage, formatTime, onInputChange, onEnterPress,
+            emojiList, previewImage, formatTime, onInputChange, onEnterPress, onSendOrCall,
             contextMenu, editingMessageId,
             startSoulLinkChat, openSoulLinkGroupChat, exitSoulLinkChat, sendSoulLinkMessage,
             switchSoulLinkTab, onMessageContextMenu, onMessageTouchStart, onMessageTouchMove, onMessageTouchEnd, handleContextAction, closeContextMenu,
@@ -4161,8 +4225,24 @@ ${styleGuide}
             favoriteStickers, activeStickerTab, isFavorite, toggleFavorite, removeFavorite, onStickerTouchStart, onStickerTouchEnd, counterWithSticker,
             isAiTyping,
             focusedOsMessageId,
-            isOfflineMode,
-            novelMode,
+            isRightnowMode,
+            isOfflineMode: chat.isOfflineMode,
+            rightnowMessages,
+            setRightnowMode,
+            rightnowSlots: chat.rightnowSlots,
+            rightnowActiveSlot: chat.rightnowActiveSlot,
+            createRightnowSlot: chat.createRightnowSlot,
+            deleteRightnowSlot: chat.deleteRightnowSlot,
+            rightnowPresetId: chat.rightnowPresetId,
+            clearRightnowHistory: chat.clearRightnowHistory,
+            rightnowStylePresets: chat.rightnowStylePresets,
+            rightnowActiveStyleId: chat.rightnowActiveStyleId,
+            saveRightnowStyles: chat.saveRightnowStyles,
+            addRightnowStyle: chat.addRightnowStyle,
+            updateRightnowStyle: chat.updateRightnowStyle,
+            deleteRightnowStyle: chat.deleteRightnowStyle,
+            presets,
+            novelMode: chat.novelMode,
             showGreetingSelect,
             availableGreetings,
             // Chat别名（兼容新UI）
@@ -4261,6 +4341,10 @@ ${styleGuide}
             showCallInput, callInputText, toggleCallInput, sendCallText, openCallDiary, closeCallDiaryModal, showCallDiaryModal, selectedCallDiary, callDiaryTitle,
             videoSelfPosition, isVideoAvatarSwapped, startDragVideoSelf, swapVideoAvatars,
             startVoiceCall, startVideoCall, endCall, sendCallMessage,
+            // rightnow
+            rightnowActiveMessages,
+            formatRightnowText,
+            insertIntoRightnow: insertIntoRightnowFn,
             showVirtualCamera, virtualImageDesc, openVirtualCamera, sendVirtualImage,
             openLocationPanel, closeLocationPanel, sendLocation,
             openTransferPanel, closeTransferPanel, sendTransfer, transferAmount, transferNote,
@@ -4275,7 +4359,7 @@ ${styleGuide}
             profileChar, viewCharacterProfile, goBackInSoulLink, showProfile, showChatMenu,
             // New Input Logic
             moodValue, bedTiming, showLocationPanel, showTransferPanel,
-            showAttachmentPanel, showImageSubmenu, toggleEmojiPanel, toggleAttachmentPanel, toggleOfflineMode, selectGreeting, addDefaultGreeting, addCustomGreeting,
+            showAttachmentPanel, showImageSubmenu, toggleEmojiPanel, toggleAttachmentPanel, selectGreeting, addDefaultGreeting, addCustomGreeting,
             startVoiceInput, onSendOrCall, selectFromAlbum, sendTextImage,
             handleRetry, handleTakeaway, handleVote, handleShare, handleTarot, handlePet, handleOrder,
             showVotePanel, voteQuestion, voteOptions, addVoteOption, removeVoteOption, createVote, castVoteInChat,
@@ -4369,7 +4453,7 @@ ${styleGuide}
             addOpeningLine,
             removeOpeningLine,
             // Worldbook & Presets
-            worldbooks, editingWorldbook, activeWorldbookEntryId, activeWorldbookEntry, showWorldbookImport, importWorldbookName, importFile, importMode, openWorldbookImport, handleFileUpload, importWorldbook,
+            worldbooks, editingWorldbook, activeWorldbookEntryId, activeWorldbookEntry, worldbookImportInput, triggerWorldbookImport, handleWorldbookImport,
             addNewWorldbook, deleteWorldbook, deleteCurrentWorldbook, openWorldbookEditor, saveWorldbookEditor, cancelWorldbookEditor,
             addWorldbookEntry, deleteWorldbookEntry,
             swipedWorldbookId, toggleSwipeWorldbook, toggleGlobalWorldbook,

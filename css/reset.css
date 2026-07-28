@@ -4,13 +4,7 @@
 
 /* 1. 引入外部字体 (如果有的话，必须放在最上面) */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-@font-face {
-    font-family: 'MateHandwritten';
-    src: url('https://s3plus.meituan.net/opapisdk/op_ticket_1_5677168484_1763505682402_qdqqd_ov02o7.ttf') format('truetype');
-    font-display: swap;
-    font-style: normal;
-    font-weight: 400;
-}
+
 
 /* 2. 基础盒模型重置 */
 * { 

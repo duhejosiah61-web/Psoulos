@@ -642,6 +642,12 @@
                         <!-- 第5-6行：app和胶囊框 (2行×4格) -->
                         <div class="grid-cell grid-row-5-6">
                             <div class="app-grid-bottom-left">
+                                <div class="app-icon" @click="openApp('rightnow')">
+                                    <div class="app-icon-wrapper" style="background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); color: #333;">
+                                        <i class="fas fa-feather-alt app-icon-font"></i>
+                                    </div>
+                                    <div class="app-label">Rightnow</div>
+                                </div>
                                 <div class="app-icon" @click="openApp('mate')">
                                     <div class="app-icon-wrapper">
                                         <i class="fa fa-user app-icon-font"></i>
@@ -736,6 +742,158 @@
             </div>
         </div>
 
+        <!-- Rightnow App (Offline Novel Mode) -->
+        <div v-else-if="openedApp === 'rightnow'" class="app-view rightnow-app" style="background: #000000; color: #e5e5e5; height: 100%; display: flex; flex-direction: column;">
+            <div class="rightnow-header" style="position: relative; display: flex; justify-content: space-between; align-items: center; padding: 30px 24px 10px; z-index: 20;">
+                <div style="flex: 1; display: flex; justify-content: flex-start;">
+                    <button class="back-btn" @click="showRightnowSettings ? (showRightnowSettings = false) : (rightnowActiveSlot ? (rightnowActiveSlot = null, soulLinkActiveChat = null, selectedCharForRightnow = null) : (setRightnowMode(false), closeApp()))" style="background: none; border: none; color: #a0a0a0; font-size: 20px; cursor: pointer; transition: color 0.3s;"><i class="fas fa-chevron-left"></i></button>
+                </div>
+                <div style="flex: 1; display: flex; justify-content: center;">
+                    <span class="app-title" style="color: #c0c0c0; font-family: 'Georgia', 'Songti SC', serif; font-size: 16px; letter-spacing: 4px; font-weight: 300; white-space: nowrap;">{{ showRightnowSettings ? '时空设置' : (rightnowActiveSlot ? (isAiTyping ? '···' : currentChatName.toUpperCase()) : '选择共鸣的灵魂') }}</span>
+                </div>
+                <div style="flex: 1; display: flex; justify-content: flex-end; align-items: center; gap: 8px;">
+                    <button v-if="rightnowActiveSlot && !showRightnowSettings" @click="clearRightnowHistory" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; padding: 4px 8px; color: #d4d4d4; font-size: 12px; cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'" title="清空当前存档记录">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                    <button v-else-if="!rightnowActiveSlot && !showRightnowSettings" @click="showRightnowSettings = true" style="background: none; border: none; color: #a0a0a0; font-size: 20px; cursor: pointer; transition: color 0.3s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#a0a0a0'" title="设置">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div v-if="showRightnowSettings" class="app-content rightnow-settings" style="flex: 1; padding: 16px; display: flex; flex-direction: column; overflow-y: auto; box-sizing: border-box;">
+                <h3 style="font-family: 'Georgia', 'Songti SC', serif; font-weight: 300; margin-bottom: 16px; color: #fff; text-align: center;">文风与系统设置</h3>
+                
+                <!-- 文风预设管理 (手机优化版) -->
+                <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 14px;">
+                    
+                    <!-- 预设选择器与操作栏 -->
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <label style="color: #aaa; font-size: 13px;">选择预设文风：</label>
+                        <div style="display: flex; gap: 8px; width: 100%;">
+                            <select :value="rightnowActiveStyleId" 
+                                    @change="rightnowActiveStyleId = $event.target.value; saveRightnowStyles()"
+                                    style="flex: 1; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 10px 12px; color: #fff; font-size: 15px; outline: none;">
+                                <option v-for="style in rightnowStylePresets" :key="style.id" :value="style.id">
+                                    {{ style.name }}
+                                </option>
+                                <option v-if="rightnowStylePresets.length === 0" value="">暂无预设</option>
+                            </select>
+                            
+                            <button @click="confirmAddRightnowStyle" style="width: 42px; height: 42px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s;">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                            
+                            <button v-if="rightnowStylePresets.length > 1 && rightnowActiveStyleId" 
+                                    @click="confirmDeleteRightnowStyle(rightnowActiveStyleId)" 
+                                    style="width: 42px; height: 42px; background: rgba(255,75,75,0.15); border: 1px solid rgba(255,75,75,0.3); border-radius: 8px; color: #ff4b4b; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s;">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 编辑区域 -->
+                    <div v-if="rightnowActiveStyleId" style="display: flex; flex-direction: column; gap: 12px; margin-top: 4px;">
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <label style="color: #aaa; font-size: 13px;">预设名称：</label>
+                            <input type="text" :value="rightnowStylePresets.find(s => s.id === rightnowActiveStyleId)?.name"
+                                   @input="updateRightnowStyle(rightnowActiveStyleId, undefined, $event.target.value)"
+                                   placeholder="预设名称" 
+                                   style="background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 10px 12px; color: #fff; font-size: 15px; outline: none;">
+                        </div>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <label style="color: #aaa; font-size: 13px;">文风与描写要求：</label>
+                            <textarea :value="rightnowStylePresets.find(s => s.id === rightnowActiveStyleId)?.content"
+                                      @input="updateRightnowStyle(rightnowActiveStyleId, $event.target.value, undefined)"
+                                      placeholder="在此输入文风要求、排版规则或行为设定... (例如：多描写微表情，使用暗黑风格的词汇等)"
+                                      style="min-height: 180px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 12px; color: #ccc; font-size: 14px; line-height: 1.5; resize: none; outline: none;"></textarea>
+                        </div>
+                    </div>
+                    
+                    <div v-else style="color: #888; text-align: center; padding: 30px 0; font-size: 14px;">
+                        暂无文风预设，请先点击右上角 “+” 创建一个吧
+                    </div>
+                </div>
+            </div>
+
+            <div v-else-if="!rightnowActiveSlot" class="app-content rightnow-select-char" style="flex: 1; padding: 24px; display: flex; gap: 40px;">
+                <!-- 左侧：角色列表 -->
+                <div style="flex: 1; display: flex; flex-direction: column; align-items: center; border-right: 1px solid rgba(255,255,255,0.1); padding-right: 40px; overflow-y: auto;">
+                    <div class="rightnow-char-list" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 30px 20px; width: 100%;">
+                        <div v-for="char in displayChatCharacters" :key="char?.id || char?.name" @click="selectedCharForRightnow = char" style="text-align: center; cursor: pointer; display: flex; flex-direction: column; align-items: center; transition: all 0.3s;" :style="{ opacity: selectedCharForRightnow && selectedCharForRightnow.id === char.id ? 1 : 0.5, transform: selectedCharForRightnow && selectedCharForRightnow.id === char.id ? 'scale(1.05)' : 'scale(1)' }">
+                            <img :src="char.avatarUrl || 'https://placehold.co/100x100/111/444?text=?'" style="width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 2px solid transparent; margin-bottom: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); transition: all 0.3s;" :style="{ borderColor: selectedCharForRightnow && selectedCharForRightnow.id === char.id ? '#ffffff' : 'transparent', filter: selectedCharForRightnow && selectedCharForRightnow.id === char.id ? 'none' : 'grayscale(30%) contrast(110%)' }">
+                            <span style="font-size: 14px; font-family: 'Georgia', 'Songti SC', serif; color: #fff; letter-spacing: 1px;">{{ char.nickname || char.name }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右侧：存档面板 -->
+                <div style="flex: 1; display: flex; flex-direction: column; overflow-y: auto; padding-left: 10px;">
+                    <template v-if="selectedCharForRightnow">
+                        <h4 style="font-family: 'Georgia', 'Songti SC', serif; font-weight: 300; color: #d0d0d0; margin-bottom: 20px; font-size: 16px;">{{ selectedCharForRightnow.nickname || selectedCharForRightnow.name }} 的存档记录</h4>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 12px;">
+                            <div v-for="slot in (rightnowSlots[selectedCharForRightnow.id] || [])" :key="slot.id" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 16px; display: flex; justify-content: space-between; align-items: center; transition: background 0.3s;">
+                                <div>
+                                    <div style="font-size: 15px; color: #fff; margin-bottom: 4px;">{{ slot.name }}</div>
+                                    <div style="font-size: 12px; color: #888;">{{ new Date(slot.updatedAt).toLocaleString() }}</div>
+                                </div>
+                                <div style="display: flex; gap: 8px;">
+                                    <button @click="startSoulLinkChat(selectedCharForRightnow.id); rightnowActiveSlot = slot.id" class="btn btn-primary btn-small" style="font-size: 13px; padding: 6px 12px;">载入</button>
+                                    <button @click="confirmDeleteRightnowSlot(selectedCharForRightnow.id, slot.id)" class="btn btn-danger btn-small" style="font-size: 13px; padding: 6px 12px;"><i class="fas fa-trash"></i></button>
+                                </div>
+                            </div>
+
+                            <button @click="(rightnowActiveSlot = createRightnowSlot(selectedCharForRightnow.id)) && startSoulLinkChat(selectedCharForRightnow.id)" style="background: transparent; border: 1px dashed rgba(255,255,255,0.3); color: #aaa; border-radius: 8px; padding: 16px; font-size: 14px; cursor: pointer; transition: all 0.3s; margin-top: 10px;" onmouseover="this.style.borderColor='rgba(255,255,255,0.6)'; this.style.color='#fff'" onmouseout="this.style.borderColor='rgba(255,255,255,0.3)'; this.style.color='#aaa'">
+                                + 新建时空存档
+                            </button>
+                        </div>
+                    </template>
+                    <div v-else style="display: flex; height: 100%; align-items: center; justify-content: center; color: #666; font-size: 14px; font-family: 'Georgia', 'Songti SC', serif;">
+                        请在左侧选择一个角色
+                    </div>
+                </div>
+            </div>
+            
+            <div v-else class="app-content rightnow-reader" style="flex: 1; overflow-y: auto; padding: 20px 28px 120px 28px; font-family: 'Georgia', 'Songti SC', 'SimSun', serif; font-size: 18px; line-height: 2.2; color: #d4d4d4; letter-spacing: 1px; scroll-behavior: smooth;" @click.self="closeAllPanels">
+                <div v-for="msg in rightnowActiveMessages" :key="msg.id" class="rightnow-paragraph" 
+                     @contextmenu.prevent="onMessageContextMenu($event, msg)"
+                     @touchstart="onMessageTouchStart($event, msg)"
+                     @touchmove="onMessageTouchMove"
+                     @touchend="onMessageTouchEnd"
+                     style="margin-bottom: 20px; padding: 18px 24px; background: rgba(20, 20, 25, 0.75); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); animation: fadeIn 0.4s ease-out; position: relative; transition: background 0.3s;">
+                    <!-- Sender Name -->
+                    <div style="font-size: 13px; color: #777; margin-bottom: 8px; font-family: sans-serif; display: flex; align-items: center; justify-content: space-between;">
+                        <span>{{ msg.sender === 'user' ? '我' : (msg.sender === 'system' ? '系统' : currentChatName) }}</span>
+                    </div>
+                    
+                    <div v-if="msg.sender === 'user'" style="text-indent: 2em; margin-top: 4px; margin-bottom: 0px;">
+                        <span style="font-weight: normal; color: #f0f0f0;">{{ msg.text }}</span>
+                    </div>
+                    <div v-else-if="msg.sender === 'system'" style="text-indent: 2em; margin-top: 4px; margin-bottom: 0px;">
+                        <span style="font-weight: normal; color: #a0a0a0; font-size: 15px;">{{ msg.text }}</span>
+                    </div>
+                    <div v-else style="font-weight: normal; color: #f0f0f0;" v-html="formatRightnowText(msg.text)"></div>
+                </div>
+                <div v-if="isAiTyping" class="rightnow-paragraph typing" style="margin-bottom: 20px; padding: 16px 24px; background: rgba(20, 20, 25, 0.75); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; color: #777; font-style: italic; animation: pulse 2s infinite;">
+                    {{ currentChatName }} 正在沉思...
+                </div>
+            </div>
+            
+            <div v-if="soulLinkActiveChat" class="rightnow-footer" style="position: absolute; bottom: 0; left: 0; right: 0; padding: 0 28px 24px; background: linear-gradient(to top, rgba(0,0,0,1) 80%, rgba(0,0,0,0)); display: flex; flex-direction: column; z-index: 10;">
+                <div class="rightnow-toolbar" style="display: flex; gap: 10px; padding: 24px 0 8px; opacity: 0.85;">
+                    <span @click="insertIntoRightnow('“', '”')" style="cursor: pointer; color: #d4d4d4; font-family: 'Georgia', serif; padding: 4px 10px; background: rgba(255,255,255,0.1); border-radius: 4px; font-size: 13px; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">“对话”</span>
+                    <span @click="insertIntoRightnow('*', '*')" style="cursor: pointer; color: #d4d4d4; font-family: 'Georgia', serif; padding: 4px 10px; background: rgba(255,255,255,0.1); border-radius: 4px; font-size: 13px; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">*旁白*</span>
+                    <span @click="insertIntoRightnow('（', '）')" style="cursor: pointer; color: #d4d4d4; font-family: 'Georgia', serif; padding: 4px 10px; background: rgba(255,255,255,0.1); border-radius: 4px; font-size: 13px; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">（内心）</span>
+                </div>
+                <div style="display: flex; align-items: flex-end; width: 100%;">
+                    <textarea name="sp_field_rightnow_input" id="sp-field-rightnow-input" v-model="soulLinkInput" placeholder="写下你的故事... (回车换行)" style="flex: 1; background: transparent; border: none; border-bottom: 1px solid rgba(255,255,255,0.15); padding: 10px 0; font-family: 'Georgia', 'Songti SC', serif; font-size: 15px; color: #e5e5e5; outline: none; transition: border-color 0.3s; resize: none; overflow-y: auto; max-height: 150px; line-height: 1.5; min-height: 22px;" oninput="this.style.height = 'auto'; this.style.height = (this.scrollHeight) + 'px';"></textarea>
+                    <button @click="onSendOrCall" style="background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; padding: 6px 14px; font-family: 'Georgia', 'Songti SC', serif; font-size: 14px; margin-left: 15px; margin-bottom: 4px; color: #fff; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.background='rgba(255,255,255,0.25)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">链接</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Chat App -->
         <div v-else-if="openedApp === 'chat'" class="app-view">
             <div class="app-header">
@@ -753,7 +911,7 @@
                 <div class="header-icons">
                     <i v-if="soulLinkActiveChat" class="fas fa-phone-alt" @click="startVoiceCall"></i>
                     <i v-if="soulLinkActiveChat" class="fas fa-video" @click="startVideoCall"></i>
-                    <i v-if="soulLinkActiveChat" :class="['fas', isOfflineMode ? 'fa-book-open' : 'fa-book']" @click="toggleOfflineMode" :title="isOfflineMode ? '退出线下模式' : '进入线下模式'"></i>
+
                     <i v-if="soulLinkActiveChat" class="fas fa-ellipsis-h" @click="toggleChatSettings"></i>
                 </div>
             </div>
@@ -1269,7 +1427,8 @@
                                             <button v-if="msg.sender === 'ai'" class="sticker-counter-btn" @click="counterWithSticker(msg)" title="斗图">怼</button>
                                         </div>
                                         <template v-else>
-                                            <div class="message-text">{{ msg.text }}</div>
+                                            <div v-if="isOfflineMode" class="message-text" v-html="formatRightnowText(msg.text)"></div>
+                                            <div v-else class="message-text">{{ msg.text }}</div>
                                             <div v-if="chatSettings.soulLinkForeignTranslationEnabled && msg.replyTranslation" class="reply-translation">
                                                 <div class="translation-divider"></div>
                                                 <div class="translation-text">{{ msg.replyTranslation }}</div>
@@ -1313,6 +1472,12 @@
                     </div>
                     
                     <div class="chat-input-container">
+                        <!-- Rightnow Narrations Panel -->
+                        <div v-if="isOfflineMode" class="rightnow-symbols-panel" style="display: flex; gap: 8px; padding: 6px 12px; background: transparent; border-bottom: 1px solid rgba(0,0,0,0.05); align-items: center; overflow-x: auto; white-space: nowrap;">
+                            <button @click="insertIntoRightnowFn('“', '”')" style="border: 1px solid rgba(0,0,0,0.1); background: rgba(255,255,255,0.7); border-radius: 12px; padding: 4px 12px; font-size: 13px; cursor: pointer; color: #333;">对话 “”</button>
+                            <button @click="insertIntoRightnowFn('（', '）')" style="border: 1px solid rgba(0,0,0,0.1); background: rgba(255,255,255,0.7); border-radius: 12px; padding: 4px 12px; font-size: 13px; cursor: pointer; color: #333;">内心 （）</button>
+                            <button @click="insertIntoRightnowFn('*', '*')" style="border: 1px solid rgba(0,0,0,0.1); background: rgba(255,255,255,0.7); border-radius: 12px; padding: 4px 12px; font-size: 13px; cursor: pointer; color: #333;">旁白 **</button>
+                        </div>
                         <div v-if="editingMessageId" class="editing-indicator">
                             <span>正在编辑消息</span>
                             <i class="fas fa-times" @click="editingMessageId = null; soulLinkInput = ''; soulLinkReplyTarget = null;"></i>
@@ -1328,7 +1493,7 @@
                             <button class="action-btn" @click="toggleAttachmentPanel" title="添加">
                                 <i class="fas fa-plus"></i>
                             </button>
-                            <input name="sp_field_4" id="sp-field-4" type="text" v-model="soulLinkInput" @keyup.enter="onSendOrCall" :placeholder="editingMessageId ? '修改消息...' : (isOfflineMode ? '输入消息（线下模式）' : '输入消息...')">
+                            <textarea name="sp_field_4" id="sp-field-4" v-model="soulLinkInput" @keydown.enter.exact="if(!$event.isComposing){ $event.preventDefault(); onSendOrCall(); }" :placeholder="editingMessageId ? '修改消息...' : (isOfflineMode ? '输入消息（线下模式）' : '输入消息...')" style="flex: 1; border: none; background: transparent; outline: none; font-size: 15px; color: #333; resize: none; overflow-y: auto; max-height: 120px; line-height: 1.4; padding: 10px 0; min-height: 20px; box-sizing: border-box;" oninput="this.style.height = 'auto'; this.style.height = (this.scrollHeight) + 'px';"></textarea>
                             <button class="send-btn" @click="onSendOrCall" title="发送">
                                 <i class="fas fa-paper-plane"></i>
                             </button>
@@ -1757,7 +1922,26 @@
                 </div>
 
                 <div class="art-settings-section">
-                    <h2 class="art-section-title">时差系统</h2>
+                    <h2 class="art-section-title">时间/时差感知</h2>
+                    <div class="art-settings-input-item">
+                        <div class="art-settings-icon-wrapper">
+                            <div class="art-settings-blob blob-color-3"></div>
+                            <svg class="art-settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <circle cx="12" cy="12" r="9"></circle>
+                                <polyline points="12 7 12 12 15 15"></polyline>
+                            </svg>
+                        </div>
+                        <div class="art-input-wrapper">
+                            <label class="art-input-label">现实时间感知</label>
+                            <div style="display: flex; align-items: center; gap: 10px; padding-top: 6px;">
+                                <input id="timeSenseEnabled" type="checkbox" v-model="chatSettings.timeSenseEnabled">
+                                <label for="timeSenseEnabled" style="font-family: 'Inter', sans-serif; font-size: 14px; color: #000000;">开启时间感知</label>
+                            </div>
+                            <div style="font-size: 12px; color: rgba(0, 0, 0, 0.55); margin-top: 8px;">
+                                角色会感知当前现实时间（早中晚/工作日/周末等），让对话更真实。若开启下方“时差系统”，将以时差系统为准。
+                            </div>
+                        </div>
+                    </div>
                     <div class="art-settings-input-item">
                         <div class="art-settings-icon-wrapper">
                             <div class="art-settings-blob blob-color-2"></div>
@@ -2370,6 +2554,14 @@
                     </svg>
                     <span>编辑</span>
                 </div>
+                <div class="context-menu-item" @click="handleContextAction('regenerate')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <polyline points="1 20 1 14 7 14"></polyline>
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                    </svg>
+                    <span>重新生成</span>
+                </div>
                 <div class="context-menu-item" @click="handleContextAction('recall')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="1 4 1 10 7 10"></polyline>
@@ -2591,14 +2783,25 @@
                                             <img :src="post.avatar || 'https://placehold.co/100x100?text=?'" class="feed-user-avatar" alt="avatar">
                                             <div class="feed-user-meta">
                                                 <div class="feed-user-name">{{ post.author }}</div>
-                                                <div class="feed-user-time">刚刚 · 仅你可见</div>
+                                                <div class="feed-user-time">
+                                                    <span v-if="post.location">{{ post.location }} · </span>
+                                                    {{ post.time || '刚刚' }} · {{ post.visibility || '公开' }}
+                                                </div>
                                             </div>
                                         </div>
-                                        <button class="feed-more-btn" @click.stop="feed.toggleActionMenu(post.id)"><i class="fas fa-ellipsis-h"></i></button>
+                                        <div style="display: flex; gap: 8px;">
+                                            <button v-if="post.author === '我'" class="feed-more-btn" @click.stop="feed.deletePost(post.id)" style="color: #ff4d4f;">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                            <button class="feed-more-btn" @click.stop="feed.triggerAIAction(post.id, characters.value || characters, activeProfile)" :disabled="feed.isGenerating(post.id)">
+                                                <i v-if="feed.isGenerating(post.id)" class="fas fa-ellipsis-h fa-bounce"></i>
+                                                <i v-else class="fas fa-wand-magic-sparkles"></i>
+                                            </button>
+                                        </div>
                                     </div>
                                     <div class="feed-copy">{{ post.content }}</div>
-                                    <div class="feed-media" v-if="post.images && post.images.length">
-                                        <div v-for="(img, idx) in post.images.slice(0, 1)" :key="idx" class="feed-media-frame" @click="feed.openImageViewer(img, post.imageDescriptions && post.imageDescriptions[idx])">
+                                    <div class="feed-media" v-if="post.images && post.images.length" :class="{'grid-1': post.images.length === 1, 'grid-4': post.images.length === 4, 'grid-n': post.images.length !== 1 && post.images.length !== 4}">
+                                        <div v-for="(img, idx) in post.images" :key="idx" class="feed-media-frame" @click="feed.openImageViewer(img, post.imageDescriptions && post.imageDescriptions[idx])">
                                             <img v-if="typeof img === 'string' && img.startsWith('data:image/')" :src="img" alt="post image">
                                             <div v-else-if="typeof img === 'string' && img.startsWith('mock:')" class="feed-mock-image" :style="{ background: img.replace('mock:', '') }"><span>{{ post.imageDescriptions && post.imageDescriptions[idx] ? post.imageDescriptions[idx] : '图片' }}</span></div>
                                             <div v-else-if="typeof img === 'object' && img.type === 'textImage'" class="feed-text-image" :style="{ background: img.bgColor }">{{ img.text }}</div>
@@ -2607,47 +2810,66 @@
                                     <div class="feed-actions">
                                         <button class="feed-action-btn" @click.stop="feed.toggleLike(post.id)"><i class="far fa-heart"></i></button>
                                         <button class="feed-action-btn" @click.stop="feed.toggleCommentInput(post.id)"><i class="far fa-comment"></i></button>
-                                        <button class="feed-action-btn"><i class="far fa-bookmark"></i></button>
+                                        <button class="feed-action-btn" @click.stop="feed.toggleCollect(post.id)">
+                                            <i :class="post.collections && post.collections.includes('我') ? 'fas fa-bookmark' : 'far fa-bookmark'"></i>
+                                        </button>
                                     </div>
                                     <div class="feed-liked-row" v-if="post.likes && post.likes.length">
                                         <img v-for="(like, i) in post.likes.slice(0, 3)" :key="i" src="https://placehold.co/48x48?text=☺" alt="like">
                                         <span>他觉得这条动态很赞</span>
                                     </div>
                                     <div class="feed-comments-preview" v-if="post.comments && post.comments.length">
-                                        <div v-for="comment in post.comments.slice(0, 2)" :key="comment.id" class="feed-comment-item">
-                                            <span class="feed-comment-author">{{ comment.user }}</span>
-                                            <span class="feed-comment-text">{{ comment.content }}</span>
+                                        <div v-for="comment in post.comments" :key="comment.id" class="feed-comment-item-container">
+                                            <div class="feed-comment-item">
+                                                <span class="feed-comment-author">{{ comment.user }}</span>
+                                                <span class="feed-comment-text">
+                                                    {{ comment.content }}
+                                                    <button v-if="comment.user === '我'" class="feed-comment-reply-btn" style="color:#ff4d4f" @click.stop="feed.deleteComment(post.id, comment.id)">删除</button>
+                                                    <button class="feed-comment-reply-btn" @click.stop="feed.toggleReplyInput(post.id, comment.id)">回复</button>
+                                                    <button class="feed-comment-reply-btn ai-action-btn" @click.stop="feed.triggerAIAction(post.id, characters.value || characters, activeProfile, comment.id)" :disabled="feed.isGenerating(post.id + '-' + comment.id)">
+                                                        <i v-if="feed.isGenerating(post.id + '-' + comment.id)" class="fas fa-ellipsis-h fa-bounce"></i>
+                                                        <i v-else class="fas fa-wand-magic-sparkles"></i>
+                                                    </button>
+                                                </span>
+                                            </div>
+                                            <div class="feed-comment-replies" v-if="comment.replies && comment.replies.length">
+                                                <div v-for="reply in comment.replies" :key="reply.id" class="feed-comment-item feed-reply-item">
+                                                    <span class="feed-comment-author">{{ reply.user }} <span style="color: rgba(255,255,255,0.4); font-weight: normal;">回复</span> {{ comment.user }}</span>
+                                                    <span class="feed-comment-text">
+                                                        {{ reply.content }}
+                                                        <button v-if="reply.user === '我'" class="feed-comment-reply-btn" style="color:#ff4d4f" @click.stop="feed.deleteComment(post.id, comment.id, reply.id)">删除</button>
+                                                        <button class="feed-comment-reply-btn" @click.stop="feed.toggleReplyInput(post.id, comment.id)">回复</button>
+                                                        <button class="feed-comment-reply-btn ai-action-btn" @click.stop="feed.triggerAIAction(post.id, characters.value || characters, activeProfile, comment.id, reply.id)" :disabled="feed.isGenerating(post.id + '-' + reply.id)">
+                                                            <i v-if="feed.isGenerating(post.id + '-' + reply.id)" class="fas fa-ellipsis-h fa-bounce"></i>
+                                                            <i v-else class="fas fa-wand-magic-sparkles"></i>
+                                                        </button>
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <!-- 楼中楼回复输入框 -->
+                                            <div v-if="feed.activeReplyCommentId === comment.id && feed.activeCommentPostId === post.id" class="feed-comment-input reply-input" @click.stop>
+                                                <input type="text" v-model="feed.replyInput" :placeholder="'回复 ' + comment.user + '...'" @keyup.enter="feed.submitComment(post.id, comment.id)">
+                                                <button @click="feed.submitComment(post.id, comment.id)">发送</button>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div v-if="feed.activeCommentPostId === post.id" class="feed-comment-input" @click.stop>
+                                    <div v-if="feed.activeCommentPostId === post.id && !feed.activeReplyCommentId" class="feed-comment-input" @click.stop>
                                         <input name="sp_field_47" id="sp-field-47" type="text" v-model="feed.commentInput" placeholder="说点什么..." @keyup.enter="feed.submitComment(post.id)">
                                         <button @click="feed.submitComment(post.id)">发送</button>
-                                    </div>
-                                    <div v-if="feed.activeActionPostId === post.id" class="feed-action-menu" @click.stop>
-                                        <button @click="feed.toggleLike(post.id); feed.closeActionMenu()">赞</button>
-                                        <button @click="feed.toggleCommentInput(post.id); feed.closeActionMenu()">评论</button>
-                                        <button @click="feed.openRoleCommentModal(post); feed.closeActionMenu()">TA评</button>
                                     </div>
                                     <div class="feed-card-foot">{{ index + 1 }} / {{ feed.posts.length }}</div>
                                 </article>
                             </div>
-                            <div class="feed-carousel-nav" @click.stop>
-                                <button class="feed-nav-arrow" @click.stop="feed.goToPreviousCard" :disabled="feed.activeCardIndex === 0"><i class="fas fa-chevron-left"></i></button>
-                                <div class="feed-dots">
-                                    <span v-for="(post, idx) in feed.posts" :key="post.id + '-dot'" class="feed-dot" :class="{ active: feed.activeCardIndex === idx }"></span>
-                                </div>
-                                <button class="feed-nav-arrow" @click.stop="feed.goToNextCard" :disabled="feed.activeCardIndex >= feed.posts.length - 1"><i class="fas fa-chevron-right"></i></button>
-                            </div>
+
                         </section>
                     </div>
                 </main>
                 <button class="feed-fab" @click="feed.showFabMenu = !feed.showFabMenu" aria-label="发布">
-                    <i class="fas fa-plus"></i>
+                    <i class="fas" :class="feed.showFabMenu ? 'fa-times' : 'fa-plus'"></i>
                 </button>
-                <div class="feed-bottom-nav">
-                    <button class="feed-bottom-icon active"><i class="fas fa-house"></i></button>
-                    <button class="feed-bottom-icon"><i class="fas fa-circle-plus"></i></button>
-                    <button class="feed-bottom-icon"><i class="far fa-user"></i></button>
+                <div v-if="feed.showFabMenu" class="feed-fab-menu" @click.stop>
+                    <button @click="feed.openCreatePost(); feed.showFabMenu = false"><i class="fas fa-pen"></i> 我发动态</button>
+                    <button @click="feed.roleAction(); feed.showFabMenu = false"><i class="fas fa-wand-magic-sparkles"></i> 角色自动发</button>
                 </div>
             </div>
             
@@ -2900,8 +3122,8 @@
                                         <p class="profile-post-text">{{ post.content }}</p>
                                         
                                         <!-- Profile Post Images -->
-                                        <div v-if="post.images && post.images.length" class="profile-post-images">
-                                            <div v-for="(img, idx) in post.images.slice(0, 3)" :key="idx" class="profile-post-image-wrap">
+                                        <div v-if="post.images && post.images.length" class="profile-post-images" :class="{'grid-1': post.images.length === 1, 'grid-4': post.images.length === 4, 'grid-n': post.images.length !== 1 && post.images.length !== 4}">
+                                            <div v-for="(img, idx) in post.images" :key="idx" class="profile-post-image-wrap">
                                                 <!-- 文字图 -->
                                                 <div v-if="typeof img === 'object' && img.type === 'textImage'" class="text-image-display" :style="{ background: img.bgColor, padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', width: '100%' }">
                                                     <div class="text-image-text" style="font-family: 'Playfair Display', Georgia, serif; font-size: 14px; font-weight: 500; color: #000; text-align: center;">{{ img.text }}</div>
@@ -2975,28 +3197,6 @@
                                 留空将恢复默认背景
                             </div>
                         </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Ta评论面板 -->
-            <div v-if="feed.showRoleCommentModal" class="role-comment-overlay" @click.self="feed.closeRoleCommentModal">
-                <div class="role-comment-panel">
-                    <div class="role-comment-header">
-                        <button class="back-btn-small" @click="feed.closeRoleCommentModal"><i class="fas fa-arrow-left"></i></button>
-                        <span>选择Ta来评论</span>
-                        <div style="width: 40px;"></div>
-                    </div>
-                    <div class="role-comment-content">
-                        <div class="role-list">
-                            <div v-for="char in (characters || []).filter(Boolean)" :key="char?.id || char?.name" class="role-item" :class="{ selected: feed.selectedRoleId === char?.id }" @click="feed.selectedRoleId = char?.id">
-                                <img :src="char.avatarUrl || 'https://placehold.co/100x100?text=?'" class="role-avatar">
-                                <span class="role-name">{{ char.nickname || char.name }}</span>
-                            </div>
-                        </div>
-                        <button class="generate-btn" @click="feed.generateAndSubmitComment(characters, activeProfile)" :disabled="!feed.selectedRoleId || feed.isGeneratingComment">
-                            {{ feed.isGeneratingComment ? '生成中...' : '发布Ta评' }}
-                        </button>
                     </div>
                 </div>
             </div>
@@ -4767,9 +4967,10 @@
                         <span>世界书</span>
                         <div class="card-actions">
                             <button class="btn-small" @click="openBatchDelete('worldbooks')">批量删除</button>
-                            <i class="fas fa-upload" @click="openWorldbookImport"></i>
+                            <i class="fas fa-upload" @click="triggerWorldbookImport"></i>
                         </div>
                     </div>
+                    <input name="sp_field_wb_import" id="sp-field-wb-import" type="file" ref="worldbookImportInput" @change="handleWorldbookImport" accept=".txt" style="display: none;">
                     <div class="card-body">
                         <div v-if="worldbooks.length === 0" class="empty-state">暂无世界书，点击下方添加</div>
                         
@@ -4804,29 +5005,7 @@
                     </div>
                 </div>
                 
-                <!-- 预设卡片 -->
-                <div class="card workshop-card">
-                    <div class="card-header">
-                        <span>预设</span>
-                        <div class="card-actions">
-                            <button class="btn-small" @click="openBatchDelete('presets')">批量删除</button>
-                            <i class="fas fa-upload" @click="triggerPresetImport"></i>
-                        </div>
-                    </div>
-                    <input name="sp_field_116" id="sp-field-116" type="file" ref="presetImportInput" @change="handlePresetImport" accept=".json" style="display: none;">
-                    <div class="card-body">
-                        <div v-if="presets.length === 0" class="empty-state">暂无预设，点击下方添加</div>
-                        <div v-for="preset in presets" :key="preset.id" class="profile-item" @click="openPresetEditor(preset)">
-                            <div class="profile-info">
-                                <div class="profile-name">{{ preset.name }}</div>
-                                <div class="profile-meta">{{ preset.segments?.length || 0 }} 个段落</div>
-                            </div>
-                        </div>
-                        <div class="profile-item add-item" @click="addNewPreset">
-                            <i class="fas fa-plus"></i>
-                        </div>
-                    </div>
-                </div>
+
             </div>
 
         </div>
@@ -4996,39 +5175,9 @@
             </div>
         </div>
 
-        <!-- 预设编辑模态框 -->
-        <div v-if="editingPreset" class="modal-overlay" @click.self="cancelPresetEditor">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <span>编辑预设</span>
-                    <button class="close-btn" @click="cancelPresetEditor"><i class="fas fa-times"></i></button>
-                </div>
-                <div class="modal-body">
-                    <label>名称</label>
-                    <input name="sp_field_133" id="sp-field-133" v-model="editingPreset.name" placeholder="预设名称">
-                    <label class="mt-2">内容 (或使用分段)</label>
-                    <textarea name="sp_field_134" id="sp-field-134" v-model="editingPreset.content" rows="3" placeholder="预设内容..."></textarea>
-                    <label class="mt-2">分段</label>
-                    <div v-for="(seg, idx) in editingPreset.segments" :key="seg.id" class="preset-segment">
-                        <input name="sp_field_135" id="sp-field-135" v-model="seg.title" placeholder="分段标题" class="segment-title">
-                        <textarea name="sp_field_136" id="sp-field-136" v-model="seg.content" placeholder="分段内容" rows="3" class="segment-content"></textarea>
-                        <div class="segment-actions">
-                            <label class="checkbox-label">
-                                <input name="sp_field_137" id="sp-field-137" type="checkbox" v-model="seg.enabled">
-                                <span>启用</span>
-                            </label>
-                            <button class="btn-small danger" @click="editingPreset.segments.splice(idx, 1)">删除</button>
-                        </div>
-                    </div>
-                    <button class="btn w-100 mt-2" @click="editingPreset.segments.push({ id: 'seg_'+Date.now(), title: '', content: '', enabled: true })">+ 添加分段</button>
-                    <div class="flex mt-2" style="justify-content: flex-end; gap: 12px;">
-                        <button class="btn btn-danger" @click="deleteCurrentPreset">删除预设</button>
-                        <button class="btn" @click="cancelPresetEditor">取消</button>
-                        <button class="btn btn-primary" @click="savePresetEditor">保存</button>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <!-- 世界书导入模态框已移除，现在使用直接选择文件的方式 -->
+
+
 
         <!-- Console App -->
         <!-- Console App - 设置界面 -->
