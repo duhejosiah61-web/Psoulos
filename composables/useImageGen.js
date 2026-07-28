@@ -14,7 +14,7 @@ const DEFAULT_CONFIG = {
     proxyUrl: '',
     useCorsProxy: true, // Web 跨域解包代理
     corsProxyUrl: 'https://corsproxy.io/?',
-    model: 'nai-diffusion-4-full', // 推荐 V4 Full
+    model: 'nai-diffusion-4-5-full', // 推荐 V4.5 Full
     width: 832,
     height: 1216,
     steps: 28,
@@ -109,9 +109,6 @@ export function useImageGen({ addConsoleLog } = {}) {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed.novelai && !parsed.novelai.model) {
-          parsed.novelai.model = 'nai-diffusion-4-full';
-        }
         return deepMerge(JSON.parse(JSON.stringify(DEFAULT_CONFIG)), parsed);
       }
     } catch (e) {
@@ -240,68 +237,83 @@ export function useImageGen({ addConsoleLog } = {}) {
     const fullNegative = [cfg.negativePrompt, extraNeg].filter(Boolean).join(', ');
     const seedNum = cfg.seed === -1 ? Math.floor(Math.random() * 999999999) : Math.abs(Number(cfg.seed) || 123456);
 
-    let modelName = cfg.model || 'nai-diffusion-4-5-full';
+    const modelName = cfg.model; // 完全使用用户配置
 
     const width = Math.floor((cfg.width || 832) / 64) * 64;
     const height = Math.floor((cfg.height || 1216) / 64) * 64;
 
-    const isV45 = modelName === 'nai-diffusion-4-5-full' || modelName === 'nai-diffusion-4-5-curated';
-    const isV4 = isV45 || modelName === 'nai-diffusion-4-full' || modelName === 'nai-diffusion-4-curated';
+    const isV4 = modelName.includes('diffusion-4');
+    const isV3 = modelName.includes('diffusion-3');
 
-    const parametersObj = {
-      width,
-      height,
-      scale: Number(cfg.cfgScale) || 5.0,
-      sampler: cfg.sampler || 'k_euler_ancestral',
-      steps: Number(cfg.steps) || 28,
-      seed: seedNum,
-      n_samples: 1,
-      qualityToggle: !!cfg.qualityTags,
-      noise_schedule: cfg.noiseSchedule || 'karras',
-      cfg_rescale: Number(cfg.cfgRescale) || 0,
-      uncond_scale: 1.0,
-      dynamic_thresholding: false,
-      controlnet_strength: 1.0,
-      legacy: false,
-      add_original_image: false,
-      params_version: isV4 ? 4 : 3
-    };
+    let parametersObj = {};
 
     if (isV4) {
-      parametersObj.v4_prompt = {
-        caption: {
-          base_caption: fullPositive,
-          char_captions: []
+      parametersObj = {
+        width,
+        height,
+        scale: Number(cfg.cfgScale) || 5.0,
+        sampler: cfg.sampler || 'k_euler_ancestral',
+        steps: Number(cfg.steps) || 28,
+        seed: seedNum,
+        n_samples: 1,
+        noise_schedule: cfg.noiseSchedule || 'karras',
+        qualityToggle: !!cfg.qualityTags,
+        params_version: 4,
+        v4_prompt: {
+          caption: {
+            base_caption: fullPositive,
+            char_captions: []
+          },
+          use_coords: false,
+          use_order: true
         },
-        use_coords: false,
-        use_order: true
+        v4_negative_prompt: {
+          caption: {
+            base_caption: fullNegative,
+            char_captions: []
+          },
+          use_coords: false,
+          use_order: true
+        }
       };
-      parametersObj.v4_negative_prompt = {
-        caption: {
-          base_caption: fullNegative,
-          char_captions: []
-        },
-        use_coords: false,
-        use_order: true
+    } else if (isV3) {
+      parametersObj = {
+        width,
+        height,
+        scale: Number(cfg.cfgScale) || 5.0,
+        sampler: cfg.sampler || 'k_euler_ancestral',
+        steps: Number(cfg.steps) || 28,
+        seed: seedNum,
+        n_samples: 1,
+        noise_schedule: cfg.noiseSchedule || 'karras',
+        params_version: 3,
+        uc: fullNegative
       };
     } else {
-      parametersObj.uc = fullNegative;
-      if (cfg.smea) parametersObj.sm = true;
-      if (cfg.smeaDyn) parametersObj.sm_dyn = true;
+      // Fallback 兼容
+      parametersObj = {
+        width,
+        height,
+        scale: Number(cfg.cfgScale) || 5.0,
+        sampler: cfg.sampler || 'k_euler_ancestral',
+        steps: Number(cfg.steps) || 28,
+        seed: seedNum,
+        n_samples: 1,
+        noise_schedule: cfg.noiseSchedule || 'karras',
+        params_version: 3,
+        uc: fullNegative
+      };
     }
-
-    // Temporarily disable vibe_transfer
-    // if (cfg.vibeTransfer && cfg.vibeTransfer.enabled && cfg.vibeTransfer.imageUrl) { ... }
 
     const payload = {
       action: 'generate',
-      input: fullPositive,
+      input: isV4 ? '' : fullPositive,
       model: modelName,
       parameters: parametersObj
     };
 
-    console.log("NAI MODEL:", modelName);
-    console.log("NAI PAYLOAD:", JSON.stringify(payload, null, 2));
+    console.log('NAI MODEL:', modelName);
+    console.log('NAI PAYLOAD:', JSON.stringify(payload, null, 2));
 
     let res;
     try {
@@ -314,7 +326,7 @@ export function useImageGen({ addConsoleLog } = {}) {
         body: JSON.stringify(payload)
       });
     } catch (netErr) {
-      throw new Error(`网络或跨域(CORS)拦截错误: ${netErr.message}`);
+      throw new Error(`网络拦截错误: ${netErr.message}`);
     }
 
     if (!res.ok) {
