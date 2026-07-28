@@ -12,7 +12,7 @@ const DEFAULT_CONFIG = {
     apiKey: '',
     endpointType: 'official', // 'official' | 'official_api' | 'proxy'
     proxyUrl: '',
-    model: 'nai-diffusion-4-full', // 正确官方 API 模型名称
+    model: 'nai-diffusion-4-full', // 推荐 V4 Full
     width: 832,
     height: 1216,
     steps: 28,
@@ -20,7 +20,7 @@ const DEFAULT_CONFIG = {
     sampler: 'k_euler',
     noiseSchedule: 'karras',
     seed: -1,
-    ucPreset: 'Preset 0 - Heavy',
+    ucPreset: 0,
     smea: false,
     smeaDyn: false,
     cfgRescale: 0,
@@ -163,7 +163,6 @@ export function useImageGen({ addConsoleLog } = {}) {
         }
       }
 
-      // 普通图片文件处理
       const reader = new FileReader();
       reader.onload = (e) => {
         imageGenConfig.novelai.vibeTransfer.imageUrl = e.target.result;
@@ -225,12 +224,14 @@ export function useImageGen({ addConsoleLog } = {}) {
     return imgUrl;
   }
 
-  // NovelAI 引擎 (兼容 ZIP 解包、PNG 直出与中转 JSON 数据)
+  // NovelAI 引擎 (严格符合 V4 v4_prompt 结构与规范)
   async function generateViaNovelAI(userPrompt, extraNeg = '') {
     const cfg = imageGenConfig.novelai;
     if (!cfg.apiKey) {
       throw new Error('NovelAI API Key 未填写，请在控制台设置。');
     }
+
+    const cleanToken = cfg.apiKey.trim().replace(/^Bearer\s+/i, '');
 
     let endpoint = 'https://image.novelai.net/ai/generate-image';
     if (cfg.endpointType === 'official_api') {
@@ -245,13 +246,14 @@ export function useImageGen({ addConsoleLog } = {}) {
 
     const fullPositive = [cfg.positivePrompt, userPrompt].filter(Boolean).join(', ');
     const fullNegative = [cfg.negativePrompt, extraNeg].filter(Boolean).join(', ');
-    const seed = cfg.seed === -1 ? Math.floor(Math.random() * 999999999) : cfg.seed;
+    const seedNum = cfg.seed === -1 ? Math.floor(Math.random() * 999999999) : Math.abs(Number(cfg.seed) || 123456);
 
     let modelName = cfg.model || 'nai-diffusion-4-full';
     if (modelName === 'nai-diffusion-4-5-full') modelName = 'nai-diffusion-4-full';
 
     const width = Math.floor((cfg.width || 832) / 64) * 64;
     const height = Math.floor((cfg.height || 1216) / 64) * 64;
+    const isV4 = modelName.includes('v4') || modelName.includes('diffusion-4');
 
     const parametersObj = {
       width,
@@ -259,15 +261,44 @@ export function useImageGen({ addConsoleLog } = {}) {
       scale: Number(cfg.cfgScale) || 5.0,
       sampler: cfg.sampler || 'k_euler',
       steps: Number(cfg.steps) || 28,
-      seed: seed,
+      seed: seedNum,
       n_samples: 1,
       uc: fullNegative,
       qualityToggle: !!cfg.qualityTags,
       noise_schedule: cfg.noiseSchedule || 'karras',
-      cfg_rescale: Number(cfg.cfgRescale) || 0
+      cfg_rescale: Number(cfg.cfgRescale) || 0,
+      uncond_scale: 1.0,
+      dynamic_thresholding: false,
+      controlnet_strength: 1.0,
+      legacy: false,
+      add_original_image: false,
+      params_version: 3
     };
 
-    // Vibe Transfer (垫图/参考图) 注入
+    // NAI V4 模型官方要求必须包含 v4_prompt 与 v4_negative_prompt 对象结构
+    if (isV4) {
+      parametersObj.v4_prompt = {
+        caption: {
+          base_caption: fullPositive,
+          char_captions: []
+        },
+        use_coords: false,
+        use_order: true
+      };
+      parametersObj.v4_negative_prompt = {
+        caption: {
+          base_caption: fullNegative,
+          char_captions: []
+        },
+        use_coords: false,
+        use_order: true
+      };
+    } else {
+      if (cfg.smea) parametersObj.sm = true;
+      if (cfg.smeaDyn) parametersObj.sm_dyn = true;
+    }
+
+    // Vibe Transfer (垫图/参考图)
     if (cfg.vibeTransfer && cfg.vibeTransfer.enabled && cfg.vibeTransfer.imageUrl) {
       const rawB64 = cfg.vibeTransfer.imageUrl.replace(/^data:[^;]+;base64,/, '');
       const str = Number(cfg.vibeTransfer.strength) || 0.5;
@@ -292,12 +323,12 @@ export function useImageGen({ addConsoleLog } = {}) {
       parameters: parametersObj
     };
 
-    log(`发送 NovelAI 请求 -> ${endpoint}`, 'info');
+    log(`发送 NovelAI (${modelName}) 请求 -> ${endpoint}`, 'info');
 
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${cfg.apiKey.trim()}`,
+        'Authorization': `Bearer ${cleanToken}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(payload)
@@ -305,13 +336,16 @@ export function useImageGen({ addConsoleLog } = {}) {
 
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
-      throw new Error(`NovelAI 请求失败 [${res.status}]: ${errText.slice(0, 250)}`);
+      let failHint = `NovelAI 请求失败 [${res.status}]: ${errText.slice(0, 250)}`;
+      if (res.status === 500 && isV4) {
+        failHint += ' 提示: NAI 官方 V4 模型接口可能正忙或 Token 无 V4 权限，可尝试将模型切换为 [nai-diffusion-3 (V3)] 再试。';
+      }
+      throw new Error(failHint);
     }
 
     const contentType = res.headers.get('content-type') || '';
     const arrayBuffer = await res.arrayBuffer();
 
-    // 1. 如果服务器/中转端点返回的是 JSON 数据
     if (contentType.includes('application/json') || isJsonBuffer(arrayBuffer)) {
       try {
         const text = new TextDecoder().decode(arrayBuffer);
@@ -328,7 +362,6 @@ export function useImageGen({ addConsoleLog } = {}) {
       }
     }
 
-    // 2. 解包/提炼 PNG 字节流（针对 NovelAI 官方原版 API 返回的 Zip 压缩包或 Raw PNG）
     const pngBlob = extractPngFromBuffer(arrayBuffer);
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -468,7 +501,6 @@ export function useImageGen({ addConsoleLog } = {}) {
 
 function extractPngFromBuffer(arrayBuffer) {
   const bytes = new Uint8Array(arrayBuffer);
-  // PNG Magic bytes: 0x89 0x50 0x4E 0x47 0x0D 0x0A 0x1A 0x0A
   const pngHeader = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
   let pngStart = -1;
 

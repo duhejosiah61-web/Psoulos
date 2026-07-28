@@ -1,5 +1,5 @@
 // 摆烂版 sw.js：只满足安装条件，不缓存任何文件
-const SW_VERSION = 'v9_20260728_fix_zip_and_endpoints';
+const SW_VERSION = 'v10_20260728_v4_prompt_payload_fix';
 
 // 1. 安装时，立刻接管，不等待
 self.addEventListener('install', event => {
