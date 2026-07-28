@@ -32,7 +32,7 @@ const DEFAULT_CONFIG = {
     dynamicThresholding: false,
     vibeTransfer: {
       enabled: false,
-      json: null
+      data: ''
     },
     positivePrompt: 'masterpiece, best quality, ultra-detailed, highly aesthetic',
     negativePrompt: 'lowres, bad quality, bad anatomy, error, missing fingers, extra digit, jpeg artifacts'
@@ -142,26 +142,31 @@ export function useImageGen({ addConsoleLog } = {}) {
   async function handleVibeFileUpload(file) {
     if (!file) return;
     try {
-      if (file.name.endsWith('.naiv4vibe') || file.type === 'application/json' || file.name.endsWith('.json')) {
-        const text = await file.text();
-        const json = JSON.parse(text);
-        
-        imageGenConfig.novelai.vibeTransfer.json = json;
-        imageGenConfig.novelai.vibeTransfer.enabled = true;
-        log('成功解析并导入 NovelAI Vibe JSON 预设！', 'success');
-      } else {
-        throw new Error('请上传 NovelAI 官网导出的 Vibe JSON 或 .naiv4vibe 文件。不支持直接上传图片。');
+      const text = await file.text();
+      let extractedData = text.trim();
+      
+      try {
+        const json = JSON.parse(extractedData);
+        if (json.vibe_image) extractedData = json.vibe_image;
+        else if (json.image) extractedData = json.image;
+        else if (json.data) extractedData = json.data;
+      } catch (e) {
+        // ignore, just use raw text
       }
+      
+      imageGenConfig.novelai.vibeTransfer.data = extractedData;
+      imageGenConfig.novelai.vibeTransfer.enabled = true;
+      log('成功解析并导入 NovelAI Vibe 预设字符串！', 'success');
     } catch (err) {
-      log('解析 Vibe JSON 失败: ' + err.message, 'error');
-      alert('解析 Vibe JSON 失败：' + err.message);
+      log('解析 Vibe 文件失败: ' + err.message, 'error');
+      alert('解析 Vibe 文件失败：' + err.message);
     }
   }
 
   function removeVibeImage() {
-    imageGenConfig.novelai.vibeTransfer.json = null;
+    imageGenConfig.novelai.vibeTransfer.data = '';
     imageGenConfig.novelai.vibeTransfer.enabled = false;
-    log('Vibe JSON 预设已清空', 'info');
+    log('Vibe 预设已清空', 'info');
   }
 
   /**
@@ -262,16 +267,19 @@ export function useImageGen({ addConsoleLog } = {}) {
 
       console.log("VIBE STATUS", {
         enabled: cfg.vibeTransfer?.enabled,
-        hasJson: !!cfg.vibeTransfer?.json
+        hasData: !!cfg.vibeTransfer?.data
       });
 
       if (
         cfg.vibeTransfer &&
         cfg.vibeTransfer.enabled &&
-        cfg.vibeTransfer.json
+        cfg.vibeTransfer.data
       ) {
-        Object.assign(parametersObj, cfg.vibeTransfer.json);
-        console.log("VIBE ATTACHED", Object.keys(cfg.vibeTransfer.json));
+        parametersObj.reference_image_multiple = cfg.vibeTransfer.data;
+        
+        console.log("VIBE ATTACHED", {
+          length: cfg.vibeTransfer.data.length
+        });
       }
     } else if (isV3) {
       parametersObj = {
