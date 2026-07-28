@@ -12,6 +12,8 @@ const DEFAULT_CONFIG = {
     apiKey: '',
     endpointType: 'official', // 'official' | 'official_api' | 'proxy'
     proxyUrl: '',
+    useCorsProxy: true, // Web 跨域解包代理
+    corsProxyUrl: 'https://corsproxy.io/?',
     model: 'nai-diffusion-4-full', // 推荐 V4 Full
     width: 832,
     height: 1216,
@@ -224,7 +226,7 @@ export function useImageGen({ addConsoleLog } = {}) {
     return imgUrl;
   }
 
-  // NovelAI 引擎 (严格符合 V4 v4_prompt 结构与规范)
+  // NovelAI 引擎 (解决 CORS 拦截、V4 v4_prompt 与 ZIP 解包)
   async function generateViaNovelAI(userPrompt, extraNeg = '') {
     const cfg = imageGenConfig.novelai;
     if (!cfg.apiKey) {
@@ -233,15 +235,20 @@ export function useImageGen({ addConsoleLog } = {}) {
 
     const cleanToken = cfg.apiKey.trim().replace(/^Bearer\s+/i, '');
 
-    let endpoint = 'https://image.novelai.net/ai/generate-image';
+    let targetEndpoint = 'https://image.novelai.net/ai/generate-image';
     if (cfg.endpointType === 'official_api') {
-      endpoint = 'https://api.novelai.net/ai/generate-image';
+      targetEndpoint = 'https://api.novelai.net/ai/generate-image';
     } else if (cfg.endpointType === 'proxy' && cfg.proxyUrl) {
       let pUrl = cfg.proxyUrl.trim();
       if (!pUrl.includes('/ai/generate-image') && !pUrl.includes('/generate-image')) {
         pUrl = pUrl.replace(/\/+$/, '') + '/ai/generate-image';
       }
-      endpoint = pUrl;
+      targetEndpoint = pUrl;
+    }
+
+    let fetchUrl = targetEndpoint;
+    if (cfg.endpointType !== 'proxy' && cfg.useCorsProxy && cfg.corsProxyUrl) {
+      fetchUrl = cfg.corsProxyUrl.trim() + encodeURIComponent(targetEndpoint);
     }
 
     const fullPositive = [cfg.positivePrompt, userPrompt].filter(Boolean).join(', ');
@@ -275,7 +282,6 @@ export function useImageGen({ addConsoleLog } = {}) {
       params_version: 3
     };
 
-    // NAI V4 模型官方要求必须包含 v4_prompt 与 v4_negative_prompt 对象结构
     if (isV4) {
       parametersObj.v4_prompt = {
         caption: {
@@ -298,7 +304,6 @@ export function useImageGen({ addConsoleLog } = {}) {
       if (cfg.smeaDyn) parametersObj.sm_dyn = true;
     }
 
-    // Vibe Transfer (垫图/参考图)
     if (cfg.vibeTransfer && cfg.vibeTransfer.enabled && cfg.vibeTransfer.imageUrl) {
       const rawB64 = cfg.vibeTransfer.imageUrl.replace(/^data:[^;]+;base64,/, '');
       const str = Number(cfg.vibeTransfer.strength) || 0.5;
@@ -323,22 +328,27 @@ export function useImageGen({ addConsoleLog } = {}) {
       parameters: parametersObj
     };
 
-    log(`发送 NovelAI (${modelName}) 请求 -> ${endpoint}`, 'info');
+    log(`发送 NovelAI (${modelName}) 请求 -> ${fetchUrl}`, 'info');
 
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${cleanToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
+    let res;
+    try {
+      res = await fetch(fetchUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${cleanToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+    } catch (netErr) {
+      throw new Error(`网络或跨域(CORS)拦截错误: ${netErr.message}。建议在控制台中勾选 [CORS 跨域中转] 或使用自定义中转反代。`);
+    }
 
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
-      let failHint = `NovelAI 请求失败 [${res.status}]: ${errText.slice(0, 250)}`;
-      if (res.status === 500 && isV4) {
-        failHint += ' 提示: NAI 官方 V4 模型接口可能正忙或 Token 无 V4 权限，可尝试将模型切换为 [nai-diffusion-3 (V3)] 再试。';
+      let failHint = `NovelAI 请求失败 [HTTP ${res.status}]: ${errText.slice(0, 250)}`;
+      if (res.status === 500) {
+        failHint += ' (提示: NAI 官方 V4 节点正忙或账号权限受限，推荐在连线设置中将模型切为 [nai-diffusion-3 (V3)] 或开启跨域中转尝试)。';
       }
       throw new Error(failHint);
     }

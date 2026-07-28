@@ -19,7 +19,7 @@ import { useChatSettings } from './composables/useChatSettings.js';
 import { useChat } from './composables/useChat.js';
 import { useAttachment } from './composables/useAttachment.js';
 import { useConsole } from './composables/useConsole.js';
-import { useImageGen } from './composables/useImageGen.js';
+import { useImageGen } from './composables/useImageGen.js?v=20260728_v11';
 import { useWorkshop } from './composables/useWorkshop.js';
 import { useHome } from './composables/useHome.js';
 import { callAI } from './api.js';
