@@ -6776,13 +6776,12 @@
                     <!-- 1. Pollinations 参数 -->
                     <div v-if="imageGenModalTab === 'pollinations'">
                         <div class="console-form-group">
-                            <label class="console-label">图像尺寸 (Resolution)</label>
-                            <select class="console-select" :value="`${imageGenConfig.pollinations.width}x${imageGenConfig.pollinations.height}`" @change="val => { const [w, h] = val.target.value.split('x').map(Number); imageGenConfig.pollinations.width = w; imageGenConfig.pollinations.height = h; }">
-                                <option value="832x1216">832 x 1216 (3:4 - 推荐人像)</option>
-                                <option value="1024x1024">1024 x 1024 (1:1 正方形)</option>
-                                <option value="1216x832">1216 x 832 (4:3 横屏)</option>
-                                <option value="1080x1920">1080 x 1920 (9:16 壁纸)</option>
-                            </select>
+                            <label class="console-label">图像尺寸 (Width x Height)</label>
+                            <div style="display: flex; gap: 8px;">
+                                <input type="number" class="console-input" placeholder="宽" v-model.number="imageGenConfig.pollinations.width" style="flex: 1;">
+                                <span style="align-self: center;">x</span>
+                                <input type="number" class="console-input" placeholder="高" v-model.number="imageGenConfig.pollinations.height" style="flex: 1;">
+                            </div>
                         </div>
                         <div class="console-form-group">
                             <label class="console-label">模型选择 (Model)</label>
@@ -6824,14 +6823,12 @@
                     <!-- 2. NovelAI 参数 -->
                     <div v-else-if="imageGenModalTab === 'novelai'">
                         <div class="console-form-group">
-                            <label class="console-label">图像尺寸 (Resolution)</label>
-                            <select class="console-select" :value="`${imageGenConfig.novelai.width}x${imageGenConfig.novelai.height}`" @change="val => { const [w, h] = val.target.value.split('x').map(Number); imageGenConfig.novelai.width = w; imageGenConfig.novelai.height = h; }">
-                                <option value="832x1216">832 x 1216 (竖屏 3:4 - 推荐人像)</option>
-                                <option value="1024x1024">1024 x 1024 (正方形 1:1)</option>
-                                <option value="1216x832">1216 x 832 (横屏 4:3 - 推荐风景)</option>
-                                <option value="512x768">512 x 768 (标准竖屏)</option>
-                                <option value="1024x1536">1024 x 1536 (超清竖向画幅)</option>
-                            </select>
+                            <label class="console-label">图像尺寸 (Width x Height)</label>
+                            <div style="display: flex; gap: 8px;">
+                                <input type="number" step="64" class="console-input" placeholder="宽 (建议64的倍数)" v-model.number="imageGenConfig.novelai.width" style="flex: 1;">
+                                <span style="align-self: center;">x</span>
+                                <input type="number" step="64" class="console-input" placeholder="高 (建议64的倍数)" v-model.number="imageGenConfig.novelai.height" style="flex: 1;">
+                            </div>
                         </div>
                         <div class="console-form-group">
                             <label class="console-label">采样步数 (Steps): {{ imageGenConfig.novelai.steps }}</label>
