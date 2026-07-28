@@ -12,7 +12,7 @@ const DEFAULT_CONFIG = {
     apiKey: '',
     endpointType: 'official', // 'official' | 'proxy'
     proxyUrl: '',
-    model: 'nai-diffusion-4-5-full',
+    model: 'nai-diffusion-4-full', // 正确官方 API 模型名称
     width: 832,
     height: 1216,
     steps: 28,
@@ -31,7 +31,8 @@ const DEFAULT_CONFIG = {
     vibeTransfer: {
       enabled: false,
       imageUrl: '',
-      strength: 0.5
+      strength: 0.5,
+      infoExtracted: 1.0
     },
     positivePrompt: 'masterpiece, best quality, ultra-detailed, highly aesthetic',
     negativePrompt: 'lowres, bad quality, bad anatomy, error, missing fingers, extra digit, jpeg artifacts'
@@ -85,7 +86,7 @@ const DEFAULT_CONFIG = {
 export function useImageGen({ addConsoleLog } = {}) {
   const imageGenConfig = reactive(loadConfig());
   const showImageGenSettingsModal = ref(false);
-  const showNovelAiSettingsModal = showImageGenSettingsModal; // 兼容兼容项
+  const showNovelAiSettingsModal = showImageGenSettingsModal;
   const imageGenModalTab = ref('novelai');
   const isGeneratingTestImage = ref(false);
   const testImageResult = ref('');
@@ -106,6 +107,10 @@ export function useImageGen({ addConsoleLog } = {}) {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
+        // 自动将废弃的错误模型标识升级修正为正确 API 名称
+        if (parsed.novelai && (parsed.novelai.model === 'nai-diffusion-4-5-full' || !parsed.novelai.model)) {
+          parsed.novelai.model = 'nai-diffusion-4-full';
+        }
         return deepMerge(JSON.parse(JSON.stringify(DEFAULT_CONFIG)), parsed);
       }
     } catch (e) {
@@ -134,6 +139,50 @@ export function useImageGen({ addConsoleLog } = {}) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(imageGenConfig));
     } catch (e) { /* ignore */ }
   }, { deep: true });
+
+  /**
+   * 上传参考图与解析 .naiv4vibe 垫图文件
+   */
+  async function handleVibeFileUpload(file) {
+    if (!file) return;
+    try {
+      if (file.name.endsWith('.naiv4vibe') || file.type === 'application/json') {
+        const text = await file.text();
+        try {
+          const json = JSON.parse(text);
+          const b64 = json.image || json.base64 || json.vibe_image || json.vibe;
+          if (b64) {
+            const dataUrl = b64.startsWith('data:') ? b64 : `data:image/png;base64,${b64}`;
+            imageGenConfig.novelai.vibeTransfer.imageUrl = dataUrl;
+            imageGenConfig.novelai.vibeTransfer.enabled = true;
+            if (json.strength !== undefined) imageGenConfig.novelai.vibeTransfer.strength = Number(json.strength);
+            log('成功解析并导入 .naiv4vibe 预设画风包！', 'success');
+            return;
+          }
+        } catch (e) {
+          /* try raw image reader fallback */
+        }
+      }
+
+      // 普通图片文件处理
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        imageGenConfig.novelai.vibeTransfer.imageUrl = e.target.result;
+        imageGenConfig.novelai.vibeTransfer.enabled = true;
+        log('画风/垫图参考图片上传成功！', 'success');
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      log('解析参考图文件失败: ' + err.message, 'error');
+      alert('解析参考图文件失败：' + err.message);
+    }
+  }
+
+  function removeVibeImage() {
+    imageGenConfig.novelai.vibeTransfer.imageUrl = '';
+    imageGenConfig.novelai.vibeTransfer.enabled = false;
+    log('参考图已清空', 'info');
+  }
 
   /**
    * 核心生图入口函数
@@ -192,26 +241,51 @@ export function useImageGen({ addConsoleLog } = {}) {
     const fullNegative = [cfg.negativePrompt, extraNeg].filter(Boolean).join(', ');
     const seed = cfg.seed === -1 ? Math.floor(Math.random() * 999999999) : cfg.seed;
 
+    // 校正并规范化模型名 (避免由于模型标识非官方导致的 500 错误)
+    let modelName = cfg.model || 'nai-diffusion-4-full';
+    if (modelName === 'nai-diffusion-4-5-full') modelName = 'nai-diffusion-4-full';
+
+    const width = Math.floor((cfg.width || 832) / 64) * 64;
+    const height = Math.floor((cfg.height || 1216) / 64) * 64;
+
+    const parametersObj = {
+      width,
+      height,
+      scale: Number(cfg.cfgScale) || 5.0,
+      sampler: cfg.sampler || 'k_euler',
+      steps: Number(cfg.steps) || 28,
+      seed: seed,
+      n_samples: 1,
+      uc: fullNegative,
+      qualityToggle: !!cfg.qualityTags,
+      noise_schedule: cfg.noiseSchedule || 'karras',
+      cfg_rescale: Number(cfg.cfgRescale) || 0
+    };
+
+    // Vibe Transfer (垫图/参考图) 注入
+    if (cfg.vibeTransfer && cfg.vibeTransfer.enabled && cfg.vibeTransfer.imageUrl) {
+      const rawB64 = cfg.vibeTransfer.imageUrl.replace(/^data:[^;]+;base64,/, '');
+      const str = Number(cfg.vibeTransfer.strength) || 0.5;
+      const info = Number(cfg.vibeTransfer.infoExtracted) || 1.0;
+
+      parametersObj.vibe_transfer = {
+        images: [rawB64],
+        information_extracted: [info],
+        reference_strength: [str]
+      };
+      // 兼容非官方代理端点的简易参数名
+      parametersObj.reference_image = rawB64;
+      parametersObj.reference_strength = str;
+      parametersObj.reference_information_extracted = info;
+
+      log('已在 NovelAI 请求中附加 Vibe Transfer 参考图与强度数据', 'info');
+    }
+
     const payload = {
       action: 'generate',
       input: fullPositive,
-      model: cfg.model || 'nai-diffusion-4-5-full',
-      parameters: {
-        width: cfg.width || 832,
-        height: cfg.height || 1216,
-        scale: cfg.cfgScale || 5.0,
-        sampler: cfg.sampler || 'k_euler',
-        steps: cfg.steps || 28,
-        seed: seed,
-        n_samples: 1,
-        uc: fullNegative,
-        qualityToggle: cfg.qualityTags,
-        noise_schedule: cfg.noiseSchedule || 'karras',
-        smea: cfg.smea,
-        smea_dyn: cfg.smeaDyn,
-        uncond_scale: cfg.undesiredStrength || 1.0,
-        cfg_rescale: cfg.cfgRescale || 0
-      }
+      model: modelName,
+      parameters: parametersObj
     };
 
     const res = await fetch(endpoint, {
@@ -225,7 +299,7 @@ export function useImageGen({ addConsoleLog } = {}) {
 
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
-      throw new Error(`NovelAI 请求失败 [${res.status}]: ${errText.slice(0, 200)}`);
+      throw new Error(`NovelAI 请求失败 [${res.status}]: ${errText.slice(0, 250)}`);
     }
 
     const blob = await res.blob();
@@ -353,6 +427,8 @@ export function useImageGen({ addConsoleLog } = {}) {
     showNovelAiSettingsModal,
     imageGenModalTab,
     openImageGenSettingsModal,
+    handleVibeFileUpload,
+    removeVibeImage,
     isGeneratingTestImage,
     testImageResult,
     testPromptInput,

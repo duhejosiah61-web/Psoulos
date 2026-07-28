@@ -5370,9 +5370,10 @@
                                 <div class="console-form-group">
                                     <label class="console-label">生图模型</label>
                                     <select class="console-select" v-model="imageGenConfig.novelai.model">
-                                        <option value="nai-diffusion-4-5-full">nai-diffusion-4-5-full (最新 V4.5 Full)</option>
-                                        <option value="nai-diffusion-4-curated">nai-diffusion-4-curated (V4 精选)</option>
+                                        <option value="nai-diffusion-4-full">nai-diffusion-4-full (V4 Full 推荐)</option>
+                                        <option value="nai-diffusion-4-curated-preview">nai-diffusion-4-curated-preview (V4 Curated)</option>
                                         <option value="nai-diffusion-3">nai-diffusion-3 (V3 Anime)</option>
+                                        <option value="furry-diffusion-3">furry-diffusion-3 (V3 Furry)</option>
                                     </select>
                                 </div>
                                 <button class="console-btn console-btn-secondary console-btn-full" @click="openImageGenSettingsModal('novelai')" style="margin-bottom: 10px;">
@@ -6876,6 +6877,56 @@
                                 </div>
                             </div>
                         </div>
+                        <!-- 画风参考 (Vibe Transfer / 垫图 / 解析 naiv4vibe) 卡片区块 -->
+                        <div style="margin: 14px 0; background: rgba(108,92,231,0.05); border: 1px dashed rgba(108,92,231,0.25); padding: 12px; border-radius: 10px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                <div style="font-size: 13px; font-weight: 600; color: #4834d4;">
+                                    <i class="fas fa-image" style="margin-right: 4px;"></i> 画风参考 (Vibe Transfer)
+                                </div>
+                                <div class="setting-toggle" @click="imageGenConfig.novelai.vibeTransfer.enabled = !imageGenConfig.novelai.vibeTransfer.enabled">
+                                    <div class="toggle-slider" :class="{ active: imageGenConfig.novelai.vibeTransfer.enabled }">
+                                        <div class="toggle-thumb"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="font-size: 11px; color: #666; margin-bottom: 10px; line-height: 1.4;">
+                                支持上传图片或直接导入 NovelAI 专属 <strong>.naiv4vibe</strong> 垫图文件，精确提取与融合画风及色彩。
+                            </div>
+
+                            <!-- 上传/导入/移除按钮组 -->
+                            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px;">
+                                <label class="console-btn console-btn-secondary" style="margin: 0; font-size: 11px; padding: 6px 10px; cursor: pointer;">
+                                    <i class="fas fa-upload"></i> 上传参考图
+                                    <input type="file" accept="image/*,.naiv4vibe" style="display: none;" @change="e => e.target.files[0] && handleVibeFileUpload(e.target.files[0])">
+                                </label>
+                                <label class="console-btn console-btn-secondary" style="margin: 0; font-size: 11px; padding: 6px 10px; cursor: pointer;">
+                                    <i class="fas fa-file-import"></i> 导入 naiv4vibe 文件
+                                    <input type="file" accept=".naiv4vibe,application/json,image/*" style="display: none;" @change="e => e.target.files[0] && handleVibeFileUpload(e.target.files[0])">
+                                </label>
+                                <button v-if="imageGenConfig.novelai.vibeTransfer.imageUrl" class="console-btn console-btn-danger" style="margin: 0; font-size: 11px; padding: 6px 10px;" @click="removeVibeImage">
+                                    <i class="fas fa-trash-alt"></i> 移除参考图
+                                </button>
+                            </div>
+
+                            <!-- 缩略图预览 -->
+                            <div v-if="imageGenConfig.novelai.vibeTransfer.imageUrl" style="margin-bottom: 10px; text-align: center; background: rgba(0,0,0,0.03); padding: 8px; border-radius: 6px;">
+                                <img :src="imageGenConfig.novelai.vibeTransfer.imageUrl" style="max-height: 120px; max-width: 100%; border-radius: 6px; border: 1px solid rgba(0,0,0,0.15); box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                            </div>
+
+                            <!-- 滑块：画风强度 -->
+                            <div v-if="imageGenConfig.novelai.vibeTransfer.enabled" class="console-form-group" style="margin-bottom: 8px;">
+                                <label class="console-label" style="font-size: 12px;">画风强度 (Strength): {{ imageGenConfig.novelai.vibeTransfer.strength }}</label>
+                                <input type="range" class="console-slider" min="0.1" max="1.0" step="0.05" v-model.number="imageGenConfig.novelai.vibeTransfer.strength">
+                                <div style="font-size: 11px; color: #999;">推荐值 0.5 - 0.7（控制融合参考图风味的比例）</div>
+                            </div>
+
+                            <!-- 滑块：信息提取度 -->
+                            <div v-if="imageGenConfig.novelai.vibeTransfer.enabled" class="console-form-group" style="margin-bottom: 0;">
+                                <label class="console-label" style="font-size: 12px;">信息提取度 (Information Extracted): {{ imageGenConfig.novelai.vibeTransfer.infoExtracted || 1.0 }}</label>
+                                <input type="range" class="console-slider" min="0.1" max="1.0" step="0.05" v-model.number="imageGenConfig.novelai.vibeTransfer.infoExtracted">
+                            </div>
+                        </div>
+
                         <div class="console-form-group">
                             <label class="console-label">默认正面提示词 (Positive Prompts)</label>
                             <textarea class="console-input" rows="2" v-model="imageGenConfig.novelai.positivePrompt"></textarea>

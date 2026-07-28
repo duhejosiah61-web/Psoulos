@@ -4446,6 +4446,8 @@ ${styleGuide}
             showNovelAiSettingsModal: imageGen.showNovelAiSettingsModal,
             imageGenModalTab: imageGen.imageGenModalTab,
             openImageGenSettingsModal: imageGen.openImageGenSettingsModal,
+            handleVibeFileUpload: imageGen.handleVibeFileUpload,
+            removeVibeImage: imageGen.removeVibeImage,
             isGeneratingTestImage: imageGen.isGeneratingTestImage,
             testImageResult: imageGen.testImageResult,
             testPromptInput: imageGen.testPromptInput,
