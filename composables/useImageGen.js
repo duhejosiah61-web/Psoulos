@@ -142,8 +142,9 @@ export function useImageGen({ addConsoleLog } = {}) {
   async function handleVibeFileUpload(file) {
     if (!file) return;
     try {
-      const text = await file.text();
-      let extractedData = text.trim();
+      const arrayBuffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let extractedData = new TextDecoder().decode(bytes).trim();
       
       try {
         const json = JSON.parse(extractedData);
@@ -275,7 +276,7 @@ export function useImageGen({ addConsoleLog } = {}) {
         cfg.vibeTransfer.enabled &&
         cfg.vibeTransfer.data
       ) {
-        parametersObj.reference_image_multiple = cfg.vibeTransfer.data;
+        parametersObj.vibe = cfg.vibeTransfer.data;
         
         console.log("VIBE ATTACHED", {
           length: cfg.vibeTransfer.data.length
