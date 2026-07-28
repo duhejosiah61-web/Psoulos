@@ -1760,9 +1760,14 @@ export function useChat(
                 if (index !== -1) {
                     if (msg.sender === 'ai' || msg.sender === 'system') {
                         chatMsgs.splice(index, 1);
-                        syncActiveChatState();
-                        persistActiveChat();
+                    } else if (msg.sender === 'user') {
+                        const nextAiIndex = chatMsgs.findIndex((m, i) => i > index && m.sender === 'ai');
+                        if (nextAiIndex !== -1) {
+                            chatMsgs.splice(nextAiIndex, 1);
+                        }
                     }
+                    syncActiveChatState();
+                    persistActiveChat();
                     triggerSoulLinkAiReply({ skipBusySimulation: true });
                 }
                 break;

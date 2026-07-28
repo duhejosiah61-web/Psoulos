@@ -3787,7 +3787,6 @@ ${styleGuide}
         const onSendOrCall = () => {
             if (soulLinkInput.value && soulLinkInput.value.trim()) {
                 sendSoulLinkMessage();
-                triggerSoulLinkAiReply();
             } else {
                 chatSettings.lastUserActiveAt = Date.now();
                 triggerSoulLinkAiReply();

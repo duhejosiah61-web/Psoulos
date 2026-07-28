@@ -403,28 +403,22 @@ export function useAttachment(opts) {
 
     const handleRetry = async () => {
         showAttachmentPanel.value = false;
-        const isGroupChat = soulLinkActiveChatType.value === 'group';
-        const history = isGroupChat
-            ? (activeGroupChat.value?.history || [])
-            : (soulLinkMessages.value[soulLinkActiveChat.value] || []);
-        if (history.length === 0) {
+        const history = getActiveChatHistory ? getActiveChatHistory() : (
+            soulLinkActiveChatType.value === 'group'
+                ? (activeGroupChat.value?.history || [])
+                : (soulLinkMessages.value[soulLinkActiveChat.value] || [])
+        );
+        if (!history || history.length === 0) {
             alert('没有可重试的消息');
             return;
         }
         const lastAiMsgIndex = history.map((m, i) => ({ ...m, index: i })).reverse().find(m => m.sender === 'ai');
-        if (!lastAiMsgIndex) {
-            alert('没有可重试的AI回复');
-            return;
+        if (lastAiMsgIndex) {
+            history.splice(lastAiMsgIndex.index, 1);
+            if (typeof syncActiveChatState === 'function') syncActiveChatState();
+            if (typeof persistActiveChat === 'function') persistActiveChat();
         }
-        history.splice(lastAiMsgIndex.index, 1);
-        pushMessageToActiveChat({
-            id: Date.now(),
-            sender: 'system',
-            text: '正在重新生成回复...',
-            timestamp: Date.now(),
-            isSystem: true
-        });
-        await triggerSoulLinkAiReply();
+        await triggerSoulLinkAiReply({ skipBusySimulation: true });
     };
 
     const handleTakeaway = () => {
