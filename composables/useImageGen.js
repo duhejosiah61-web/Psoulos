@@ -276,7 +276,7 @@ export function useImageGen({ addConsoleLog } = {}) {
         cfg.vibeTransfer.enabled &&
         cfg.vibeTransfer.data
       ) {
-        parametersObj.vibe = cfg.vibeTransfer.data;
+        parametersObj.reference_image_multiple = [cfg.vibeTransfer.data];
         
         console.log("VIBE ATTACHED", {
           length: cfg.vibeTransfer.data.length
