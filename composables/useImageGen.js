@@ -277,8 +277,18 @@ export function useImageGen({ addConsoleLog } = {}) {
         }
       };
 
-      if (cfg.vibeTransfer && cfg.vibeTransfer.enabled && cfg.vibeTransfer.imageUrl) {
-        const base64Data = cfg.vibeTransfer.imageUrl.split(',')[1] || cfg.vibeTransfer.imageUrl;
+      console.log("VIBE STATUS", {
+        enabled: cfg.vibeTransfer?.enabled,
+        hasImage: !!cfg.vibeTransfer?.imageUrl,
+        strength: cfg.vibeTransfer?.strength,
+        info: cfg.vibeTransfer?.infoExtracted
+      });
+
+      if (cfg.vibeTransfer?.enabled && cfg.vibeTransfer?.imageUrl) {
+        let base64Data = cfg.vibeTransfer.imageUrl;
+        if (base64Data.includes(',')) {
+          base64Data = base64Data.split(',')[1];
+        }
         parametersObj.reference_image_multiple = [
           {
             image: base64Data,
