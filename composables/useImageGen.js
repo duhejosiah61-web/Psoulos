@@ -337,8 +337,11 @@ export function useImageGen({ addConsoleLog } = {}) {
 
     const contentType = res.headers.get('content-type') || '';
     const arrayBuffer = await res.arrayBuffer();
+    
+    const bytes = new Uint8Array(arrayBuffer);
+    const isZipFile = bytes.length > 4 && bytes[0] === 0x50 && bytes[1] === 0x4B && bytes[2] === 0x03 && bytes[3] === 0x04;
 
-    if (contentType.includes('application/zip') || contentType.includes('application/x-zip-compressed')) {
+    if (isZipFile || contentType.includes('zip')) {
       try {
         const JSZip = (await import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm')).default;
         const zip = await JSZip.loadAsync(arrayBuffer);
