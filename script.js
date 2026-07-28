@@ -1938,7 +1938,8 @@ export function setupApp() {
             persistActiveChat,
             isAiTyping,
             showChatSettings,
-            soulLinkPet
+            soulLinkPet,
+            generateImage: imageGen.generateImage
         });
 
         const {
@@ -4381,7 +4382,7 @@ ${styleGuide}
             showVotePanel, voteQuestion, voteOptions, addVoteOption, removeVoteOption, createVote, castVoteInChat,
             showTaobaoPanel, taobaoSearchTerm, taobaoProducts, taobaoLoading, openTaobaoPanel, searchTaobaoProducts, buyTaobaoProduct, helpBuyTaobaoProduct, confirmHelpBuy,
             showSharePanel, shareSource, shareContent, shareSources, sendShareCard,
-            showPhotoSelectPanel, showTextImagePanel, textImageText, textImageBgColor, textImageColors,
+            showPhotoSelectPanel, showTextImagePanel, textImageText, textImageBgColor, textImageColors, isGeneratingChatImage: attachment.isGeneratingChatImage,
             showVoiceInputPanel, voiceInputText, sendVoiceMessage, closeVoiceInputPanel, toggleVoicePlayback, onChatBackgroundClick,
             showImageCropModal, imageCropSource, imageCropRect, imageCropScale, imageCropCanvasAspect,
             closeImageCropModal, confirmImageCrop, onImageCropDragStart, onImageCropScaleChange,

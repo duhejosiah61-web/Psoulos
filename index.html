@@ -4130,45 +4130,32 @@
                     </div>
                     <div class="photo-option" @click="showTextImagePanel = true; showPhotoSelectPanel = false">
                         <div class="option-icon">
-                            <i class="fas fa-font"></i>
+                            <i class="fas fa-magic"></i>
                         </div>
-                        <span class="option-label">文字图</span>
-                        <span class="option-desc">使用文字创建美化卡片</span>
+                        <span class="option-label">文生图</span>
+                        <span class="option-desc">AI 生成图片</span>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- 文字图创建面板 -->
+        <!-- 文生图创建面板 -->
         <div v-if="showTextImagePanel" class="text-image-overlay" @click.self="showTextImagePanel = false">
             <div class="text-image-panel">
                 <div class="text-image-header">
                     <button class="back-btn-small" @click="showTextImagePanel = false; showPhotoSelectPanel = true"><i class="fas fa-arrow-left"></i></button>
-                    <h3>创建文字图</h3>
+                    <h3>AI 文生图</h3>
                     <div style="width: 40px;"></div>
                 </div>
-                <div class="text-image-content">
-                    <div class="text-image-preview">
-                        <div class="text-card-preview" :style="{ background: textImageBgColor }">
-                            <div class="text-card-decoration"></div>
-                            <div class="text-card-text">{{ textImageText || '输入文字...' }}</div>
-                        </div>
-                    </div>
-                    <div class="text-image-controls">
-                        <textarea name="sp_field_83" id="sp-field-83" v-model="textImageText" placeholder="输入要显示的文字..." class="text-image-input" maxlength="50"></textarea>
-                        <div class="color-options">
-                            <span class="color-label">选择背景:</span>
-                            <div class="color-grid">
-                                <div v-for="color in textImageColors" :key="color" 
-                                     class="color-option" 
-                                     :class="{ active: textImageBgColor === color }"
-                                     :style="{ background: color }"
-                                     @click="textImageBgColor = color"></div>
-                            </div>
-                        </div>
+                <div class="text-image-content" style="padding: 20px;">
+                    <div class="text-image-controls" style="width: 100%;">
+                        <textarea name="sp_field_83" id="sp-field-83" v-model="textImageText" placeholder="输入画面描述 (Prompt)..." class="text-image-input" style="height: 120px; font-size: 15px; border: 1px solid rgba(0,0,0,0.1); border-radius: 8px; padding: 12px; background: rgba(0,0,0,0.02);"></textarea>
                     </div>
                 </div>
-                <button class="send-text-image-btn" @click="sendTextImage" :disabled="!textImageText.trim()">发送</button>
+                <button class="send-text-image-btn" @click="sendTextImage" :disabled="!textImageText.trim() || isGeneratingChatImage">
+                    <i class="fas" :class="isGeneratingChatImage ? 'fa-spinner fa-spin' : 'fa-magic'"></i>
+                    {{ isGeneratingChatImage ? '生成中...' : '生成并发送' }}
+                </button>
             </div>
         </div>
 

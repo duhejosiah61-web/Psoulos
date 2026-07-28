@@ -47,7 +47,8 @@ export function useAttachment(opts) {
         persistActiveChat,
         isAiTyping,
         showChatSettings,
-        soulLinkPet
+        soulLinkPet,
+        generateImage
     } = opts;
 
     // 未注入压缩函数时同步直通（不包一层 Promise/setTimeout）
@@ -271,7 +272,7 @@ export function useAttachment(opts) {
         } catch (error) {
             const fallbackLoc = pickLocationName();
             aiAddress.value = fallbackLoc;
-            calculatedDistance.value = buildDistanceText(userAddress.value, fallbackLoc);
+            calculatedDistance.value = buildDistanceText(userAddress.value, locationName);
         }
     };
 
@@ -883,27 +884,39 @@ export function useAttachment(opts) {
         input.click();
     };
 
-    const sendTextImage = () => {
-        if (!textImageText.value.trim()) return;
-        const msg = {
-            id: Date.now(),
-            sender: 'user',
-            messageType: 'textImage',
-            textImageText: textImageText.value,
-            textImageBgColor: textImageBgColor.value,
-            text: '文字图',
-            timestamp: Date.now(),
-            isReplied: false,
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        };
-        if (soulLinkActiveChatType.value === 'group') {
-            msg.senderName = '我';
+    const isGeneratingChatImage = ref(false);
+
+    const sendTextImage = async () => {
+        if (!textImageText.value.trim() || isGeneratingChatImage.value) return;
+        
+        isGeneratingChatImage.value = true;
+        try {
+            const imageUrl = await generateImage({ prompt: textImageText.value });
+            if (imageUrl) {
+                const msg = {
+                    id: Date.now(),
+                    sender: 'user',
+                    messageType: 'image',
+                    image: imageUrl,
+                    timestamp: Date.now(),
+                    isReplied: false,
+                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                };
+                if (soulLinkActiveChatType.value === 'group') {
+                    msg.senderName = '我';
+                }
+                pushMessageToActiveChat(msg);
+                saveSoulLinkMessages();
+                textImageText.value = '';
+                showTextImagePanel.value = false;
+                scrollToBottom();
+            }
+        } catch (error) {
+            console.error('文生图失败:', error);
+            alert('文生图失败: ' + (error.message || '未知错误'));
+        } finally {
+            isGeneratingChatImage.value = false;
         }
-        pushMessageToActiveChat(msg);
-        saveSoulLinkMessages();
-        textImageText.value = '';
-        showTextImagePanel.value = false;
-        scrollToBottom();
     };
 
     const addTrajectoryPoint = () => {
@@ -935,6 +948,8 @@ export function useAttachment(opts) {
         textImageText,
         textImageBgColor,
         textImageColors,
+        sendTextImage,
+        isGeneratingChatImage,
         voiceInputText,
         virtualImageDesc,
         voteQuestion,
