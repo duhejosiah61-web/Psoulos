@@ -12,7 +12,7 @@ const DEFAULT_CONFIG = {
     apiKey: '',
     endpointType: 'official', // 'official' | 'official_api' | 'proxy'
     proxyUrl: '',
-    useCorsProxy: true, // Web 跨域解包代理
+    useCorsProxy: false, // Web 跨域解包代理
     corsProxyUrl: 'https://corsproxy.io/?',
     model: 'nai-diffusion-4-5-full', // 推荐 V4.5 Full
     width: 832,
@@ -338,26 +338,6 @@ export function useImageGen({ addConsoleLog } = {}) {
     const contentType = res.headers.get('content-type') || '';
     const arrayBuffer = await res.arrayBuffer();
     
-    const bytes = new Uint8Array(arrayBuffer);
-    const isZipFile = bytes.length > 4 && bytes[0] === 0x50 && bytes[1] === 0x4B && bytes[2] === 0x03 && bytes[3] === 0x04;
-
-    if (isZipFile || contentType.includes('zip')) {
-      try {
-        const JSZip = (await import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm')).default;
-        const zip = await JSZip.loadAsync(arrayBuffer);
-        const files = Object.keys(zip.files);
-        for (const filename of files) {
-          if (filename.endsWith('.png')) {
-            const base64 = await zip.file(filename).async('base64');
-            return `data:image/png;base64,${base64}`;
-          }
-        }
-        throw new Error('ZIP 中未找到 PNG 图像');
-      } catch (err) {
-        throw new Error(`解压ZIP失败: ${err.message}`);
-      }
-    }
-
     if (contentType.includes('application/json') || isJsonBuffer(arrayBuffer)) {
       try {
         const text = new TextDecoder().decode(arrayBuffer);
@@ -371,13 +351,20 @@ export function useImageGen({ addConsoleLog } = {}) {
       }
     }
 
-    const pngBlob = extractPngFromBuffer(arrayBuffer);
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(pngBlob);
-    });
+    try {
+      const JSZip = (await import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm')).default;
+      const zip = await JSZip.loadAsync(arrayBuffer);
+      const pngName = Object.keys(zip.files).find(name => name.toLowerCase().endsWith('.png'));
+
+      if (!pngName) {
+        throw new Error('NAI ZIP 中没有找到 PNG: ' + Object.keys(zip.files).join(','));
+      }
+
+      const blob = await zip.files[pngName].async('blob');
+      return URL.createObjectURL(blob);
+    } catch (err) {
+      throw new Error(`解压ZIP失败: ${err.message}`);
+    }
   }
 
   // OpenAI DALL-E 引擎
