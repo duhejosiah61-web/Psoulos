@@ -284,19 +284,20 @@ export function useImageGen({ addConsoleLog } = {}) {
         info: cfg.vibeTransfer?.infoExtracted
       });
 
-      if (cfg.vibeTransfer?.enabled && cfg.vibeTransfer?.imageUrl) {
-        let base64Data = cfg.vibeTransfer.imageUrl;
-        if (base64Data.includes(',')) {
-          base64Data = base64Data.split(',')[1];
-        }
-        parametersObj.reference_image_multiple = [
-          {
-            image: base64Data,
-            strength: cfg.vibeTransfer.strength !== undefined ? Number(cfg.vibeTransfer.strength) : 0.5,
-            information_extracted: cfg.vibeTransfer.infoExtracted !== undefined ? Number(cfg.vibeTransfer.infoExtracted) : 1.0
-          }
-        ];
-        console.log('NAI PAYLOAD: reference_image_multiple 存在。');
+      if (
+        cfg.vibeTransfer &&
+        cfg.vibeTransfer.enabled &&
+        cfg.vibeTransfer.imageUrl
+      ) {
+        const base64Data = cfg.vibeTransfer.imageUrl
+          .replace(/^data:image\/\w+;base64,/, '')
+          .trim();
+
+        parametersObj.reference_image_multiple = base64Data;
+
+        console.log("VIBE ATTACHED", {
+          length: base64Data.length
+        });
       }
     } else if (isV3) {
       parametersObj = {
