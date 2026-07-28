@@ -1880,7 +1880,7 @@ export function setupApp() {
         const peek = reactive(usePeek(characters, activeProfile, soulLinkMessages, soulLinkGroups));
         const games = reactive(useGames(activeProfile, characters));
         const read = reactive(useRead(characters, worldbooks, presets, activeProfile));
-        const nest = reactive(useNest(characters, soulLinkMessages, soulLinkActiveChat));
+        const nest = reactive(useNest(characters, soulLinkMessages, soulLinkActiveChat, activeProfile));
 
         attachSoulStoreCoordinators({
             soulLinkActiveChat,
@@ -4715,6 +4715,11 @@ ${styleGuide}
             imageCropRect: ref({ x: 0.1, y: 0.1, w: 0.8, h: 0.8 }),
             imageCropScale: ref(0.82),
             imageCropCanvasAspect: computed(() => 1),
+            nest: ref({}),
+            showNestNoteModal: ref(false),
+            selectedNestNote: ref(null),
+            openNestNote: noop,
+            closeNestNoteModal: noop,
             closeImageCropModal: noop,
             confirmImageCrop: noop,
             onImageCropDragStart: noop,

@@ -1,5 +1,5 @@
 import { ref, computed, watch } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
-import { callAI } from './api.js';
+import { callAI } from '../api.js';
 
 const buildCharacterIdentityPrompt = (char) => {
     if (!char) return '';
