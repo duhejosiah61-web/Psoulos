@@ -10,7 +10,7 @@ const DEFAULT_CONFIG = {
 
   novelai: {
     apiKey: '',
-    endpointType: 'official', // 'official' | 'proxy'
+    endpointType: 'official', // 'official' | 'official_api' | 'proxy'
     proxyUrl: '',
     model: 'nai-diffusion-4-full', // 正确官方 API 模型名称
     width: 832,
@@ -107,7 +107,6 @@ export function useImageGen({ addConsoleLog } = {}) {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        // 自动将废弃的错误模型标识升级修正为正确 API 名称
         if (parsed.novelai && (parsed.novelai.model === 'nai-diffusion-4-5-full' || !parsed.novelai.model)) {
           parsed.novelai.model = 'nai-diffusion-4-full';
         }
@@ -160,7 +159,7 @@ export function useImageGen({ addConsoleLog } = {}) {
             return;
           }
         } catch (e) {
-          /* try raw image reader fallback */
+          /* fallback */
         }
       }
 
@@ -226,22 +225,28 @@ export function useImageGen({ addConsoleLog } = {}) {
     return imgUrl;
   }
 
-  // NovelAI 引擎
+  // NovelAI 引擎 (兼容 ZIP 解包、PNG 直出与中转 JSON 数据)
   async function generateViaNovelAI(userPrompt, extraNeg = '') {
     const cfg = imageGenConfig.novelai;
     if (!cfg.apiKey) {
       throw new Error('NovelAI API Key 未填写，请在控制台设置。');
     }
 
-    const endpoint = cfg.endpointType === 'proxy' && cfg.proxyUrl
-      ? cfg.proxyUrl
-      : 'https://image.novelai.net/ai/generate-image';
+    let endpoint = 'https://image.novelai.net/ai/generate-image';
+    if (cfg.endpointType === 'official_api') {
+      endpoint = 'https://api.novelai.net/ai/generate-image';
+    } else if (cfg.endpointType === 'proxy' && cfg.proxyUrl) {
+      let pUrl = cfg.proxyUrl.trim();
+      if (!pUrl.includes('/ai/generate-image') && !pUrl.includes('/generate-image')) {
+        pUrl = pUrl.replace(/\/+$/, '') + '/ai/generate-image';
+      }
+      endpoint = pUrl;
+    }
 
     const fullPositive = [cfg.positivePrompt, userPrompt].filter(Boolean).join(', ');
     const fullNegative = [cfg.negativePrompt, extraNeg].filter(Boolean).join(', ');
     const seed = cfg.seed === -1 ? Math.floor(Math.random() * 999999999) : cfg.seed;
 
-    // 校正并规范化模型名 (避免由于模型标识非官方导致的 500 错误)
     let modelName = cfg.model || 'nai-diffusion-4-full';
     if (modelName === 'nai-diffusion-4-5-full') modelName = 'nai-diffusion-4-full';
 
@@ -273,12 +278,11 @@ export function useImageGen({ addConsoleLog } = {}) {
         information_extracted: [info],
         reference_strength: [str]
       };
-      // 兼容非官方代理端点的简易参数名
       parametersObj.reference_image = rawB64;
       parametersObj.reference_strength = str;
       parametersObj.reference_information_extracted = info;
 
-      log('已在 NovelAI 请求中附加 Vibe Transfer 参考图与强度数据', 'info');
+      log('已在 NovelAI 请求中附加 Vibe Transfer 参考图数据', 'info');
     }
 
     const payload = {
@@ -287,6 +291,8 @@ export function useImageGen({ addConsoleLog } = {}) {
       model: modelName,
       parameters: parametersObj
     };
+
+    log(`发送 NovelAI 请求 -> ${endpoint}`, 'info');
 
     const res = await fetch(endpoint, {
       method: 'POST',
@@ -302,12 +308,33 @@ export function useImageGen({ addConsoleLog } = {}) {
       throw new Error(`NovelAI 请求失败 [${res.status}]: ${errText.slice(0, 250)}`);
     }
 
-    const blob = await res.blob();
+    const contentType = res.headers.get('content-type') || '';
+    const arrayBuffer = await res.arrayBuffer();
+
+    // 1. 如果服务器/中转端点返回的是 JSON 数据
+    if (contentType.includes('application/json') || isJsonBuffer(arrayBuffer)) {
+      try {
+        const text = new TextDecoder().decode(arrayBuffer);
+        const json = JSON.parse(text);
+        if (json.image) return json.image.startsWith('data:') ? json.image : `data:image/png;base64,${json.image}`;
+        if (json.images?.[0]) return json.images[0].startsWith('data:') ? json.images[0] : `data:image/png;base64,${json.images[0]}`;
+        if (json.data?.[0]?.b64_json) return `data:image/png;base64,${json.data[0].b64_json}`;
+        if (json.data?.[0]?.url) return json.data[0].url;
+        if (json.errorMessage || json.message || json.error) {
+          throw new Error(`NovelAI 接口返回错误: ${json.errorMessage || json.message || json.error}`);
+        }
+      } catch (e) {
+        if (e.message.startsWith('NovelAI 接口返回错误')) throw e;
+      }
+    }
+
+    // 2. 解包/提炼 PNG 字节流（针对 NovelAI 官方原版 API 返回的 Zip 压缩包或 Raw PNG）
+    const pngBlob = extractPngFromBuffer(arrayBuffer);
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onloadend = () => resolve(reader.result);
       reader.onerror = reject;
-      reader.readAsDataURL(blob);
+      reader.readAsDataURL(pngBlob);
     });
   }
 
@@ -437,6 +464,43 @@ export function useImageGen({ addConsoleLog } = {}) {
     generateImage,
     testGenerateImage
   };
+}
+
+function extractPngFromBuffer(arrayBuffer) {
+  const bytes = new Uint8Array(arrayBuffer);
+  // PNG Magic bytes: 0x89 0x50 0x4E 0x47 0x0D 0x0A 0x1A 0x0A
+  const pngHeader = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+  let pngStart = -1;
+
+  for (let i = 0; i <= bytes.length - 8; i++) {
+    let match = true;
+    for (let j = 0; j < 8; j++) {
+      if (bytes[i + j] !== pngHeader[j]) {
+        match = false;
+        break;
+      }
+    }
+    if (match) {
+      pngStart = i;
+      break;
+    }
+  }
+
+  if (pngStart !== -1) {
+    const pngBytes = bytes.slice(pngStart);
+    return new Blob([pngBytes], { type: 'image/png' });
+  }
+
+  return new Blob([bytes], { type: 'image/png' });
+}
+
+function isJsonBuffer(buffer) {
+  try {
+    const str = new TextDecoder().decode(new Uint8Array(buffer).subarray(0, 50)).trim();
+    return str.startsWith('{') || str.startsWith('[');
+  } catch (e) {
+    return false;
+  }
 }
 
 function deepMerge(target, source) {

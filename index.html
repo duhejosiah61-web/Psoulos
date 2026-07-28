@@ -5359,8 +5359,9 @@
                                 <div class="console-form-group">
                                     <label class="console-label">连线方式</label>
                                     <select class="console-select" v-model="imageGenConfig.novelai.endpointType">
-                                        <option value="official">官方直连 (https://image.novelai.net)</option>
-                                        <option value="proxy">自定义中转 / 反代</option>
+                                        <option value="official">官方主节点 (https://image.novelai.net)</option>
+                                        <option value="official_api">官方备用节点 (https://api.novelai.net)</option>
+                                        <option value="proxy">自定义中转 / 反代 URL</option>
                                     </select>
                                 </div>
                                 <div class="console-form-group" v-if="imageGenConfig.novelai.endpointType === 'proxy'">
