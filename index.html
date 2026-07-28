@@ -6473,14 +6473,34 @@
                     <div style="display:flex; flex-direction:column; gap:8px;">
                         <input name="sp_field_160" id="sp-field-160" v-model="nest.nestTitle" class="lock-wallpaper-input" placeholder="空间名称">
                         <input name="sp_field_161" id="sp-field-161" v-model="nest.anniversaryDate" type="date" class="lock-wallpaper-input">
-                        <textarea name="sp_field_162" id="sp-field-162" v-model="nest.dailyNote" class="lock-wallpaper-input" style="min-height:64px;" placeholder="今日想对Ta说..."></textarea>
+                        <textarea name="sp_field_162" id="sp-field-162" v-model="nest.myNote" class="lock-wallpaper-input" style="min-height:64px;" placeholder="今日想对Ta说..."></textarea>
                     </div>
                     <div style="margin-top:10px; font-size:13px; color:#666;">
                         和 {{ nest.partnerName }} 在一起第 {{ nest.daysTogether }} 天 · Love Score {{ nest.loveScore }}
                     </div>
                     <div style="margin-top:8px; display:flex; gap:8px;">
-                        <button class="console-btn console-btn-primary" @click="nest.sendLovePulse">+1 心动值</button>
+                        <button class="console-btn console-btn-primary" @click="nest.refreshPartnerNote(true)" :disabled="nest.partnerNoteLoading">
+                            {{ nest.partnerNoteLoading ? '写日记中...' : '让Ta写今日日记' }}
+                        </button>
                         <button class="console-btn console-btn-secondary" @click="nest.addMemoryFromChat" :disabled="!nest.latestChatLine">从最近聊天摘录</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">便签墙</div>
+                    <div class="nest-note-wall">
+                        <div
+                            v-for="note in nest.noteWall"
+                            :key="note.id"
+                            class="nest-note-card"
+                            @click="openNestNote(note)"
+                        >
+                            <div class="nest-note-date">{{ note.title }}</div>
+                            <div class="nest-note-preview">{{ note.text }}</div>
+                        </div>
+                        <div v-if="nest.noteWall.length === 0" style="font-size:13px; color:#999; padding:10px;">
+                            还没有日记，等 Ta 写第一篇吧
+                        </div>
                     </div>
                 </div>
 
@@ -6508,6 +6528,7 @@
                         <label v-for="w in nest.wishes" :key="w.id" style="display:flex; align-items:center; gap:8px; font-size:13px; color:#333;">
                             <input name="sp_field_165" id="sp-field-165" type="checkbox" :checked="w.done" @change="nest.toggleWish(w.id)">
                             <span :style="{ textDecoration: w.done ? 'line-through' : 'none', opacity: w.done ? 0.6 : 1 }">{{ w.text }}</span>
+                            <span v-if="nest.pendingReactionTrigger === ('wish:' + w.id)" class="nest-pulse-dot"></span>
                         </label>
                     </div>
                 </div>
@@ -6523,9 +6544,21 @@
                         <label v-for="p in nest.plans" :key="p.id" style="display:flex; align-items:center; gap:8px; font-size:13px; color:#333; padding:6px 0;">
                             <input name="sp_field_168" id="sp-field-168" type="checkbox" :checked="p.done" @change="nest.togglePlan(p.id)">
                             <span :style="{ textDecoration: p.done ? 'line-through' : 'none', opacity: p.done ? 0.6 : 1 }">{{ p.date }} · {{ p.text }}</span>
+                            <span v-if="nest.pendingReactionTrigger === ('plan:' + p.id)" class="nest-pulse-dot"></span>
                         </label>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Nest 便签放大弹窗 -->
+        <div v-if="showNestNoteModal && selectedNestNote" class="call-diary-modal" @click.self="closeNestNoteModal">
+            <div class="call-diary-panel">
+                <div class="call-diary-header">
+                    <strong>{{ selectedNestNote.title }}</strong>
+                    <button class="call-diary-close" @click="closeNestNoteModal"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="call-diary-body">{{ selectedNestNote.text }}</div>
             </div>
         </div>
 

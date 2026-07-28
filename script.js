@@ -3285,6 +3285,19 @@ ${styleGuide}
             selectedCallDiary.value = null;
         };
 
+        const showNestNoteModal = ref(false);
+        const selectedNestNote = ref(null);
+
+        const openNestNote = (note) => {
+            selectedNestNote.value = note;
+            showNestNoteModal.value = true;
+        };
+
+        const closeNestNoteModal = () => {
+            showNestNoteModal.value = false;
+            selectedNestNote.value = null;
+        };
+
         let callInterval = null;
 
         const viewCharacterProfile = () => {
@@ -4339,6 +4352,7 @@ ${styleGuide}
             saveChatMenuSettings, loadChatMenuSettings, clearChatHistory, exportChatHistory, showCreateGroupDialog, newGroupName, newGroupMembers, createNewGroup, newGroupAvatar, selectedGroupMembers, groupAvatarInput, triggerGroupAvatarUpload, handleGroupAvatarUpload, toggleGroupMember, showAddMemberDialog, selectedAddMembers, getAvailableCharactersForAdd, toggleAddMember, addMembersToGroup, removeGroupMember, addMemberMode, customMemberAvatar, customMemberName, customMemberPersona, customMemberWorldbookIds, customMemberPresetId, customMemberTimeZone, customMemberAvatarInput, triggerCustomMemberAvatarUpload, handleCustomMemberAvatarUpload, addCustomMember, showMemberEditor, editingMember, openMemberEditor, closeMemberEditor, saveMemberEditor, showRenameGroupDialog, newGroupNameInput, tempGroupAvatar, renameGroupAvatarInput, triggerRenameGroupAvatarUpload, handleRenameGroupAvatarUpload, renameGroup, shakeCharacter, shakeGroupMember,
             callActive, callType, callTimer, callInput, callMessages, isCallAiTyping, isMuted, toggleMute, isSpeakerOn, toggleSpeaker, isCameraOn, toggleCamera, currentChatName, currentChatAvatar,
             showCallInput, callInputText, toggleCallInput, sendCallText, openCallDiary, closeCallDiaryModal, showCallDiaryModal, selectedCallDiary, callDiaryTitle,
+            showNestNoteModal, selectedNestNote, openNestNote, closeNestNoteModal,
             videoSelfPosition, isVideoAvatarSwapped, startDragVideoSelf, swapVideoAvatars,
             startVoiceCall, startVideoCall, endCall, sendCallMessage,
             // rightnow
