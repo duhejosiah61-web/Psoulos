@@ -4393,6 +4393,7 @@ ${styleGuide}
             showRerollModal: attachment.showRerollModal,
             rerollOriginalPrompt: attachment.rerollOriginalPrompt,
             rerollOptimizedPrompt: attachment.rerollOptimizedPrompt,
+            rerollUseAI: attachment.rerollUseAI,
             openRerollModal: attachment.openRerollModal,
             closeRerollModal: attachment.closeRerollModal,
             executeReroll: attachment.executeReroll,
