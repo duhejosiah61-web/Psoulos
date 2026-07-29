@@ -2749,7 +2749,7 @@
             <div class="image-viewer" style="display: flex; flex-direction: column; position: relative;">
                 <img :src="chatViewingHighResUrl" class="viewer-image" style="max-height: 80vh; max-width: 90vw; object-fit: contain; border-radius: 8px;">
                 <button class="close-viewer-btn" @click="closeChatImageViewer"><i class="fas fa-times"></i></button>
-                <div style="position: absolute; bottom: -50px; right: 0; display: flex; gap: 10px;">
+                <div style="position: absolute; bottom: 20px; right: 20px; display: flex; gap: 10px; z-index: 9999;">
                     <button class="chat-btn" @click="downloadChatImage" style="background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); color: white; border: none; padding: 8px 16px; border-radius: 20px; cursor: pointer;">
                         <i class="fas fa-download"></i> 存图
                     </button>
