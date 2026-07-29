@@ -2768,11 +2768,15 @@
                     <button class="close-btn" @click="closeRerollModal"><i class="fas fa-times"></i></button>
                 </div>
                 <div class="modal-body" style="display: flex; flex-direction: column; gap: 15px;">
-                    <div class="settings-group">
-                        <label>原始输入 (供参考，不再传给引擎)</label>
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;">
+                        <input type="checkbox" v-model="rerollUseAI">
+                        <strong>AI优化提示词 (选中修改中文，取消直接修改英文Tag)</strong>
+                    </label>
+                    <div class="settings-group" v-if="rerollUseAI">
+                        <label>原始输入 (中文)</label>
                         <textarea v-model="rerollOriginalPrompt" rows="3" style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #ddd; resize: vertical;"></textarea>
                     </div>
-                    <div class="settings-group">
+                    <div class="settings-group" v-else>
                         <label>实际请求的英文 Tags (可直接修改)</label>
                         <textarea v-model="rerollOptimizedPrompt" rows="5" style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #ddd; resize: vertical; font-family: monospace;"></textarea>
                     </div>
