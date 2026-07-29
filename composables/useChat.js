@@ -3,6 +3,48 @@ import { ref, computed, watch, nextTick } from 'https://unpkg.com/vue@3/dist/vue
 import { callAI } from '../api.js';
 
 export function useChat(
+
+    const generateFallbackTextImage = (text) => {
+        try {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#f5f5f5';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#333333';
+            ctx.font = '32px "Playfair Display", Georgia, serif, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const words = (text || '').split('');
+            let line = '';
+            const lines = [];
+            const maxWidth = 460;
+            for (let i = 0; i < words.length; i++) {
+                const testLine = line + words[i];
+                const metrics = ctx.measureText(testLine);
+                if (metrics.width > maxWidth && i > 0) {
+                    lines.push(line);
+                    line = words[i];
+                } else {
+                    line = testLine;
+                }
+            }
+            lines.push(line);
+            const lineHeight = 40;
+            const totalHeight = lines.length * lineHeight;
+            let startY = (canvas.height - totalHeight) / 2 + lineHeight / 2;
+            lines.forEach(l => {
+                ctx.fillText(l, canvas.width / 2, startY);
+                startY += lineHeight;
+            });
+            return canvas.toDataURL('image/jpeg', 0.9);
+        } catch (err) {
+            console.error('Fallback image generation failed:', err);
+            return null;
+        }
+    };
+
     characters,
     worldbooks,
     presets,
@@ -1343,7 +1385,26 @@ export function useChat(
                                     if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
                                     if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
                                 }
-                            }).catch(e => console.error('AI Auto Image Gen Error:', e));
+                            }).catch(e => {
+                                console.warn('AI Auto Image Gen failed, using text image fallback:', e);
+                                const fallbackUrl = generateFallbackTextImage(segment.content);
+                                if (fallbackUrl) {
+                                    msg.imageUrl = fallbackUrl;
+                                    msg.originalPrompt = segment.content;
+                                    msg.optimizedPrompt = segment.content;
+                                    if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
+                                    if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
+                        } else {
+                            const fallbackUrl = generateFallbackTextImage(segment.content);
+                            if (fallbackUrl) {
+                                msg.imageUrl = fallbackUrl;
+                                msg.originalPrompt = segment.content;
+                                msg.optimizedPrompt = segment.content;
+                                if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
+                                if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
+                            }
+                        }
+                            });
                         }
                             } else {
                                 pushMessageToTargetChat(currentChatId, currentChatType, {
@@ -1380,7 +1441,26 @@ export function useChat(
                                     if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
                                     if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
                                 }
-                            }).catch(e => console.error('AI Auto Image Gen Error:', e));
+                            }).catch(e => {
+                                console.warn('AI Auto Image Gen failed, using text image fallback:', e);
+                                const fallbackUrl = generateFallbackTextImage(imageDesc);
+                                if (fallbackUrl) {
+                                    msg.imageUrl = fallbackUrl;
+                                    msg.originalPrompt = imageDesc;
+                                    msg.optimizedPrompt = imageDesc;
+                                    if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
+                                    if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
+                        } else {
+                            const fallbackUrl = generateFallbackTextImage(imageDesc);
+                            if (fallbackUrl) {
+                                msg.imageUrl = fallbackUrl;
+                                msg.originalPrompt = imageDesc;
+                                msg.optimizedPrompt = imageDesc;
+                                if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
+                                if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
+                            }
+                        }
+                            });
                         }
                         return;
                     }
@@ -1486,7 +1566,26 @@ export function useChat(
                                     if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
                                     if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
                                 }
-                            }).catch(e => console.error('AI Auto Image Gen Error:', e));
+                            }).catch(e => {
+                                console.warn('AI Auto Image Gen failed, using text image fallback:', e);
+                                const fallbackUrl = generateFallbackTextImage(segment.content);
+                                if (fallbackUrl) {
+                                    msg.imageUrl = fallbackUrl;
+                                    msg.originalPrompt = segment.content;
+                                    msg.optimizedPrompt = segment.content;
+                                    if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
+                                    if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
+                        } else {
+                            const fallbackUrl = generateFallbackTextImage(segment.content);
+                            if (fallbackUrl) {
+                                msg.imageUrl = fallbackUrl;
+                                msg.originalPrompt = segment.content;
+                                msg.optimizedPrompt = segment.content;
+                                if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
+                                if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
+                            }
+                        }
+                            });
                         }
                             } else {
                                 pushMessageToTargetChat(currentChatId, currentChatType, {
@@ -1519,7 +1618,26 @@ export function useChat(
                                     if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
                                     if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
                                 }
-                            }).catch(e => console.error('AI Auto Image Gen Error:', e));
+                            }).catch(e => {
+                                console.warn('AI Auto Image Gen failed, using text image fallback:', e);
+                                const fallbackUrl = generateFallbackTextImage(imageDesc);
+                                if (fallbackUrl) {
+                                    msg.imageUrl = fallbackUrl;
+                                    msg.originalPrompt = imageDesc;
+                                    msg.optimizedPrompt = imageDesc;
+                                    if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
+                                    if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
+                        } else {
+                            const fallbackUrl = generateFallbackTextImage(imageDesc);
+                            if (fallbackUrl) {
+                                msg.imageUrl = fallbackUrl;
+                                msg.originalPrompt = imageDesc;
+                                msg.optimizedPrompt = imageDesc;
+                                if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
+                                if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
+                            }
+                        }
+                            });
                         }
                         return;
                     }
