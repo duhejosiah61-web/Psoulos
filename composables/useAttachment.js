@@ -897,7 +897,7 @@ export function useAttachment(opts) {
                     id: Date.now(),
                     sender: 'user',
                     messageType: 'image',
-                    image: imageUrl,
+                    imageUrl: imageUrl,
                     timestamp: Date.now(),
                     isReplied: false,
                     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
