@@ -1,4 +1,4 @@
-// composables/useAttachment.js �?SoulLink 附件面板、定�?转账/淘宝/投票/分享�?
+// composables/useAttachment.js — SoulLink 附件面板、定位/转账/淘宝/投票/分享等
 import { ref } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
 import { callAI } from '../api.js';
 
@@ -54,7 +54,7 @@ export function useAttachment(opts) {
         generateImage
     } = opts;
 
-    // 未注入压缩函数时同步直通（不包一�?Promise/setTimeout�?
+    // 未注入压缩函数时同步直通（不包一层 Promise/setTimeout）
     const compress = typeof compressAvatarImage === 'function'
         ? compressAvatarImage
         : (dataUrl, _preset, cb) => cb(dataUrl);
@@ -87,7 +87,7 @@ export function useAttachment(opts) {
     const showSharePanel = ref(false);
     const shareSource = ref('');
     const shareContent = ref('');
-    const shareSources = ['B�?, '小红�?, '知乎', '微博', '抖音', '浏览�?, '微信公众�?, '其他'];
+    const shareSources = ['B站', '小红书', '知乎', '微博', '抖音', '浏览器', '微信公众号', '其他'];
     const transferAmount = ref(0);
     const transferNote = ref('');
     const locationUser = ref('');
@@ -141,13 +141,13 @@ export function useAttachment(opts) {
         showVirtualCamera.value = false;
     };
 
-    const locationNameOptions = ['�?, '咖啡�?, '学校', '公司', '公园', '图书�?, '便利�?, '地铁�?, '健身�?];
+    const locationNameOptions = ['家', '咖啡馆', '学校', '公司', '公园', '图书馆', '便利店', '地铁站', '健身房'];
 
     const normalizeLocationName = (value) => {
         if (!value) return '';
         let text = value.trim();
         text = text.split('\n')[0].trim();
-        text = text.replace(/^[「�?“�?《》]+|[」�?“�?《》]+$/g, '');
+        text = text.replace(/^[「『"“”'《》]+|[」』"“”'《》]+$/g, '');
         text = text.replace(/^[\-\*\d\.\s]+/g, '').trim();
         return text;
     };
@@ -160,7 +160,7 @@ export function useAttachment(opts) {
                 return '很近';
             }
         }
-        const pool = ['�?00�?, '�?.2公里', '�?公里', '�?公里', '�?2公里'];
+        const pool = ['约500米', '约1.2公里', '约3公里', '约6公里', '约12公里'];
         return pool[Math.floor(Math.random() * pool.length)];
     };
 
@@ -175,29 +175,29 @@ export function useAttachment(opts) {
         if (isGroupChat) {
             const groupName = activeGroup && activeGroup.name ? activeGroup.name : '群聊';
             const members = activeGroup && Array.isArray(activeGroup.members) && activeGroup.members.length > 0 ? activeGroup.members : ['成员A', '成员B', '成员C'];
-            systemPrompt = `你正在群聊�?{groupName}】中与用户对话。\n\n`;
-            systemPrompt += `# 群成员\n${members.join('�?)}\n\n`;
+            systemPrompt = `你正在群聊【${groupName}】中与用户对话。\n\n`;
+            systemPrompt += `# 群成员\n${members.join('、')}\n\n`;
             systemPrompt += `# 行为规则\n1. 回复要简短自然，像真实群聊一样。\n2. 每次回复只扮演其中一名群成员。\n3. 回复格式为「成员名: 内容」。\n4. 可以用emoji和口语表达。\n\n`;
             if (availableStickers.length > 0) {
-                systemPrompt += `你可以发送表情包来表达情感！使用格式：[表情名] �?[表情:表情名]。可用的表情包有�?{availableStickers.map(s => s.name).join('�?)}。当情绪适合时自然地发送表情包。\n\n`;
+                systemPrompt += `你可以发送表情包来表达情感！使用格式：[表情名] 或 [表情:表情名]。可用的表情包有：${availableStickers.map(s => s.name).join('、')}。当情绪适合时自然地发送表情包。\n\n`;
             }
             systemPrompt += `现在请开始回复。`;
         } else if (char && char.persona) {
             const charName = char.name || '角色';
             systemPrompt = `你正在通过 SoulLink 和朋友聊天。\n\n`;
-            systemPrompt += `你的名字是�?{charName}】。\n`;
+            systemPrompt += `你的名字是【${charName}】。\n`;
             systemPrompt += `${char.persona}\n\n`;
             systemPrompt += `1. 像真实的人类那样自然地聊天。\n2. 每次回复保持简短（1-3句话）。\n3. 使用符合${charName}性格的语气、口头禅和表情。\n4. 绝对不要暴露你是AI。你就是${charName}本人。\n`;
             if (availableStickers.length > 0) {
-                systemPrompt += `\n你可以发送表情包来表达情感！使用格式：[表情名] �?[表情:表情名]。可用的表情包有�?{availableStickers.map(s => s.name).join('�?)}。当情绪适合时自然地发送表情包，有时可以连续发多个表情包来表达强烈情感。`;
+                systemPrompt += `\n你可以发送表情包来表达情感！使用格式：[表情名] 或 [表情:表情名]。可用的表情包有：${availableStickers.map(s => s.name).join('、')}。当情绪适合时自然地发送表情包，有时可以连续发多个表情包来表达强烈情感。`;
             }
             if (char.openingLine && history.length === 1) {
                 systemPrompt += `这是你们的第一次对话。你可以主动打招呼：\n${char.openingLine}\n\n`;
             }
         } else {
-            systemPrompt = '你是一个友好的朋友，正在通过SoulLink聊天。请像真人一样自然、简短地对话，每�?-3句话即可。可以用emoji和口语化表达�?;
+            systemPrompt = '你是一个友好的朋友，正在通过SoulLink聊天。请像真人一样自然、简短地对话，每次1-3句话即可。可以用emoji和口语化表达。';
             if (availableStickers.length > 0) {
-                systemPrompt += `\n你可以发送表情包来表达情感！使用格式：[表情名] �?[表情:表情名]。可用的表情包有�?{availableStickers.map(s => s.name).join('�?)}。当情绪适合时自然地发送表情包，有时可以连续发多个表情包来表达强烈情感。`;
+                systemPrompt += `\n你可以发送表情包来表达情感！使用格式：[表情名] 或 [表情:表情名]。可用的表情包有：${availableStickers.map(s => s.name).join('、')}。当情绪适合时自然地发送表情包，有时可以连续发多个表情包来表达强烈情感。`;
             }
         }
         return systemPrompt;
@@ -242,7 +242,7 @@ export function useAttachment(opts) {
                 messagesPayload.push({ role: 'assistant', content: raw });
             }
         });
-        messagesPayload.push({ role: 'user', content: '请只输出地点名称�? });
+        messagesPayload.push({ role: 'user', content: '请只输出地点名称。' });
         try {
             const response = await fetch(endpoint.replace(/\/+$/, '') + '/chat/completions', {
                 method: 'POST',
@@ -285,7 +285,7 @@ export function useAttachment(opts) {
         const aiLocation = aiAddress.value.trim();
         const distance = calculatedDistance.value.trim();
         if (!distance || (!userLocation && !aiLocation)) {
-            alert('“我的位置”和“Ta的位置”至少填写一个，且“相距”为必填项�?);
+            alert('“我的位置”和“Ta的位置”至少填写一个，且“相距”为必填项。');
             return;
         }
         const trajectoryPoints = locationTrajectoryPoints.value
@@ -294,11 +294,11 @@ export function useAttachment(opts) {
             .map(name => ({ name }));
         let contentString = '[SEND_LOCATION]';
         if (userLocation) contentString += ` 我的位置: ${userLocation}`;
-        if (aiLocation) contentString += ` | Ta的位�? ${aiLocation}`;
+        if (aiLocation) contentString += ` | Ta的位置: ${aiLocation}`;
         contentString += ` | 相距: ${distance}`;
         if (trajectoryPoints.length > 0) {
             const trajectoryText = trajectoryPoints.map(p => p.name).join(', ');
-            contentString += ` | 途经�? ${trajectoryText}`;
+            contentString += ` | 途经点: ${trajectoryText}`;
         }
         const newMsg = {
             id: Date.now(),
@@ -315,7 +315,7 @@ export function useAttachment(opts) {
             isReplied: false
         };
         if (soulLinkActiveChatType.value === 'group') {
-            newMsg.senderName = '�?;
+            newMsg.senderName = '我';
         }
         pushMessageToActiveChat(newMsg);
         return newMsg;
@@ -327,8 +327,8 @@ export function useAttachment(opts) {
         if (!userAddress.value) {
             userAddress.value = locationUser.value || '当前位置';
         }
-        aiAddress.value = '定位�?..';
-        calculatedDistance.value = '计算�?..';
+        aiAddress.value = '定位中...';
+        calculatedDistance.value = '计算中...';
         await inferAiLocationForPanel();
     };
 
@@ -374,7 +374,7 @@ export function useAttachment(opts) {
             isReplied: false
         };
         if (soulLinkActiveChatType.value === 'group') {
-            newMsg.senderName = '�?;
+            newMsg.senderName = '我';
         }
         pushMessageToActiveChat(newMsg);
         showTransferPanel.value = false;
@@ -428,18 +428,18 @@ export function useAttachment(opts) {
     const handleTakeaway = () => {
         showAttachmentPanel.value = false;
         const restaurants = [
-            { name: '麦当�?, food: '巨无霸套�?, price: 38 },
-            { name: '肯德�?, food: '香辣鸡腿堡套�?, price: 35 },
-            { name: '必胜�?, food: '至尊披萨', price: 89 },
-            { name: '星巴�?, food: '拿铁咖啡', price: 32 },
-            { name: '海底�?, food: '番茄锅底', price: 128 }
+            { name: '麦当劳', food: '巨无霸套餐', price: 38 },
+            { name: '肯德基', food: '香辣鸡腿堡套餐', price: 35 },
+            { name: '必胜客', food: '至尊披萨', price: 89 },
+            { name: '星巴克', food: '拿铁咖啡', price: 32 },
+            { name: '海底捞', food: '番茄锅底', price: 128 }
         ];
         const randomRestaurant = restaurants[Math.floor(Math.random() * restaurants.length)];
         const msg = {
             id: Date.now(),
             sender: 'user',
             messageType: 'takeaway',
-            text: `外卖�?{randomRestaurant.food}`,
+            text: `外卖：${randomRestaurant.food}`,
             restaurant: randomRestaurant.name,
             food: randomRestaurant.food,
             price: randomRestaurant.price,
@@ -496,7 +496,7 @@ export function useAttachment(opts) {
         const searchTerm = taobaoSearchTerm.value.trim();
         if (!searchTerm) return;
         if (!activeProfile.value) {
-            alert('请先配置API�?);
+            alert('请先配置API！');
             return;
         }
         taobaoLoading.value = true;
@@ -506,25 +506,25 @@ export function useAttachment(opts) {
         const key = (profile.key || '').trim();
         let modelId = profile.model;
         if (!endpoint || !key) {
-            alert('当前配置缺少 API 地址或密�?);
+            alert('当前配置缺少 API 地址或密钥');
             taobaoLoading.value = false;
             return;
         }
         const prompt = `
 # 任务
-你是一个虚拟购物App的搜索引擎。请根据用户提供的【搜索关键词】，为Ta创作一个包�?-8件相关商品的列表�?
+你是一个虚拟购物App的搜索引擎。请根据用户提供的【搜索关键词】，为Ta创作一个包含6-8件相关商品的列表。
 
 # 用户搜索的关键词:
 "${searchTerm}"
 
 # 核心规则
-1.  **高度相关**: 所有商品都必须与用户的搜索关键�?"${searchTerm}" 紧密相关�?
-2.  **商品多样�?*: 即使是同一个主题，也要尽量展示不同款式、功能或角度的商品�?
-3.  **格式铁律**: 你的回复【必须且只能】是一个严格的JSON数组，每个对象代表一件商品，【必须】包含以下字�?
+1.  **高度相关**: 所有商品都必须与用户的搜索关键词 "${searchTerm}" 紧密相关。
+2.  **商品多样性**: 即使是同一个主题，也要尽量展示不同款式、功能或角度的商品。
+3.  **格式铁律**: 你的回复【必须且只能】是一个严格的JSON数组，每个对象代表一件商品，【必须】包含以下字段:
     -   \`"name"\`: 商品名称
     -   \`"price"\`: 价格 (数字，人民币)
     -   \`"category"\`: 商品分类
-    -   \`"imagePrompt"\`: 一个详细的、用于文生图AI的【英文提示词】，描述这张商品的【产品展示图 (product shot)】。风格要求【干净、简约、纯色或渐变背景 (clean, minimalist, solid color background)】�?
+    -   \`"imagePrompt"\`: 一个详细的、用于文生图AI的【英文提示词】，描述这张商品的【产品展示图 (product shot)】。风格要求【干净、简约、纯色或渐变背景 (clean, minimalist, solid color background)】。
 
 # JSON输出格式示例:
 [
@@ -560,7 +560,7 @@ export function useAttachment(opts) {
                     loadTaobaoProductImage(product, index);
                 });
             } else {
-                throw new Error('AI没有找到相关的商品�?);
+                throw new Error('AI没有找到相关的商品。');
             }
         } catch (error) {
             console.error('AI搜索商品失败:', error);
@@ -578,8 +578,8 @@ export function useAttachment(opts) {
             platform: '购物',
             item: product.name,
             price: product.price,
-            status: '已下�?,
-            eta: '2-3�?,
+            status: '已下单',
+            eta: '2-3天',
             timestamp: Date.now(),
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };
@@ -628,7 +628,7 @@ export function useAttachment(opts) {
             id: Date.now(),
             sender: 'user',
             messageType: 'vote',
-            text: `投票�?{voteQuestion.value}`,
+            text: `投票：${voteQuestion.value}`,
             question: voteQuestion.value,
             options: validOptions.map(opt => ({ text: opt, votes: 0 })),
             totalVotes: 0,
@@ -643,7 +643,7 @@ export function useAttachment(opts) {
         showVotePanel.value = false;
     };
 
-    /** 与模�?index �?castVoteInChat(msg.id, optIndex) 一�?*/
+    /** 与模板 index 中 castVoteInChat(msg.id, optIndex) 一致 */
     const castVoteInChat = (msgId, optionIndex) => {
         const isGroupChat = soulLinkActiveChatType.value === 'group';
         const history = isGroupChat
@@ -665,7 +665,7 @@ export function useAttachment(opts) {
 
     const sendShareCard = () => {
         if (!shareSource.value || !shareContent.value.trim()) {
-            alert('请选择来源并填写分享内�?);
+            alert('请选择来源并填写分享内容');
             return;
         }
         const shareMsg = {
@@ -688,27 +688,27 @@ export function useAttachment(opts) {
     const handleTarot = () => {
         showAttachmentPanel.value = false;
         const tarotCards = [
-            { name: '愚�?, meaning: '新的开始、冒险、纯�?, emoji: '🃏' },
-            { name: '魔术�?, meaning: '创造力、自信、行动力', emoji: '🎩' },
-            { name: '女祭�?, meaning: '直觉、神秘、智�?, emoji: '🌙' },
+            { name: '愚者', meaning: '新的开始、冒险、纯真', emoji: '🃏' },
+            { name: '魔术师', meaning: '创造力、自信、行动力', emoji: '🎩' },
+            { name: '女祭司', meaning: '直觉、神秘、智慧', emoji: '🌙' },
             { name: '女皇', meaning: '丰盛、母性、创造力', emoji: '👑' },
-            { name: '皇帝', meaning: '权威、结构、领导力', emoji: '🏛�? },
-            { name: '恋人', meaning: '爱情、选择、和�?, emoji: '💕' },
-            { name: '战车', meaning: '意志力、胜利、决�?, emoji: '⚔️' },
-            { name: '力量', meaning: '勇气、耐心、内在力�?, emoji: '🦁' },
-            { name: '隐士', meaning: '内省、寻求真理、智�?, emoji: '🏔�? },
-            { name: '命运之轮', meaning: '变化、机遇、命�?, emoji: '🎡' },
-            { name: '正义', meaning: '公平、真相、因�?, emoji: '⚖️' },
-            { name: '倒吊�?, meaning: '牺牲、等待、新视角', emoji: '🙃' },
-            { name: '死神', meaning: '结束、转变、重�?, emoji: '🦋' },
-            { name: '节制', meaning: '平衡、耐心、调�?, emoji: '🌈' },
-            { name: '恶魔', meaning: '束缚、诱惑、物�?, emoji: '😈' },
-            { name: '�?, meaning: '突变、觉醒、重�?, emoji: '🗼' },
-            { name: '星星', meaning: '希望、灵感、平�?, emoji: '�? },
+            { name: '皇帝', meaning: '权威、结构、领导力', emoji: '🏛️' },
+            { name: '恋人', meaning: '爱情、选择、和谐', emoji: '💕' },
+            { name: '战车', meaning: '意志力、胜利、决心', emoji: '⚔️' },
+            { name: '力量', meaning: '勇气、耐心、内在力量', emoji: '🦁' },
+            { name: '隐士', meaning: '内省、寻求真理、智慧', emoji: '🏔️' },
+            { name: '命运之轮', meaning: '变化、机遇、命运', emoji: '🎡' },
+            { name: '正义', meaning: '公平、真相、因果', emoji: '⚖️' },
+            { name: '倒吊人', meaning: '牺牲、等待、新视角', emoji: '🙃' },
+            { name: '死神', meaning: '结束、转变、重生', emoji: '🦋' },
+            { name: '节制', meaning: '平衡、耐心、调和', emoji: '🌈' },
+            { name: '恶魔', meaning: '束缚、诱惑、物质', emoji: '😈' },
+            { name: '塔', meaning: '突变、觉醒、重建', emoji: '🗼' },
+            { name: '星星', meaning: '希望、灵感、平静', emoji: '⭐' },
             { name: '月亮', meaning: '幻觉、恐惧、潜意识', emoji: '🌕' },
-            { name: '太阳', meaning: '成功、活力、快�?, emoji: '☀�? },
-            { name: '审判', meaning: '觉醒、重生、召�?, emoji: '📯' },
-            { name: '世界', meaning: '完成、整合、成�?, emoji: '🌍' }
+            { name: '太阳', meaning: '成功、活力、快乐', emoji: '☀️' },
+            { name: '审判', meaning: '觉醒、重生、召唤', emoji: '📯' },
+            { name: '世界', meaning: '完成、整合、成就', emoji: '🌍' }
         ];
         const randomCard = tarotCards[Math.floor(Math.random() * tarotCards.length)];
         const isReversed = Math.random() > 0.5;
@@ -716,7 +716,7 @@ export function useAttachment(opts) {
             id: Date.now(),
             sender: 'user',
             messageType: 'tarot',
-            text: `塔罗占卜�?{randomCard.emoji} ${randomCard.name}${isReversed ? '（逆位�? : ''}`,
+            text: `塔罗占卜：${randomCard.emoji} ${randomCard.name}${isReversed ? '（逆位）' : ''}`,
             cardName: randomCard.name,
             cardMeaning: randomCard.meaning,
             isReversed: isReversed,
@@ -732,7 +732,7 @@ export function useAttachment(opts) {
         showAttachmentPanel.value = false;
         if (!soulLinkPet.value) {
             soulLinkPet.value = {
-                name: '小可�?,
+                name: '小可爱',
                 mood: 100,
                 hunger: 100,
                 level: 1,
@@ -741,7 +741,7 @@ export function useAttachment(opts) {
         }
         const actions = [
             { action: 'feed', text: '喂食', emoji: '🍖' },
-            { action: 'play', text: '玩�?, emoji: '🎾' },
+            { action: 'play', text: '玩耍', emoji: '🎾' },
             { action: 'pet', text: '抚摸', emoji: '🤚' }
         ];
         const randomAction = actions[Math.floor(Math.random() * actions.length)];
@@ -775,7 +775,7 @@ export function useAttachment(opts) {
             id: Date.now(),
             sender: 'user',
             messageType: 'pet',
-            text: `�?{soulLinkPet.value.name}${randomAction.text}${randomAction.emoji}`,
+            text: `与${soulLinkPet.value.name}${randomAction.text}${randomAction.emoji}`,
             petName: soulLinkPet.value.name,
             action: randomAction.text,
             emoji: randomAction.emoji,
@@ -792,18 +792,18 @@ export function useAttachment(opts) {
     const handleOrder = () => {
         showAttachmentPanel.value = false;
         const orders = [
-            { platform: '美团外卖', item: '黄焖鸡米�?, price: 28, status: '配送中', eta: '15分钟' },
-            { platform: '饿了�?, item: '麻辣香锅', price: 45, status: '商家接单', eta: '30分钟' },
-            { platform: '京东', item: '无线蓝牙耳机', price: 199, status: '已发�?, eta: '明天送达' },
-            { platform: '购物', item: '手机�?, price: 25, status: '运输�?, eta: '2天后' },
-            { platform: '拼多�?, item: '零食大礼�?, price: 39, status: '已签�?, eta: '已送达' }
+            { platform: '美团外卖', item: '黄焖鸡米饭', price: 28, status: '配送中', eta: '15分钟' },
+            { platform: '饿了么', item: '麻辣香锅', price: 45, status: '商家接单', eta: '30分钟' },
+            { platform: '京东', item: '无线蓝牙耳机', price: 199, status: '已发货', eta: '明天送达' },
+            { platform: '购物', item: '手机壳', price: 25, status: '运输中', eta: '2天后' },
+            { platform: '拼多多', item: '零食大礼包', price: 39, status: '已签收', eta: '已送达' }
         ];
         const randomOrder = orders[Math.floor(Math.random() * orders.length)];
         const msg = {
             id: Date.now(),
             sender: 'user',
             messageType: 'order',
-            text: `订单�?{randomOrder.platform} - ${randomOrder.item}`,
+            text: `订单：${randomOrder.platform} - ${randomOrder.item}`,
             platform: randomOrder.platform,
             item: randomOrder.item,
             price: randomOrder.price,
@@ -838,7 +838,7 @@ export function useAttachment(opts) {
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };
         if (soulLinkActiveChatType.value === 'group') {
-            msg.senderName = '�?;
+            msg.senderName = '我';
         }
         pushMessageToActiveChat(msg);
         saveSoulLinkMessages();
@@ -873,7 +873,7 @@ export function useAttachment(opts) {
                             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                         };
                         if (soulLinkActiveChatType.value === 'group') {
-                            msg.senderName = '�?;
+                            msg.senderName = '我';
                         }
                         pushMessageToActiveChat(msg);
                         saveSoulLinkMessages();
@@ -963,7 +963,7 @@ export function useAttachment(opts) {
                     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                 };
                 if (soulLinkActiveChatType.value === 'group') {
-                    msg.senderName = '�?;
+                    msg.senderName = '我';
                 }
                 pushMessageToActiveChat(msg);
                 saveSoulLinkMessages();
@@ -977,6 +977,15 @@ export function useAttachment(opts) {
         }
     };
 
+function sanitizePrompt(rawText) {
+    let text = rawText;
+    text = text.replace(/[\u4e00-\u9fa5\u3000-\u303f\uff00-\uffef]/g, '');
+    text = text.replace(/[#*_`>-]/g, '');
+    text = text.split('\n').map(l => l.trim()).filter(Boolean)[0] || '';
+    text = text.replace(/\s+/g, ' ').trim();
+    return text;
+}
+
     const sendTextImage = async () => {
         if (!textImageText.value.trim() || isGeneratingChatImage.value) return;
         
@@ -985,20 +994,30 @@ export function useAttachment(opts) {
             let finalPrompt = textImageText.value.trim();
 
             if (/[\u4e00-\u9fa5]/.test(finalPrompt) && activeProfile.value) {
-                const sysPrompt = "You are an expert prompt engineer for AI image generation (e.g. Stable Diffusion, NovelAI). Translate the user's Chinese description into high-quality, comma-separated English tags. Add relevant aesthetic tags if appropriate.\n\nCRITICAL RULE: You MUST output ONLY the English tags separated by commas. DO NOT include ANY conversational text, explanations, markdown formatting, or Chinese characters. Example output: masterpiece, best quality, 1girl, red hair, obesity";
+                const sysPrompt = `你是一个"用户描述到Stable Diffusion/NovelAI英文tag"的转换器，不是聊天助手。
+严格规则：
+1. 只输出danbooru风格的英文tag，用英文逗号分隔
+2. 禁止输出任何中文
+3. 禁止输出任何解释、建议、开场白、结尾话术
+4. 禁止markdown格式
+5. 禁止提问、禁止说任何废话
+6. 只允许一行纯tag文本作为输出，不要有多个版本/风格选项
+
+输出格式必须是：tag1, tag2, tag3
+如果输入无意义，输出：1girl, simple background`;
                 const msgs = [{ role: "user", content: finalPrompt }];
-                if (addConsoleLog) addConsoleLog(`正在将中�?Prompt 转化为标准英文标�?..`);
+                if (addConsoleLog) addConsoleLog(`正在将中文 Prompt 转化为标准英文标签...`);
                 try {
                     const aiResult = await callAI(activeProfile.value, msgs, {
                         systemPrompt: sysPrompt,
-                        temperature: 0.5
+                        temperature: 0.2
                     });
                     if (aiResult && aiResult.trim()) {
-                        finalPrompt = aiResult.trim();
+                        finalPrompt = sanitizePrompt(aiResult);
                         if (addConsoleLog) addConsoleLog(`Prompt 转化成功: ${finalPrompt}`);
                     }
                 } catch (err) {
-                    if (addConsoleLog) addConsoleLog(`Prompt 转化失败，将使用原内容�?${err.message})`, 'error');
+                    if (addConsoleLog) addConsoleLog(`Prompt 转化失败，将使用原内容。(${err.message})`, 'error');
                 }
             }
 
@@ -1022,7 +1041,7 @@ export function useAttachment(opts) {
                     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                 };
                 if (soulLinkActiveChatType.value === 'group') {
-                    msg.senderName = '�?;
+                    msg.senderName = '我';
                 }
                 pushMessageToActiveChat(msg);
                 saveSoulLinkMessages();
@@ -1031,8 +1050,8 @@ export function useAttachment(opts) {
                 scrollToBottom();
             }
         } catch (error) {
-            console.error('文生图失�?', error);
-            alert('文生图失�? ' + (error.message || '未知错误'));
+            console.error('文生图失败:', error);
+            alert('文生图失败: ' + (error.message || '未知错误'));
         } finally {
             isGeneratingChatImage.value = false;
         }
