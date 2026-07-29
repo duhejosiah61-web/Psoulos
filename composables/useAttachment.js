@@ -979,9 +979,12 @@ export function useAttachment(opts) {
 
 function sanitizePrompt(rawText) {
     let text = rawText;
-    text = text.replace(/[\u4e00-\u9fa5\u3000-\u303f\uff00-\uffef]/g, '');
+    // Keep only standard printable ASCII and newlines (strips all Chinese, emojis, full-width chars)
+    text = text.replace(/[^\x20-\x7E\n]/g, '');
+    // Strip markdown formatting symbols
     text = text.replace(/[#*_`>-]/g, '');
-    text = text.split('\n').map(l => l.trim()).filter(Boolean)[0] || '';
+    // Merge multiline outputs into a single comma-separated line, in case AI breaks it into multiple lines
+    text = text.split('\n').map(l => l.trim()).filter(Boolean).join(', ');
     text = text.replace(/\s+/g, ' ').trim();
     return text;
 }
