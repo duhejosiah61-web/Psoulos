@@ -1,5 +1,6 @@
 // composables/useAttachment.js — SoulLink 附件面板、定位/转账/淘宝/投票/分享等
 import { ref } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
+import { callAI } from '../api.js';
 
 /**
  * @param {object} opts
@@ -891,7 +892,27 @@ export function useAttachment(opts) {
         
         isGeneratingChatImage.value = true;
         try {
-            const imageUrl = await generateImage({ prompt: textImageText.value });
+            let finalPrompt = textImageText.value.trim();
+
+            if (/[\u4e00-\u9fa5]/.test(finalPrompt) && activeProfile.value) {
+                const sysPrompt = "You are an expert prompt engineer for AI image generation (e.g. Stable Diffusion, NovelAI). Translate the user's Chinese description into high-quality, comma-separated English tags. Add relevant aesthetic tags if appropriate. Output ONLY the tags, no other text or quotes.";
+                const msgs = [{ role: "user", content: finalPrompt }];
+                if (addConsoleLog) addConsoleLog(`正在将中文 Prompt 转化为标准英文标签...`);
+                try {
+                    const aiResult = await callAI(activeProfile.value, msgs, {
+                        systemPrompt: sysPrompt,
+                        temperature: 0.5
+                    });
+                    if (aiResult && aiResult.trim()) {
+                        finalPrompt = aiResult.trim();
+                        if (addConsoleLog) addConsoleLog(`Prompt 转化成功: ${finalPrompt}`);
+                    }
+                } catch (err) {
+                    if (addConsoleLog) addConsoleLog(`Prompt 转化失败，将使用原内容。(${err.message})`, 'error');
+                }
+            }
+
+            const imageUrl = await generateImage({ prompt: finalPrompt });
             if (imageUrl) {
                 const msg = {
                     id: Date.now(),
