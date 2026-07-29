@@ -1264,7 +1264,7 @@
                                         </div>
                                         <div v-else-if="msg.messageType === 'image'" class="special-card polaroid-card">
                                             <div class="polaroid-frame">
-                                                <img v-if="msg.imageUrl" :src="msg.imageUrl" class="chat-image">
+                                                <img v-if="msg.imageUrl" :src="msg.imageUrl" class="chat-image" @click="openChatImageViewer(msg)" style="cursor: pointer;">
                                                 <div v-else class="polaroid-text">{{ msg.text || '一张照片' }}</div>
                                             </div>
                                             <div class="polaroid-bottom">
@@ -2742,6 +2742,49 @@
                     </svg>
                 </button>
             </nav>
+        </div>
+
+        <!-- Chat Image Viewer Modal -->
+        <div v-if="chatImageViewerOpen" class="image-viewer-overlay" @click.self="closeChatImageViewer">
+            <div class="image-viewer" style="display: flex; flex-direction: column; position: relative;">
+                <img :src="chatViewingHighResUrl" class="viewer-image" style="max-height: 80vh; max-width: 90vw; object-fit: contain; border-radius: 8px;">
+                <button class="close-viewer-btn" @click="closeChatImageViewer"><i class="fas fa-times"></i></button>
+                <div style="position: absolute; bottom: -50px; right: 0; display: flex; gap: 10px;">
+                    <button class="chat-btn" @click="downloadChatImage" style="background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); color: white; border: none; padding: 8px 16px; border-radius: 20px; cursor: pointer;">
+                        <i class="fas fa-download"></i> 存图
+                    </button>
+                    <button v-if="chatViewingMsg && chatViewingMsg.optimizedPrompt" class="chat-btn" @click="openRerollModal" style="background: var(--ios-blue); color: white; border: none; padding: 8px 16px; border-radius: 20px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,122,255,0.3);">
+                        <i class="fas fa-dice"></i> 重 Roll
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Re-roll Modal -->
+        <div v-if="showRerollModal" class="modal-overlay" @click.self="closeRerollModal">
+            <div class="modal-content" style="width: 90%; max-width: 500px;">
+                <div class="modal-header">
+                    <h3>重新生成 (Re-roll)</h3>
+                    <button class="close-btn" @click="closeRerollModal"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="modal-body" style="display: flex; flex-direction: column; gap: 15px;">
+                    <div class="settings-group">
+                        <label>原始输入 (供参考，不再传给引擎)</label>
+                        <textarea v-model="rerollOriginalPrompt" rows="3" style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #ddd; resize: vertical;"></textarea>
+                    </div>
+                    <div class="settings-group">
+                        <label>实际请求的英文 Tags (可直接修改)</label>
+                        <textarea v-model="rerollOptimizedPrompt" rows="5" style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #ddd; resize: vertical; font-family: monospace;"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn secondary" @click="closeRerollModal">取消</button>
+                    <button class="btn primary" @click="executeReroll" :disabled="isGeneratingChatImage">
+                        <i class="fas" :class="isGeneratingChatImage ? 'fa-spinner fa-spin' : 'fa-magic'"></i>
+                        {{ isGeneratingChatImage ? '生成中...' : '生成并发送' }}
+                    </button>
+                </div>
+            </div>
         </div>
 
         <!-- Feed App -->

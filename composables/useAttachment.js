@@ -2,6 +2,8 @@
 import { ref } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
 import { callAI } from '../api.js';
 
+export const chatImageHighResCache = new Map();
+
 /**
  * @param {object} opts
  * @param {() => void} opts.pushMessageToActiveChat
@@ -887,6 +889,94 @@ export function useAttachment(opts) {
 
     const isGeneratingChatImage = ref(false);
 
+    // Image viewer state
+    const chatImageViewerOpen = ref(false);
+    const chatViewingMsg = ref(null);
+    const chatViewingHighResUrl = ref(null);
+
+    const openChatImageViewer = (msg) => {
+        chatViewingMsg.value = msg;
+        // Check if high-res image is in cache
+        if (chatImageHighResCache.has(msg.id)) {
+            chatViewingHighResUrl.value = chatImageHighResCache.get(msg.id);
+        } else {
+            chatViewingHighResUrl.value = msg.imageUrl;
+        }
+        chatImageViewerOpen.value = true;
+    };
+
+    const closeChatImageViewer = () => {
+        chatImageViewerOpen.value = false;
+        chatViewingMsg.value = null;
+        chatViewingHighResUrl.value = null;
+    };
+
+    const downloadChatImage = () => {
+        if (!chatViewingHighResUrl.value) return;
+        const a = document.createElement('a');
+        a.href = chatViewingHighResUrl.value;
+        a.download = `ai_image_${Date.now()}.png`;
+        a.click();
+    };
+
+    // Re-roll state
+    const showRerollModal = ref(false);
+    const rerollOriginalPrompt = ref('');
+    const rerollOptimizedPrompt = ref('');
+
+    const openRerollModal = () => {
+        if (!chatViewingMsg.value) return;
+        rerollOriginalPrompt.value = chatViewingMsg.value.originalPrompt || '';
+        rerollOptimizedPrompt.value = chatViewingMsg.value.optimizedPrompt || '';
+        showRerollModal.value = true;
+    };
+
+    const closeRerollModal = () => {
+        showRerollModal.value = false;
+    };
+
+    const executeReroll = async () => {
+        if (!rerollOptimizedPrompt.value.trim() || isGeneratingChatImage.value) return;
+        closeRerollModal();
+        closeChatImageViewer();
+        
+        isGeneratingChatImage.value = true;
+        try {
+            const finalPrompt = rerollOptimizedPrompt.value.trim();
+            const imageUrl = await generateImage({ prompt: finalPrompt });
+            if (imageUrl) {
+                const msgId = Date.now();
+                chatImageHighResCache.set(msgId, imageUrl);
+
+                const compressAsync = (dataUrl, preset) => new Promise(resolve => compress(dataUrl, preset, resolve));
+                const compressedDataUrl = await compressAsync(imageUrl, 'chatImage');
+
+                const msg = {
+                    id: msgId,
+                    sender: 'user',
+                    messageType: 'image',
+                    imageUrl: compressedDataUrl,
+                    originalPrompt: rerollOriginalPrompt.value.trim(),
+                    optimizedPrompt: finalPrompt,
+                    timestamp: msgId,
+                    isReplied: false,
+                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                };
+                if (soulLinkActiveChatType.value === 'group') {
+                    msg.senderName = '我';
+                }
+                pushMessageToActiveChat(msg);
+                saveSoulLinkMessages();
+                scrollToBottom();
+            }
+        } catch (error) {
+            console.error('重新生成失败:', error);
+            alert('重新生成失败: ' + (error.message || '未知错误'));
+        } finally {
+            isGeneratingChatImage.value = false;
+        }
+    };
+
     const sendTextImage = async () => {
         if (!textImageText.value.trim() || isGeneratingChatImage.value) return;
         
@@ -914,12 +1004,20 @@ export function useAttachment(opts) {
 
             const imageUrl = await generateImage({ prompt: finalPrompt });
             if (imageUrl) {
+                const msgId = Date.now();
+                chatImageHighResCache.set(msgId, imageUrl);
+
+                const compressAsync = (dataUrl, preset) => new Promise(resolve => compress(dataUrl, preset, resolve));
+                const compressedDataUrl = await compressAsync(imageUrl, 'chatImage');
+
                 const msg = {
-                    id: Date.now(),
+                    id: msgId,
                     sender: 'user',
                     messageType: 'image',
-                    imageUrl: imageUrl,
-                    timestamp: Date.now(),
+                    imageUrl: compressedDataUrl,
+                    originalPrompt: textImageText.value.trim(),
+                    optimizedPrompt: finalPrompt,
+                    timestamp: msgId,
                     isReplied: false,
                     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                 };
@@ -971,6 +1069,18 @@ export function useAttachment(opts) {
         textImageColors,
         sendTextImage,
         isGeneratingChatImage,
+        chatImageViewerOpen,
+        chatViewingMsg,
+        chatViewingHighResUrl,
+        openChatImageViewer,
+        closeChatImageViewer,
+        downloadChatImage,
+        showRerollModal,
+        rerollOriginalPrompt,
+        rerollOptimizedPrompt,
+        openRerollModal,
+        closeRerollModal,
+        executeReroll,
         voiceInputText,
         virtualImageDesc,
         voteQuestion,
