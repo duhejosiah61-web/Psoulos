@@ -979,13 +979,38 @@ export function useAttachment(opts) {
 
 function sanitizePrompt(rawText) {
     let text = rawText;
-    // Keep only standard printable ASCII and newlines (strips all Chinese, emojis, full-width chars)
+    
+    // 先去掉中文和非ASCII
     text = text.replace(/[^\x20-\x7E\n]/g, '');
-    // Strip markdown formatting symbols
     text = text.replace(/[#*_`>-]/g, '');
-    // Merge multiline outputs into a single comma-separated line, in case AI breaks it into multiple lines
-    text = text.split('\n').map(l => l.trim()).filter(Boolean).join(', ');
+    
+    // 按行拆分，过滤空行
+    let lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    
+    // 去掉编号前缀，如 "1." "2)" "3、" 等
+    lines = lines.map(l => l.replace(/^\d+[\.\)、]\s*/, ''));
+    
+    // 去掉常见的标题类噪音行（不包含逗号、且长度短的，大概率是标题不是tag）
+    lines = lines.filter(l => {
+        const commaCount = (l.match(/,/g) || []).length;
+        // 一行合格的tag列表通常逗号很多；标题行往往逗号为0或很少
+        return commaCount >= 2 || l.length > 60;
+    });
+    
+    if (lines.length === 0) return '';
+    
+    // 取逗号最多的那一行，最像正经tag列表
+    lines.sort((a, b) => {
+        const ca = (a.match(/,/g) || []).length;
+        const cb = (b.match(/,/g) || []).length;
+        return cb - ca;
+    });
+    
+    text = lines[0];
     text = text.replace(/\s+/g, ' ').trim();
+    // 去掉行首可能残留的 "Prompt:" "AI Prompt:" 这类前缀
+    text = text.replace(/^(AI\s*)?(Midjourney\s*)?(Stable\s*Diffusion\s*)?Prompt\s*:?\s*/i, '');
+    
     return text;
 }
 
@@ -1003,10 +1028,22 @@ function sanitizePrompt(rawText) {
 2. 禁止输出任何中文
 3. 禁止输出任何解释、建议、开场白、结尾话术
 4. 禁止markdown格式
-5. 禁止提问、禁止说任何废话
-6. 只允许一行纯tag文本作为输出，不要有多个版本/风格选项
+5. 禁止编号列表（不要出现1. 2. 3.这种格式）
+6. 禁止输出多个版本/风格选项，只能给出唯一一个结果
+7. 禁止任何标题、前缀说明（比如"Prompt:"、"AI Prompt"、"Midjourney Prompt"这类文字一律不许出现）
+8. 只允许纯tag文本，不能有其他任何文字
 
-输出格式必须是：tag1, tag2, tag3
+输出格式必须严格是：tag1, tag2, tag3
+不允许任何其他格式。
+
+示例1：
+用户输入：一个女生在吃棒棒糖
+你的输出：1girl, solo, lollipop, eating, close-up, detailed face, soft lighting, masterpiece, best quality
+
+示例2：
+用户输入：海边日落，一个男生在看书
+你的输出：1boy, solo, beach, sunset, reading book, sitting, ocean background, warm lighting, masterpiece, best quality
+
 如果输入无意义，输出：1girl, simple background`;
                 const msgs = [{ role: "user", content: finalPrompt }];
                 if (addConsoleLog) addConsoleLog(`正在将中文 Prompt 转化为标准英文标签...`);
