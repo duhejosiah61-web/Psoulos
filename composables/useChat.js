@@ -922,7 +922,7 @@ export function useChat(
             const activeStyle = rightnowActiveStyleId.value ? rightnowStylePresets.value.find(s => s.id === rightnowActiveStyleId.value) : null;
             const styleText = activeStyle && activeStyle.content ? `\n# 文风与描写要求\n${activeStyle.content}\n\n` : '';
 
-            return `\n# 线下扮演模式（最高优先级）\n${baseInstruction}\n\n${presetText ? `# 用户自定义预设《${presetName}》\n${presetText}\n\n` : ''}${styleText}# 必须遵守的排版与交互规则\n1. 绝对不要输出 [REPLY]、[OS]、“我：”“TA：”等类似聊天软件的气泡格式。\n2. **必须包含丰富的互动与对话**：不要只写景物或心理，必须对用户的话作出明确回应（用第一人称或贴近视角）。\n3. **旁白与动作标记**：所有的动作、神态、环境等旁白描写**必须**用星号包围，例如：*他微微一笑，转过头去*。\n4. **对话标记**：所有的直接对话台词**必须**用中文双引号包围，例如：“你好啊。”\n5. **内心想法标记**：如果是人物内心的思考和想法，**必须**用括号包围，例如：（这到底是怎么回事……）\n6. 对话台词、内心想法和动作描写要交织在一起，呈现出语意扮演（Roleplay）般的质感（参考 Silly Tavern 风格）。\n7. 单次回复建议在 2-4 个段落，排版错落有致。\n`;
+            return `\n# 线下扮演模式（最高优先级）\n${baseInstruction}\n\n${presetText ? `# 用户自定义预设《${presetName}》\n${presetText}\n\n` : ''}${styleText}# 必须遵守的排版与交互规则\n1. 绝对不要输出 [REPLY]、[OS]、“我：”“TA：”等类似聊天软件的气泡格式。\n2. **必须包含丰富的互动与对话**：不要只写景物或心理，必须对用户的话作出明确回应（用第一人称或贴近视角）。\n3. **旁白与动作标记**：所有的动作、神态、环境等旁白描写**必须**用星号包围，例如：*他微微一笑，转过头去*。\n4. **对话标记**：所有的直接对话台词**必须**用中文双引号包围，例如：“你好啊。”\n5. **内心想法标记**：如果是人物内心的思考和想法，**必须**用括号包围，例如：（这到底是怎么回事……）\n6. 对话台词、内心想法和动作描写要交织在一起，呈现出语意扮演（Roleplay）般的质感（参考 Silly Tavern 风格）。\n7. 单次回复建议在 2-4 个段落，排版错落有致。\n8. **发送图片**：如果你想向用户发送照片、图片（如自拍、风景等），请在回复内容的最后输出 [IMAGE: 对应的英文Danbooru风格画图Prompt]，例如：[IMAGE: 1girl, selfie, masterpiece, highres]。系统会自动为你生成图片并发送。\n`;
         };
 
         let systemPrompt = '';
@@ -1324,7 +1324,7 @@ export function useChat(
                     if (segments) {
                         segments.forEach((segment, offset) => {
                             if (segment.type === 'image') {
-                                pushMessageToTargetChat(currentChatId, currentChatType, {
+                                const msg = {
                                     id: Date.now() + index + offset,
                                     sender: 'ai',
                                     senderName: parsed.senderName,
@@ -1334,7 +1334,17 @@ export function useChat(
                                     text: formatAiImageText(segment.content, 'TA'),
                                     osContent: (offset === segments.length - 1) ? (osContent || undefined) : undefined,
                                     timestamp: Date.now()
-                                });
+                                };
+                        pushMessageToTargetChat(currentChatId, currentChatType, msg);
+                        if (externalTrigger.generateImage) {
+                            externalTrigger.generateImage({ prompt: segment.content }).then(url => {
+                                if (url) {
+                                    msg.imageUrl = url;
+                                    if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
+                                    if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
+                                }
+                            }).catch(e => console.error('AI Auto Image Gen Error:', e));
+                        }
                             } else {
                                 pushMessageToTargetChat(currentChatId, currentChatType, {
                                     id: Date.now() + index + offset,
@@ -1351,7 +1361,7 @@ export function useChat(
                     }
                     const imageDesc = extractAiImageDescription(parsed.content);
                     if (imageDesc) {
-                        pushMessageToTargetChat(currentChatId, currentChatType, {
+                        const msg = {
                             id: Date.now() + index,
                             sender: 'ai',
                             senderName: parsed.senderName,
@@ -1361,7 +1371,17 @@ export function useChat(
                             text: formatAiImageText(imageDesc, 'TA'),
                             osContent: osContent || undefined,
                             timestamp: Date.now()
-                        });
+                        };
+                        pushMessageToTargetChat(currentChatId, currentChatType, msg);
+                        if (externalTrigger.generateImage) {
+                            externalTrigger.generateImage({ prompt: imageDesc }).then(url => {
+                                if (url) {
+                                    msg.imageUrl = url;
+                                    if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
+                                    if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
+                                }
+                            }).catch(e => console.error('AI Auto Image Gen Error:', e));
+                        }
                         return;
                     }
                     const stickerSegments = extractStickersFromText(parsed.content);
@@ -1449,7 +1469,7 @@ export function useChat(
                     if (segments) {
                         segments.forEach((segment, offset) => {
                             if (segment.type === 'image') {
-                                pushMessageToTargetChat(currentChatId, currentChatType, {
+                                const msg = {
                                     id: Date.now() + index + offset,
                                     sender: 'ai',
                                     messageType: 'image',
@@ -1457,7 +1477,17 @@ export function useChat(
                                     text: formatAiImageText(segment.content, chatSettings.getActiveChatPronoun ? chatSettings.getActiveChatPronoun() : 'TA'),
                                     osContent: (offset === segments.length - 1) ? (osContent || undefined) : undefined,
                                     timestamp: Date.now()
-                                });
+                                };
+                        pushMessageToTargetChat(currentChatId, currentChatType, msg);
+                        if (externalTrigger.generateImage) {
+                            externalTrigger.generateImage({ prompt: segment.content }).then(url => {
+                                if (url) {
+                                    msg.imageUrl = url;
+                                    if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
+                                    if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
+                                }
+                            }).catch(e => console.error('AI Auto Image Gen Error:', e));
+                        }
                             } else {
                                 pushMessageToTargetChat(currentChatId, currentChatType, {
                                     id: Date.now() + index + offset,
@@ -1472,7 +1502,7 @@ export function useChat(
                     }
                     const imageDesc = extractAiImageDescription(trimmedText);
                     if (imageDesc) {
-                        pushMessageToTargetChat(currentChatId, currentChatType, {
+                        const msg = {
                             id: Date.now() + index,
                             sender: 'ai',
                             messageType: 'image',
@@ -1480,7 +1510,17 @@ export function useChat(
                             text: formatAiImageText(imageDesc, chatSettings.getActiveChatPronoun ? chatSettings.getActiveChatPronoun() : 'TA'),
                             osContent: osContent || undefined,
                             timestamp: Date.now()
-                        });
+                        };
+                        pushMessageToTargetChat(currentChatId, currentChatType, msg);
+                        if (externalTrigger.generateImage) {
+                            externalTrigger.generateImage({ prompt: imageDesc }).then(url => {
+                                if (url) {
+                                    msg.imageUrl = url;
+                                    if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
+                                    if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
+                                }
+                            }).catch(e => console.error('AI Auto Image Gen Error:', e));
+                        }
                         return;
                     }
                     const shoppingCard = extractAiShoppingCard(trimmedText);

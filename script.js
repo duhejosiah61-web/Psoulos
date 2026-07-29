@@ -1682,7 +1682,8 @@ export function setupApp() {
                 openedApp,
                 saveSoulLinkMessages: () => chatPersistence.saveSoulLinkMessages(),
                 saveSoulLinkGroups: () => chatPersistence.saveSoulLinkGroups(),
-                saveArchivedChats: () => chatPersistence.saveArchivedChats()
+                saveArchivedChats: () => chatPersistence.saveArchivedChats(),
+                generateImage: imageGen.generateImage
             }
         );
         // useChat 内的 chatSettings 为 Proxy，必须在 useChatSettings 赋值后才能读到 getChatSummaryCursor 等（本段同步执行，早于首条消息）
