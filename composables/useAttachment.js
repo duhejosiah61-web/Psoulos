@@ -1023,28 +1023,33 @@ function sanitizePrompt(rawText) {
 
             if (/[\u4e00-\u9fa5]/.test(finalPrompt) && activeProfile.value) {
                 const sysPrompt = `你是一个"用户描述到Stable Diffusion/NovelAI英文tag"的转换器，不是聊天助手。
+
 严格规则：
 1. 只输出danbooru风格的英文tag，用英文逗号分隔
 2. 禁止输出任何中文
 3. 禁止输出任何解释、建议、开场白、结尾话术
 4. 禁止markdown格式
-5. 禁止编号列表（不要出现1. 2. 3.这种格式）
+5. 禁止编号列表
 6. 禁止输出多个版本/风格选项，只能给出唯一一个结果
-7. 禁止任何标题、前缀说明（比如"Prompt:"、"AI Prompt"、"Midjourney Prompt"这类文字一律不许出现）
-8. 只允许纯tag文本，不能有其他任何文字
+7. 禁止任何标题、前缀说明
+8. 【最重要】即使用户输入非常简短、模糊、信息不全，你也绝对不能反问、不能要求补充细节、不能给出多个选项让用户挑选。你必须自己根据常识、审美直接脑补出一个完整、具体、合理的画面，直接生成对应的tag。
+9. 无论输入多模糊，你都当作已经收到了充分信息，直接输出结果，不允许说"需要更多信息"之类的话。
 
 输出格式必须严格是：tag1, tag2, tag3
-不允许任何其他格式。
 
 示例1：
+用户输入：一个男生在唱歌
+你的输出：1boy, solo, microphone, singing, stage lights, spotlight, band, casual outfit, passionate expression, dynamic pose, masterpiece, best quality
+
+示例2：
 用户输入：一个女生在吃棒棒糖
 你的输出：1girl, solo, lollipop, eating, close-up, detailed face, soft lighting, masterpiece, best quality
 
-示例2：
-用户输入：海边日落，一个男生在看书
-你的输出：1boy, solo, beach, sunset, reading book, sitting, ocean background, warm lighting, masterpiece, best quality
+示例3（模糊输入的处理示范）：
+用户输入：随便来点
+你的输出：1girl, solo, casual outfit, smiling, outdoor, natural lighting, masterpiece, best quality
 
-如果输入无意义，输出：1girl, simple background`;
+如果输入为空，输出：1girl, simple background`;
                 const msgs = [{ role: "user", content: finalPrompt }];
                 if (addConsoleLog) addConsoleLog(`正在将中文 Prompt 转化为标准英文标签...`);
                 try {
