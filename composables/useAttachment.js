@@ -66,6 +66,8 @@ export function useAttachment(opts) {
     const showTransferPanel = ref(false);
     const showPhotoSelectPanel = ref(false);
     const showTextImagePanel = ref(false);
+    const pureTextImageText = ref('');
+    const showPureTextImagePanel = ref(false);
     const textImageText = ref('');
     const textImageBgColor = ref('#ffffff');
     const textImageColors = ['#ffffff', '#f8f5f0', '#fef3c7', '#dbeafe', '#f3e8ff', '#fce7f3', '#dcfce7'];
@@ -1088,6 +1090,83 @@ function sanitizePrompt(rawText) {
     return text;
 }
 
+    const sendPureTextImage = async () => {
+        if (!pureTextImageText.value.trim() || isGeneratingChatImage.value) return;
+        
+        isGeneratingChatImage.value = true;
+        try {
+            const text = pureTextImageText.value.trim();
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            
+            // Background
+            ctx.fillStyle = '#f5f5f5';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Text configuration
+            ctx.fillStyle = '#333333';
+            ctx.font = '32px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            const words = text.split('');
+            let line = '';
+            const lines = [];
+            const maxWidth = 460;
+            
+            for (let i = 0; i < words.length; i++) {
+                const testLine = line + words[i];
+                const metrics = ctx.measureText(testLine);
+                if (metrics.width > maxWidth && i > 0) {
+                    lines.push(line);
+                    line = words[i];
+                } else {
+                    line = testLine;
+                }
+            }
+            lines.push(line);
+            
+            const lineHeight = 40;
+            const totalHeight = lines.length * lineHeight;
+            let startY = (canvas.height - totalHeight) / 2 + lineHeight / 2;
+            
+            lines.forEach(l => {
+                ctx.fillText(l, canvas.width / 2, startY);
+                startY += lineHeight;
+            });
+            
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+            
+            const msgId = Date.now();
+            const msg = {
+                id: msgId,
+                sender: 'user',
+                messageType: 'image',
+                imageUrl: dataUrl,
+                timestamp: msgId,
+                isReplied: false,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            };
+            if (soulLinkActiveChatType.value === 'group') {
+                msg.senderName = '我';
+            }
+            pushMessageToActiveChat(msg);
+            saveSoulLinkMessages();
+            scrollToBottom();
+            
+            showPureTextImagePanel.value = false;
+            pureTextImageText.value = '';
+        } catch (e) {
+            console.error('文字图生成失败:', e);
+            alert('文字图生成失败');
+        } finally {
+            isGeneratingChatImage.value = false;
+        }
+    };
+
     const sendTextImage = async () => {
         if (!textImageText.value.trim() || isGeneratingChatImage.value) return;
         
@@ -1205,6 +1284,9 @@ function sanitizePrompt(rawText) {
         showArchivedChats,
         archiveName,
         archiveDescription,
+        pureTextImageText,
+        showPureTextImagePanel,
+        sendPureTextImage,
         textImageText,
         textImageBgColor,
         textImageColors,

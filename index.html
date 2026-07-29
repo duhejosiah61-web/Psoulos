@@ -4060,6 +4060,26 @@
             </div>
         </div>
 
+        <!-- 文字图 -->
+        <div v-if="showPureTextImagePanel" class="text-image-overlay" @click.self="showPureTextImagePanel = false">
+            <div class="text-image-panel">
+                <div class="text-image-header">
+                    <button class="back-btn-small" @click="showPureTextImagePanel = false; showPhotoSelectPanel = true"><i class="fas fa-arrow-left"></i></button>
+                    <h3>文字图</h3>
+                    <div style="width: 40px;"></div>
+                </div>
+                <div class="text-image-content" style="padding: 20px;">
+                    <div class="text-image-controls" style="width: 100%;">
+                        <textarea v-model="pureTextImageText" placeholder="输入要生成的文字内容..." class="text-image-input" style="height: 120px; font-size: 15px; border: 1px solid rgba(0,0,0,0.1); border-radius: 8px; padding: 12px; background: rgba(0,0,0,0.02);"></textarea>
+                    </div>
+                </div>
+                <button class="send-text-image-btn" @click="sendPureTextImage" :disabled="!pureTextImageText.trim() || isGeneratingChatImage">
+                    <i class="fas" :class="isGeneratingChatImage ? 'fa-spinner fa-spin' : 'fa-font'"></i>
+                    {{ isGeneratingChatImage ? '生成中...' : '生成发送' }}
+                </button>
+            </div>
+        </div>
+
         <!-- 购物面板 -->
         <div v-if="showTaobaoPanel" class="modal-overlay" @click.self="showTaobaoPanel = false">
             <div class="taobao-modal">
@@ -4181,6 +4201,13 @@
                         </div>
                         <span class="option-label">文生图</span>
                         <span class="option-desc">AI 生成图片</span>
+                    </div>
+                    <div class="photo-option" @click="showPureTextImagePanel = true; showPhotoSelectPanel = false">
+                        <div class="option-icon">
+                            <i class="fas fa-font"></i>
+                        </div>
+                        <span class="option-label">文字图</span>
+                        <span class="option-desc">纯文字生成图片</span>
                     </div>
                 </div>
             </div>
