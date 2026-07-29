@@ -2159,24 +2159,31 @@
 }
 
 .attachment-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 16px 12px;
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 14px;
+    padding-bottom: 4px;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+.attachment-grid::-webkit-scrollbar {
+    display: none;
 }
 
 .attachment-item {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 12px;
     border-radius: 18px;
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
     background: rgba(255, 255, 255, 0.5);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.9);
-    aspect-ratio: 1;
-    min-height: 50px;
+    flex: 0 0 56px;
+    height: 56px;
+    box-sizing: border-box;
 }
 
 .attachment-item:active {
