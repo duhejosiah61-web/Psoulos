@@ -6,7 +6,7 @@
 @import url('./css/variables.css');
 
 
-@import url('./css/apps/chat.css');
+@import url('./css/apps/chat.css?v=20260729_v2');
 @import url('./css/apps/console.css');
 @import url('./css/apps/ember.css');
 @import url('./css/apps/feed.css');
