@@ -3,48 +3,6 @@ import { ref, computed, watch, nextTick } from 'https://unpkg.com/vue@3/dist/vue
 import { callAI } from '../api.js';
 
 export function useChat(
-
-    const generateFallbackTextImage = (text) => {
-        try {
-            const canvas = document.createElement('canvas');
-            canvas.width = 512;
-            canvas.height = 512;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#f5f5f5';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = '#333333';
-            ctx.font = '32px "Playfair Display", Georgia, serif, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            const words = (text || '').split('');
-            let line = '';
-            const lines = [];
-            const maxWidth = 460;
-            for (let i = 0; i < words.length; i++) {
-                const testLine = line + words[i];
-                const metrics = ctx.measureText(testLine);
-                if (metrics.width > maxWidth && i > 0) {
-                    lines.push(line);
-                    line = words[i];
-                } else {
-                    line = testLine;
-                }
-            }
-            lines.push(line);
-            const lineHeight = 40;
-            const totalHeight = lines.length * lineHeight;
-            let startY = (canvas.height - totalHeight) / 2 + lineHeight / 2;
-            lines.forEach(l => {
-                ctx.fillText(l, canvas.width / 2, startY);
-                startY += lineHeight;
-            });
-            return canvas.toDataURL('image/jpeg', 0.9);
-        } catch (err) {
-            console.error('Fallback image generation failed:', err);
-            return null;
-        }
-    };
-
     characters,
     worldbooks,
     presets,
@@ -57,6 +15,35 @@ export function useChat(
     // 可选依赖（用于外部交互）
     externalTrigger = {}
 ) {
+    // ── AI 自主发图 fallback ──────────────────────────────────────────────────
+    const generateFallbackTextImage = (text) => {
+        try {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512; canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#f5f5f5';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#333333';
+            ctx.font = '32px "Playfair Display", Georgia, serif, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const words = (text || '').split('');
+            let line = ''; const lines = []; const maxWidth = 460;
+            for (let i = 0; i < words.length; i++) {
+                const testLine = line + words[i];
+                if (ctx.measureText(testLine).width > maxWidth && i > 0) {
+                    lines.push(line); line = words[i];
+                } else { line = testLine; }
+            }
+            lines.push(line);
+            const lineHeight = 40;
+            let startY = (canvas.height - lines.length * lineHeight) / 2 + lineHeight / 2;
+            lines.forEach(l => { ctx.fillText(l, canvas.width / 2, startY); startY += lineHeight; });
+            return canvas.toDataURL('image/jpeg', 0.9);
+        } catch (err) { console.error('Fallback image gen failed:', err); return null; }
+    };
+    // ─────────────────────────────────────────────────────────────────────────
+
     // ==================== 核心状态 ====================
     const soulLinkTab = ref('msg');
     const soulLinkActiveChat = ref(null);
@@ -476,26 +463,21 @@ export function useChat(
         }
     };
 
-    // Update imageUrl on a message that's already been pushed into reactive arrays
+    // Reactive-safe image URL updater (avoids Vue not tracking plain-object mutation)
     const updateMessageImageUrl = (chatId, chatType, msgId, imageUrl) => {
         let found = null;
         if (chatType === 'group') {
             const group = soulLinkGroups.value.find(g => String(g.id) === String(chatId));
-            if (group && Array.isArray(group.history)) {
-                found = group.history.find(m => m.id === msgId);
-            }
+            if (group && Array.isArray(group.history)) found = group.history.find(m => m.id === msgId);
         } else if (isRightnowMode.value) {
             const slotSuffix = rightnowActiveSlot.value ? `_${rightnowActiveSlot.value}` : '';
-            const key = `${chatId}${slotSuffix}`;
-            const arr = rightnowMessages.value[key];
+            const arr = rightnowMessages.value[`${chatId}${slotSuffix}`];
             if (Array.isArray(arr)) found = arr.find(m => m.id === msgId);
         } else {
             const arr = soulLinkMessages.value[chatId];
             if (Array.isArray(arr)) found = arr.find(m => m.id === msgId);
         }
-        if (found) {
-            found.imageUrl = imageUrl;
-        }
+        if (found) found.imageUrl = imageUrl;
     };
 
     const markMessagesReplied = (history, ids) => {
@@ -1408,25 +1390,21 @@ export function useChat(
                                     if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
                                 }
                             }).catch(e => {
-                                console.warn('AI Auto Image Gen failed, using text image fallback:', e);
-                                const fallbackUrl = generateFallbackTextImage(segment.content);
-                                if (fallbackUrl) {
-                                    updateMessageImageUrl(currentChatId, currentChatType, msg.id, fallbackUrl);
-                                    msg.originalPrompt = segment.content;
-                                    msg.optimizedPrompt = segment.content;
+                                console.warn('AI image gen failed, using text fallback:', e);
+                                const fbUrl = generateFallbackTextImage(segment.content);
+                                if (fbUrl) {
+                                    updateMessageImageUrl(currentChatId, currentChatType, msg.id, fbUrl);
                                     if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
                                     if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
+                                }
+                            });
                         } else {
-                            const fallbackUrl = generateFallbackTextImage(segment.content);
-                            if (fallbackUrl) {
-                                updateMessageImageUrl(currentChatId, currentChatType, msg.id, fallbackUrl);
-                                msg.originalPrompt = segment.content;
-                                msg.optimizedPrompt = segment.content;
+                            const fbUrl = generateFallbackTextImage(segment.content);
+                            if (fbUrl) {
+                                updateMessageImageUrl(currentChatId, currentChatType, msg.id, fbUrl);
                                 if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
                                 if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
                             }
-                        }
-                            });
                         }
                             } else {
                                 pushMessageToTargetChat(currentChatId, currentChatType, {
@@ -1464,25 +1442,21 @@ export function useChat(
                                     if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
                                 }
                             }).catch(e => {
-                                console.warn('AI Auto Image Gen failed, using text image fallback:', e);
-                                const fallbackUrl = generateFallbackTextImage(imageDesc);
-                                if (fallbackUrl) {
-                                    updateMessageImageUrl(currentChatId, currentChatType, msg.id, fallbackUrl);
-                                    msg.originalPrompt = imageDesc;
-                                    msg.optimizedPrompt = imageDesc;
+                                console.warn('AI image gen failed, using text fallback:', e);
+                                const fbUrl = generateFallbackTextImage(imageDesc);
+                                if (fbUrl) {
+                                    updateMessageImageUrl(currentChatId, currentChatType, msg.id, fbUrl);
                                     if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
                                     if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
+                                }
+                            });
                         } else {
-                            const fallbackUrl = generateFallbackTextImage(imageDesc);
-                            if (fallbackUrl) {
-                                updateMessageImageUrl(currentChatId, currentChatType, msg.id, fallbackUrl);
-                                msg.originalPrompt = imageDesc;
-                                msg.optimizedPrompt = imageDesc;
+                            const fbUrl = generateFallbackTextImage(imageDesc);
+                            if (fbUrl) {
+                                updateMessageImageUrl(currentChatId, currentChatType, msg.id, fbUrl);
                                 if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
                                 if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
                             }
-                        }
-                            });
                         }
                         return;
                     }
@@ -1589,25 +1563,21 @@ export function useChat(
                                     if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
                                 }
                             }).catch(e => {
-                                console.warn('AI Auto Image Gen failed, using text image fallback:', e);
-                                const fallbackUrl = generateFallbackTextImage(segment.content);
-                                if (fallbackUrl) {
-                                    updateMessageImageUrl(currentChatId, currentChatType, msg.id, fallbackUrl);
-                                    msg.originalPrompt = segment.content;
-                                    msg.optimizedPrompt = segment.content;
+                                console.warn('AI image gen failed, using text fallback:', e);
+                                const fbUrl = generateFallbackTextImage(segment.content);
+                                if (fbUrl) {
+                                    updateMessageImageUrl(currentChatId, currentChatType, msg.id, fbUrl);
                                     if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
                                     if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
+                                }
+                            });
                         } else {
-                            const fallbackUrl = generateFallbackTextImage(segment.content);
-                            if (fallbackUrl) {
-                                updateMessageImageUrl(currentChatId, currentChatType, msg.id, fallbackUrl);
-                                msg.originalPrompt = segment.content;
-                                msg.optimizedPrompt = segment.content;
+                            const fbUrl = generateFallbackTextImage(segment.content);
+                            if (fbUrl) {
+                                updateMessageImageUrl(currentChatId, currentChatType, msg.id, fbUrl);
                                 if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
                                 if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
                             }
-                        }
-                            });
                         }
                             } else {
                                 pushMessageToTargetChat(currentChatId, currentChatType, {
@@ -1641,25 +1611,21 @@ export function useChat(
                                     if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
                                 }
                             }).catch(e => {
-                                console.warn('AI Auto Image Gen failed, using text image fallback:', e);
-                                const fallbackUrl = generateFallbackTextImage(imageDesc);
-                                if (fallbackUrl) {
-                                    updateMessageImageUrl(currentChatId, currentChatType, msg.id, fallbackUrl);
-                                    msg.originalPrompt = imageDesc;
-                                    msg.optimizedPrompt = imageDesc;
+                                console.warn('AI image gen failed, using text fallback:', e);
+                                const fbUrl = generateFallbackTextImage(imageDesc);
+                                if (fbUrl) {
+                                    updateMessageImageUrl(currentChatId, currentChatType, msg.id, fbUrl);
                                     if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
                                     if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
+                                }
+                            });
                         } else {
-                            const fallbackUrl = generateFallbackTextImage(imageDesc);
-                            if (fallbackUrl) {
-                                updateMessageImageUrl(currentChatId, currentChatType, msg.id, fallbackUrl);
-                                msg.originalPrompt = imageDesc;
-                                msg.optimizedPrompt = imageDesc;
+                            const fbUrl = generateFallbackTextImage(imageDesc);
+                            if (fbUrl) {
+                                updateMessageImageUrl(currentChatId, currentChatType, msg.id, fbUrl);
                                 if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
                                 if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
                             }
-                        }
-                            });
                         }
                         return;
                     }
