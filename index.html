@@ -4070,7 +4070,7 @@
                 </div>
                 <div class="text-image-content" style="padding: 20px;">
                     <div class="text-image-controls" style="width: 100%;">
-                        <textarea v-model="pureTextImageText" placeholder="输入要生成的文字内容..." class="text-image-input" style="height: 120px; font-size: 15px; border: 1px solid rgba(0,0,0,0.1); border-radius: 8px; padding: 12px; background: rgba(0,0,0,0.02);"></textarea>
+                        <textarea v-model="pureTextImageText" placeholder="输入要生成的文字内容..." class="text-image-input" style="height: 120px; font-size: 15px; color: #000; border: 1px solid rgba(0,0,0,0.1); border-radius: 8px; padding: 12px; background: rgba(0,0,0,0.02); color: #000;"></textarea>
                     </div>
                 </div>
                 <button class="send-text-image-btn" @click="sendPureTextImage" :disabled="!pureTextImageText.trim() || isGeneratingChatImage">
@@ -4223,7 +4223,7 @@
                 </div>
                 <div class="text-image-content" style="padding: 20px;">
                     <div class="text-image-controls" style="width: 100%;">
-                        <textarea name="sp_field_83" id="sp-field-83" v-model="textImageText" placeholder="输入画面描述 (Prompt)..." class="text-image-input" style="height: 120px; font-size: 15px; border: 1px solid rgba(0,0,0,0.1); border-radius: 8px; padding: 12px; background: rgba(0,0,0,0.02);"></textarea>
+                        <textarea name="sp_field_83" id="sp-field-83" v-model="textImageText" placeholder="输入画面描述 (Prompt)..." class="text-image-input" style="height: 120px; font-size: 15px; border: 1px solid rgba(0,0,0,0.1); border-radius: 8px; padding: 12px; background: rgba(0,0,0,0.02); color: #000;"></textarea>
                     </div>
                 </div>
                 <button class="send-text-image-btn" @click="sendTextImage" :disabled="!textImageText.trim() || isGeneratingChatImage">
@@ -5201,7 +5201,7 @@
                     <label>名称</label>
                     <input name="sp_field_128" id="sp-field-128" v-model="editingWorldbook.name" placeholder="世界书名称">
                     <label class="mt-2">类型</label>
-                    <select name="sp_field_type" id="sp-field-type" v-model="editingWorldbook.category" style="width: 100%; padding: 10px; border: 1px solid rgba(0,0,0,0.1); border-radius: 12px; background: rgba(0,0,0,0.02); font-size: 14px; outline: none; transition: border-color 0.2s;">
+                    <select name="sp_field_type" id="sp-field-type" v-model="editingWorldbook.category" style="width: 100%; padding: 10px; border: 1px solid rgba(0,0,0,0.1); border-radius: 12px; background: rgba(0,0,0,0.02); color: #000; font-size: 14px; outline: none; transition: border-color 0.2s;">
                         <option value="global">全局世界书 (所有角色生效)</option>
                         <option value="character">角色世界书 (仅绑定角色生效)</option>
                     </select>
