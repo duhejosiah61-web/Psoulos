@@ -476,6 +476,28 @@ export function useChat(
         }
     };
 
+    // Update imageUrl on a message that's already been pushed into reactive arrays
+    const updateMessageImageUrl = (chatId, chatType, msgId, imageUrl) => {
+        let found = null;
+        if (chatType === 'group') {
+            const group = soulLinkGroups.value.find(g => String(g.id) === String(chatId));
+            if (group && Array.isArray(group.history)) {
+                found = group.history.find(m => m.id === msgId);
+            }
+        } else if (isRightnowMode.value) {
+            const slotSuffix = rightnowActiveSlot.value ? `_${rightnowActiveSlot.value}` : '';
+            const key = `${chatId}${slotSuffix}`;
+            const arr = rightnowMessages.value[key];
+            if (Array.isArray(arr)) found = arr.find(m => m.id === msgId);
+        } else {
+            const arr = soulLinkMessages.value[chatId];
+            if (Array.isArray(arr)) found = arr.find(m => m.id === msgId);
+        }
+        if (found) {
+            found.imageUrl = imageUrl;
+        }
+    };
+
     const markMessagesReplied = (history, ids) => {
         if (!Array.isArray(ids) || ids.length === 0) return;
         history.forEach(m => {
@@ -1381,7 +1403,7 @@ export function useChat(
                         if (externalTrigger.generateImage) {
                             externalTrigger.generateImage({ prompt: segment.content }).then(url => {
                                 if (url) {
-                                    msg.imageUrl = url;
+                                    updateMessageImageUrl(currentChatId, currentChatType, msg.id, url);
                                     if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
                                     if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
                                 }
@@ -1389,7 +1411,7 @@ export function useChat(
                                 console.warn('AI Auto Image Gen failed, using text image fallback:', e);
                                 const fallbackUrl = generateFallbackTextImage(segment.content);
                                 if (fallbackUrl) {
-                                    msg.imageUrl = fallbackUrl;
+                                    updateMessageImageUrl(currentChatId, currentChatType, msg.id, fallbackUrl);
                                     msg.originalPrompt = segment.content;
                                     msg.optimizedPrompt = segment.content;
                                     if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
@@ -1397,7 +1419,7 @@ export function useChat(
                         } else {
                             const fallbackUrl = generateFallbackTextImage(segment.content);
                             if (fallbackUrl) {
-                                msg.imageUrl = fallbackUrl;
+                                updateMessageImageUrl(currentChatId, currentChatType, msg.id, fallbackUrl);
                                 msg.originalPrompt = segment.content;
                                 msg.optimizedPrompt = segment.content;
                                 if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
@@ -1437,7 +1459,7 @@ export function useChat(
                         if (externalTrigger.generateImage) {
                             externalTrigger.generateImage({ prompt: imageDesc }).then(url => {
                                 if (url) {
-                                    msg.imageUrl = url;
+                                    updateMessageImageUrl(currentChatId, currentChatType, msg.id, url);
                                     if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
                                     if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
                                 }
@@ -1445,7 +1467,7 @@ export function useChat(
                                 console.warn('AI Auto Image Gen failed, using text image fallback:', e);
                                 const fallbackUrl = generateFallbackTextImage(imageDesc);
                                 if (fallbackUrl) {
-                                    msg.imageUrl = fallbackUrl;
+                                    updateMessageImageUrl(currentChatId, currentChatType, msg.id, fallbackUrl);
                                     msg.originalPrompt = imageDesc;
                                     msg.optimizedPrompt = imageDesc;
                                     if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
@@ -1453,7 +1475,7 @@ export function useChat(
                         } else {
                             const fallbackUrl = generateFallbackTextImage(imageDesc);
                             if (fallbackUrl) {
-                                msg.imageUrl = fallbackUrl;
+                                updateMessageImageUrl(currentChatId, currentChatType, msg.id, fallbackUrl);
                                 msg.originalPrompt = imageDesc;
                                 msg.optimizedPrompt = imageDesc;
                                 if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
@@ -1562,7 +1584,7 @@ export function useChat(
                         if (externalTrigger.generateImage) {
                             externalTrigger.generateImage({ prompt: segment.content }).then(url => {
                                 if (url) {
-                                    msg.imageUrl = url;
+                                    updateMessageImageUrl(currentChatId, currentChatType, msg.id, url);
                                     if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
                                     if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
                                 }
@@ -1570,7 +1592,7 @@ export function useChat(
                                 console.warn('AI Auto Image Gen failed, using text image fallback:', e);
                                 const fallbackUrl = generateFallbackTextImage(segment.content);
                                 if (fallbackUrl) {
-                                    msg.imageUrl = fallbackUrl;
+                                    updateMessageImageUrl(currentChatId, currentChatType, msg.id, fallbackUrl);
                                     msg.originalPrompt = segment.content;
                                     msg.optimizedPrompt = segment.content;
                                     if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
@@ -1578,7 +1600,7 @@ export function useChat(
                         } else {
                             const fallbackUrl = generateFallbackTextImage(segment.content);
                             if (fallbackUrl) {
-                                msg.imageUrl = fallbackUrl;
+                                updateMessageImageUrl(currentChatId, currentChatType, msg.id, fallbackUrl);
                                 msg.originalPrompt = segment.content;
                                 msg.optimizedPrompt = segment.content;
                                 if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
@@ -1614,7 +1636,7 @@ export function useChat(
                         if (externalTrigger.generateImage) {
                             externalTrigger.generateImage({ prompt: imageDesc }).then(url => {
                                 if (url) {
-                                    msg.imageUrl = url;
+                                    updateMessageImageUrl(currentChatId, currentChatType, msg.id, url);
                                     if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
                                     if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
                                 }
@@ -1622,7 +1644,7 @@ export function useChat(
                                 console.warn('AI Auto Image Gen failed, using text image fallback:', e);
                                 const fallbackUrl = generateFallbackTextImage(imageDesc);
                                 if (fallbackUrl) {
-                                    msg.imageUrl = fallbackUrl;
+                                    updateMessageImageUrl(currentChatId, currentChatType, msg.id, fallbackUrl);
                                     msg.originalPrompt = imageDesc;
                                     msg.optimizedPrompt = imageDesc;
                                     if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
@@ -1630,7 +1652,7 @@ export function useChat(
                         } else {
                             const fallbackUrl = generateFallbackTextImage(imageDesc);
                             if (fallbackUrl) {
-                                msg.imageUrl = fallbackUrl;
+                                updateMessageImageUrl(currentChatId, currentChatType, msg.id, fallbackUrl);
                                 msg.originalPrompt = imageDesc;
                                 msg.optimizedPrompt = imageDesc;
                                 if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
