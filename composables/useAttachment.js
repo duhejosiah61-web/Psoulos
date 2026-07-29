@@ -1015,6 +1015,9 @@ function sanitizePrompt(rawText) {
                         systemPrompt: sysPrompt,
                         temperature: 0.2
                     });
+                    
+                    console.log("=== AI原始返回(未清洗) ===\n", aiResult);
+                    
                     if (aiResult && aiResult.trim()) {
                         finalPrompt = sanitizePrompt(aiResult);
                         if (addConsoleLog) addConsoleLog(`Prompt 转化成功: ${finalPrompt}`);
