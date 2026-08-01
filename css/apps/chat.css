@@ -467,7 +467,7 @@
 
 .message .bubble {
     max-width: 100%;
-    padding: 12px 20px;
+    padding: 10px 16px;
     border-radius: var(--chat-bubble-radius, 18px);
     font-size: 14px;
     line-height: 1.6;
@@ -475,7 +475,9 @@
     word-wrap: break-word;
     font-family: 'Inter', sans-serif;
     border: 1px solid rgba(0, 0, 0, 0.08);
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
 }
 
 /* Chat message avatars */
@@ -507,19 +509,20 @@
     pointer-events: none;
 }
 
-/* My messages — 纯黑底白字 */
+/* My messages — 深色毛玻璃 */
 .message.user .bubble {
-    background: var(--chat-bubble-user-bg, #000000);
+    background: var(--chat-bubble-user-bg, rgba(0, 0, 0, 0.65));
     color: var(--chat-bubble-user-color, #ffffff);
     border: 1px solid rgba(255, 255, 255, 0.15);
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
 }
 
-/* 对方消息 — 极浅灰、无边框 */
+/* 对方消息 — 浅色毛玻璃 */
 .message.ai .bubble {
-    background: var(--chat-bubble-ai-bg, #f2f2f2);
-    color: var(--chat-bubble-ai-color, #000000);
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+    background: var(--chat-bubble-ai-bg, rgba(255, 255, 255, 0.6));
+    color: var(--chat-bubble-ai-color, #333333);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
 }
 
 /* Bubble Beautify Variants（恢复蓝/橙真实配色） */

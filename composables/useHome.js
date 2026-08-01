@@ -30,11 +30,10 @@ export function useHome({
     if (currentPage.value < 2) currentPage.value++;
   };
   const updateHomePagePosition = () => {
-    const el = document.querySelector('.home-pages');
-    if (el) el.style.transform = `translateX(-${currentPage.value * 100}%)`;
+    // 移除强行 translateX，改为原生滑动
   };
 
-  watch(currentPage, () => updateHomePagePosition());
+  // watch(currentPage, () => updateHomePagePosition());
 
   const photoWidgetDate = ref({ day: '', weekday: '' });
   const photoWidgetText = ref({

@@ -2,27 +2,27 @@
 // == SoulPocket app script
 // =========================================================================
 import { ref, computed, onMounted, onUnmounted, watch, reactive, nextTick } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
-import { useFeed } from './feed.js';
-import { useMate } from './mate.js';
-import { useNotice } from './notice.js';
-import { useGames } from './games.js';
-import { useLive } from './live.js';
-import { usePeek } from './peek.js';
-import { useRead } from './read.js';
-import { useNest } from './nest.js';
-import { useMusic } from './music.js';
-import { useEmber } from './ember.js';
-import { attachSoulStoreCoordinators } from './store.js';
-import { useLockScreen } from './composables/useLockScreen.js';
-import { useTheme } from './composables/useTheme.js';
-import { useChatSettings } from './composables/useChatSettings.js';
-import { useChat } from './composables/useChat.js';
-import { useAttachment } from './composables/useAttachment.js';
-import { useConsole } from './composables/useConsole.js';
-import { useImageGen } from './composables/useImageGen.js?v=20260728_v11';
-import { useWorkshop } from './composables/useWorkshop.js';
-import { useHome } from './composables/useHome.js';
-import { callAI } from './api.js';
+import { useFeed } from './feed.js?v=20260801_v3';
+import { useMate } from './mate.js?v=20260801_v3';
+import { useNotice } from './notice.js?v=20260801_v3';
+import { useGames } from './games.js?v=20260801_v3';
+import { useLive } from './live.js?v=20260801_v3';
+import { usePeek } from './peek.js?v=20260801_v3';
+import { useRead } from './read.js?v=20260801_v3';
+import { useNest } from './nest.js?v=20260801_v3';
+import { useMusic } from './music.js?v=20260801_v3';
+import { useEmber } from './ember.js?v=20260801_v3';
+import { attachSoulStoreCoordinators } from './store.js?v=20260801_v3';
+import { useLockScreen } from './composables/useLockScreen.js?v=20260801_v3';
+import { useTheme } from './composables/useTheme.js?v=20260801_v3';
+import { useChatSettings } from './composables/useChatSettings.js?v=20260801_v2.0.0.0.6';
+import { useChat } from './composables/useChat.js?v=20260801_v3';
+import { useAttachment } from './composables/useAttachment.js?v=20260801_v3';
+import { useConsole } from './composables/useConsole.js?v=20260801_v3';
+import { useImageGen } from './composables/useImageGen.js?v=20260801_v3';
+import { useWorkshop } from './composables/useWorkshop.js?v=20260801_v3';
+import { useHome } from './composables/useHome.js?v=20260801_v3';
+import { callAI } from './api.js?v=20260801_v3';
 
 
 export function setupApp() {
@@ -4204,9 +4204,136 @@ ${styleGuide}
         const musicPlayPrevious = () => musicState.playPrevious();
         const musicPlayNext = () => musicState.playNext();
 
+        const showUpdateNotice = ref(true);
+        const updateNoticeVersion = ref('最新版本：v2.0.0.0.7 - 增加了直接在界面上点击“获取 AI 指南”一键下载模板的功能！');
+        const closeUpdateNotice = () => { showUpdateNotice.value = false; };
+
+        const uploadLockWallpaper = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const fn = typeof globalThis.compressAvatarImage === 'function' ? globalThis.compressAvatarImage : (data, p, cb) => cb(data);
+                    fn(ev.target.result, 'background', (compressed) => {
+                        lock.lockWallpaperInput.value = compressed;
+                        lock.saveLockWallpaper();
+                    });
+                };
+                reader.readAsDataURL(file);
+            }
+            e.target.value = '';
+        };
+
+        const uploadHomeWallpaper = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const fn = typeof globalThis.compressAvatarImage === 'function' ? globalThis.compressAvatarImage : (data, p, cb) => cb(data);
+                    fn(ev.target.result, 'background', (compressed) => {
+                        theme.homeWallpaperInput.value = compressed;
+                        theme.saveHomeWallpaper();
+                    });
+                };
+                reader.readAsDataURL(file);
+            }
+            e.target.value = '';
+        };
+
+        const uploadChatBackgroundImage = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const fn = typeof globalThis.compressAvatarImage === 'function' ? globalThis.compressAvatarImage : (data, p, cb) => cb(data);
+                    fn(ev.target.result, 'background', (compressed) => {
+                        chatSettings.chatBackgroundImageInput = compressed;
+                        chatSettings.applyBackgroundImageLink();
+                    });
+                };
+                reader.readAsDataURL(file);
+            }
+            e.target.value = '';
+        };
+
+        const uploadChatThemeCSS = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    chatSettings.customBubbleCSS = ev.target.result;
+                    chatSettings.applyCustomCSS();
+                };
+                reader.readAsText(file);
+            }
+            e.target.value = '';
+        };
+        const downloadChatBeautifyGuide = () => {
+            const guideText = `你是一个资深的前端开发与 UI/UX 设计师。我现在需要为一个聊天应用编写自定义的 CSS 主题代码。
+
+这个系统允许用户注入原生的 CSS 代码来修改聊天气泡的外观。系统的基本结构如下，请你严格遵守以下选择器结构来进行样式覆盖，这样你的代码才能生效：
+
+### 核心选择器结构
+1. **背景控制**:
+聊天界面的容器叫 \`.wechat-messages\`。如果你想修改聊天背景或聊天容器整体效果，请修改它。
+如果应用了全屏样式，它的顶层容器是 \`#app\` 或 \`.chat-fullscreen\`。
+
+2. **我的消息（发出的气泡）**:
+\`\`\`css
+#app.bubble-style-custom .message.user .bubble {
+    /* 这里的样式会应用到用户发出的气泡上 */
+}
+\`\`\`
+
+3. **对方的消息（收到的气泡）**:
+\`\`\`css
+#app.bubble-style-custom .message.ai .bubble {
+    /* 这里的样式会应用到 AI 或他人发出的气泡上 */
+}
+\`\`\`
+
+4. **语音消息气泡（可选扩展）**:
+\`\`\`css
+#app.bubble-style-custom .voice-message-bubble {
+    /* 语音消息的通用气泡样式 */
+}
+\`\`\`
+
+5. **全局气泡变量（可选，可以直接覆盖）**:
+系统支持这四个内置变量，如果你觉得写具体类名太麻烦，也可以直接覆盖这四个变量：
+\`--chat-bubble-user-bg\` (我的气泡背景色)
+\`--chat-bubble-user-color\` (我的气泡文字颜色)
+\`--chat-bubble-ai-bg\` (对方气泡背景色)
+\`--chat-bubble-ai-color\` (对方气泡文字颜色)
+
+### CSS 编写要求
+- 我会提供一个我想要的主题风格。请运用你的美学知识，设计出高质感、现代化的样式，可以使用 box-shadow, backdrop-filter (毛玻璃), linear-gradient, border-radius, 以及适当的内边距。
+- 确保前景色（字体）和背景色有足够的对比度。
+- 必须确保所有的样式被 \`#app.bubble-style-custom\` 提权包裹，或者使用 \`!important\`，以免被原系统默认样式覆盖。
+- 你可以直接输出 CSS 代码，不需要给出过多的 HTML 解释。
+
+======
+
+**我想要的风格是：**
+【在此处填入你想要的风格，例如：
+- 赛博朋克风，使用霓虹灯光效，暗黑背景，气泡有发光边缘！
+- 完全模仿 iOS iMessage，我的气泡是经典蓝色渐变，对方是浅灰色。
+- 梦幻粉色玻璃质感，气泡半透明，带有浅粉色发光阴影。】
+`;
+            const blob = new Blob([guideText], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'AI聊天皮肤提示词模板.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+        };
+
         console.log('setup end');
 
         const returnObject = {
+            uploadLockWallpaper, uploadHomeWallpaper, uploadChatBackgroundImage, uploadChatThemeCSS, downloadChatBeautifyGuide,
+            showUpdateNotice, updateNoticeVersion, closeUpdateNotice,
             // SoulLink / Chat
             soulLinkTab, soulLinkActiveChat, soulLinkActiveChatType, soulLinkInput, soulLinkReplyTarget,
             soulLinkMessages, soulLinkGroups, activeGroupChat, activeChatMessages, currentChatMessages, recentChats,
@@ -4759,7 +4886,10 @@ ${styleGuide}
             closeImageCropModal: noop,
             confirmImageCrop: noop,
             onImageCropDragStart: noop,
-            onImageCropScaleChange: noop
+            onImageCropScaleChange: noop,
+            showUpdateNotice: ref(true),
+            updateNoticeVersion: ref('当前版本: v2.0 - 彻底解除了桌面的宽度限制，畅享大屏体验！'),
+            closeUpdateNotice: () => { showUpdateNotice.value = false; }
         };
     }
 }

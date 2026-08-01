@@ -20,7 +20,7 @@
 /* 主屏幕内部“隐形手机宽度”，锁住图标和小组件的布局宽度 */
 .homescreen-inner {
     width: 100%;
-    max-width: 430px; /* 模拟常见手机宽度 */
+    /* 移除了 max-width 限制，让界面能够占满宽屏 */
     margin: 0 auto;
     height: 100%;
     display: flex;
@@ -492,7 +492,7 @@
     justify-content: flex-start;
     cursor: pointer;
     transition: transform 0.3s ease;
-    aspect-ratio: 1 / 1.2;
+    height: max-content;
     flex-shrink: 0;
 }
 .app-icon:hover { transform: scale(1.05); }
@@ -529,12 +529,12 @@
     font-weight: 500;
     text-align: center;
     color: #333333;
-    line-height: 1.3;
+    line-height: 1.5;
     width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow: visible;
     white-space: nowrap;
     margin-top: 2px;
+    padding-bottom: 2px;
 }
 
 /* 基础 Widget */
@@ -892,38 +892,17 @@
 }
 
 .homescreen-inner {
-    width: 430px;
-    height: 930px;
+    width: 100%;
+    height: 100%;
     display: flex;
     flex-direction: column;
     box-sizing: border-box;
-    position: absolute;
-    left: 50%;
-    top: auto;
-    bottom: 0;
+    position: relative;
     /* 仅裁切水平方向：避免相邻页漏边；不要用 overflow:hidden 以免裁掉 translateX 后的第 2/3 页 */
     overflow-x: hidden;
     overflow-y: visible;
     /* 预留底部 UI（翻页器 + Dock）高度，避免遮住第5-6行 */
     --home-bottom-gap: clamp(120px, calc(18vh + env(safe-area-inset-bottom)), 190px);
-    /*
-     * 缩放高度预算：必须减去顶部固定状态栏 + 底部安全区（状态栏为 position:absolute，不占文档流）
-     * 使用 min(100dvh, 100svh) 缓解部分桌面/移动浏览器地址栏导致的裁切
-     */
-    --sp-home-vh-budget: min(100dvh, 100vh);
-    --phone-scale: min(
-        calc((100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)) / 430px),
-        calc(
-            (
-                var(--sp-home-vh-budget)
-                - var(--sp-home-status-reserve)
-                - max(env(safe-area-inset-bottom), 0px)
-                - 10px
-            ) / 930px
-        )
-    );
-    transform: translateX(-50%) scale(var(--phone-scale));
-    transform-origin: center bottom;
     padding: 0;
 }
 
@@ -933,13 +912,13 @@
     min-width: 0;
     min-height: 0;
     display: flex;
-    /* 只裁 X：保留纵向给 grid；hidden 会导致多页横滑后内容被整块裁没 */
-    overflow-x: visible;
+    /* 开启原生横向滑动与吸附效果 */
+    overflow-x: auto;
     overflow-y: visible;
-    transition: transform 0.3s ease;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
     box-sizing: border-box;
-    touch-action: pan-y;
-    will-change: transform;
+    touch-action: pan-x pan-y;
     -webkit-overflow-scrolling: touch;
     -ms-overflow-style: none;
     scrollbar-width: none;
@@ -955,6 +934,8 @@
     height: 100%;
     min-height: 100%;
     flex-shrink: 0;
+    scroll-snap-align: center;
+    scroll-snap-stop: always;
     overflow: auto;
     padding: 4% 4%;
     box-sizing: border-box;
@@ -964,18 +945,7 @@
 
 /* 页面指示器：固定在舞台内靠近底部，但不压到第5-6行（坐标在 930px 画布内，不再叠加 env 以免与全局缩放重复） */
 .page-indicator-container {
-    position: absolute !important;
-    left: 50% !important;
-    bottom: 112px !important;
-    transform: translateX(-50%) !important;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 16px;
-    z-index: 99;
-    width: 100%;
-    padding: 0;
-    flex: 0 0 auto;
+    display: none !important;
 }
 
 /* Dock：贴住舞台最底部中间（画布内像素；安全区已在 --phone-scale 中扣除） */
@@ -1031,8 +1001,8 @@
 
 /* 主页底部：让 app 图标随网格单元“高度”自适应（避免只按宽度出高） */
 .first-page-apps .app-icon {
-    height: 100%;
-    justify-content: flex-start; /* 不拉伸到非等比尺寸 */
+    height: auto;
+    justify-content: flex-start;
 }
 
 .first-page-apps .app-icon-wrapper {
@@ -1044,7 +1014,7 @@
 }
 
 .page-2-grid .app-grid-bottom-left .app-icon {
-    height: 100%;
+    height: auto;
     justify-content: flex-start;
 }
 

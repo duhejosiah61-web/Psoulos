@@ -644,9 +644,17 @@ export function useChat(
             }
         }
         
+        let genPrompt = imageDesc;
+        let fbText = imageDesc;
+        if (imageDesc && imageDesc.includes('|')) {
+            const parts = imageDesc.split('|');
+            genPrompt = parts[0].trim();
+            fbText = parts[1].trim() || genPrompt;
+        }
+
         const segments = [];
         if (before) segments.push({ type: 'text', content: before });
-        if (imageDesc) segments.push({ type: 'image', content: imageDesc });
+        if (imageDesc) segments.push({ type: 'image', content: genPrompt, fbText: fbText });
         if (after) segments.push({ type: 'text', content: after });
         
         return segments.length ? segments : null;
@@ -654,7 +662,7 @@ export function useChat(
 
     const extractAiImageDescription = (rawText) => {
         const text = (rawText || '').trim();
-        if (!text) return '';
+        if (!text) return null;
         const patterns = [
             /^\[\s*图片\s*[:：]\s*(.*?)\]/i,
             /^【\s*图片\s*[:：]\s*(.*?)】/i,
@@ -667,10 +675,18 @@ export function useChat(
         for (const pattern of patterns) {
             const match = text.match(pattern);
             if (match) {
-                return match[1].trim() || '一张照片';
+                let imageDesc = match[1].trim() || '一张照片';
+                let genPrompt = imageDesc;
+                let fbText = imageDesc;
+                if (imageDesc.includes('|')) {
+                    const parts = imageDesc.split('|');
+                    genPrompt = parts[0].trim();
+                    fbText = parts[1].trim() || genPrompt;
+                }
+                return { genPrompt, fbText };
             }
         }
-        return '';
+        return null;
     };
 
     const formatAiImageText = (rawText, subject) => {
@@ -773,7 +789,7 @@ export function useChat(
     const buildSoulLinkReplyContext = (msg) => {
         let text = '';
         if (msg.messageType === 'image') {
-            text = msg.text || '[图片]';
+            text = msg.originalPrompt || msg.text || '[图片]';
         } else if (msg.messageType === 'voice') {
             text = msg.transcription ? `[语音消息] "${msg.transcription}"` : (msg.text ? `[语音消息] "${msg.text}"` : '[语音消息]');
         } else if (msg.messageType === 'sticker') {
@@ -1050,7 +1066,7 @@ export function useChat(
                 systemPrompt += `3. 必须在多名成员的回复之间，或者同一成员连发消息之间严格使用 \`---\` 分隔。\n`;
                 systemPrompt += `4. 格式：成员名: [REPLY]正式内容[/REPLY] [OS]内心独白[/OS]。注意：无论是否连发，每一段被 \`---\` 分隔的消息都必须包含独立的 [REPLY] 和 [OS] 标签！\n`;
                 systemPrompt += `5. 表情包使用极其克制：不要每句话都带表情。如果发表情，务必随机挑选，禁止重复使用同一个表情包！\n`;
-                systemPrompt += `6. 附件语法（可随时使用）：\n   - 发送表情包：[表情:表情名]\n   - 发送语音：[语音: 内容]\n   - 发送图片：[图片: 画面描述]\n   - 发送转账：[转账] 金额 附言\n   - 为用户下单外卖/购物：[购买: 物品名: 价格]\n   - 请求用户帮你买单：[帮买请求: 物品名: 价格]\n`;
+                systemPrompt += `6. 附件语法（可随时使用）：\n   - 发送表情包：[表情:表情名]\n   - 发送语音：[语音: 内容]\n   - 发送图片：[图片: 英文提示词(必须全英文) | 中文画面描述]\n   - 发送转账：[转账] 金额 附言\n   - 为用户下单外卖/购物：[购买: 物品名: 价格]\n   - 请求用户帮你买单：[帮买请求: 物品名: 价格]\n`;
                 systemPrompt += `\n现在开始回复。`;
             }
         } else if (char && char.persona) {
@@ -1121,7 +1137,7 @@ export function useChat(
                 systemPrompt += `2. 表情包使用极其克制：不要每句话都带表情，多用纯文字交流。如果需要发表情，务必根据语境随机挑选，禁止重复使用同一个表情包！\n`;
                 systemPrompt += `3. 结合情绪和场景，灵活使用图片或语音。\n`;
                 systemPrompt += `4. 绝对不要暴露AI身份。\n\n`;
-                systemPrompt += `# 附件语法（你可以随时使用以下功能）：\n- 发送语音：[语音: 内容]\n- 发送图片：[图片: 画面描述]\n- 发送转账：[转账] 金额 附言\n- 为对方下单外卖/购物：[购买: 物品名: 价格]\n- 请求对方帮你代付/购买：[帮买请求: 物品名: 价格]${stickerPrompt}\n`;
+                systemPrompt += `# 附件语法（你可以随时使用以下功能）：\n- 发送语音：[语音: 内容]\n- 发送图片：[图片: 英文提示词(必须全英文) | 中文画面描述]\n- 发送转账：[转账] 金额 附言\n- 为对方下单外卖/购物：[购买: 物品名: 价格]\n- 请求对方帮你代付/购买：[帮买请求: 物品名: 价格]${stickerPrompt}\n`;
                 systemPrompt += `\n# 回复格式\n[REPLY]正式回复[/REPLY] [OS]内心独白[/OS]\n注意：无论是否连发，每一段被 \`---\` 分隔的消息都必须包含独立的 [REPLY] 和 [OS] 标签！\n`;
                 systemPrompt += `\n现在请以${charName}的身份回复。`;
             }
@@ -1377,13 +1393,19 @@ export function useChat(
                                     senderAvatar,
                                     messageType: 'image',
                                     imageUrl: null,
-                                    text: formatAiImageText(segment.content, 'TA'),
+                                    originalPrompt: segment.fbText || segment.content,
+                                    optimizedPrompt: segment.content,
+                                    text: formatAiImageText(segment.fbText || segment.content, 'TA'),
                                     osContent: (offset === segments.length - 1) ? (osContent || undefined) : undefined,
                                     timestamp: Date.now()
                                 };
                         pushMessageToTargetChat(currentChatId, currentChatType, msg);
                         if (externalTrigger.generateImage) {
-                            externalTrigger.generateImage({ prompt: segment.content }).then(url => {
+                            const charObj = currentChatType === 'character' ? characters.value.find(c => String(c.id) === String(currentChatId)) : null;
+                            externalTrigger.generateImage({ 
+                                prompt: segment.content,
+                                appearance: charObj?.appearance
+                            }).then(url => {
                                 if (url) {
                                     updateMessageImageUrl(currentChatId, currentChatType, msg.id, url);
                                     if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
@@ -1391,7 +1413,7 @@ export function useChat(
                                 }
                             }).catch(e => {
                                 console.warn('AI image gen failed, using text fallback:', e);
-                                const fbUrl = generateFallbackTextImage(segment.content);
+                                const fbUrl = generateFallbackTextImage(segment.fbText || segment.content);
                                 if (fbUrl) {
                                     updateMessageImageUrl(currentChatId, currentChatType, msg.id, fbUrl);
                                     if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
@@ -1399,7 +1421,7 @@ export function useChat(
                                 }
                             });
                         } else {
-                            const fbUrl = generateFallbackTextImage(segment.content);
+                            const fbUrl = generateFallbackTextImage(segment.fbText || segment.content);
                             if (fbUrl) {
                                 updateMessageImageUrl(currentChatId, currentChatType, msg.id, fbUrl);
                                 if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
@@ -1420,8 +1442,8 @@ export function useChat(
                         });
                         return;
                     }
-                    const imageDesc = extractAiImageDescription(parsed.content);
-                    if (imageDesc) {
+                    const extracted = extractAiImageDescription(parsed.content);
+                    if (extracted) {
                         const msg = {
                             id: Date.now() + index,
                             sender: 'ai',
@@ -1429,13 +1451,19 @@ export function useChat(
                             senderAvatar,
                             messageType: 'image',
                             imageUrl: null,
-                            text: formatAiImageText(imageDesc, 'TA'),
+                            originalPrompt: extracted.fbText,
+                            optimizedPrompt: extracted.genPrompt,
+                            text: formatAiImageText(extracted.fbText, 'TA'),
                             osContent: osContent || undefined,
                             timestamp: Date.now()
                         };
                         pushMessageToTargetChat(currentChatId, currentChatType, msg);
                         if (externalTrigger.generateImage) {
-                            externalTrigger.generateImage({ prompt: imageDesc }).then(url => {
+                            const charObj = currentChatType === 'character' ? characters.value.find(c => String(c.id) === String(currentChatId)) : null;
+                            externalTrigger.generateImage({ 
+                                prompt: extracted.genPrompt,
+                                appearance: charObj?.appearance
+                            }).then(url => {
                                 if (url) {
                                     updateMessageImageUrl(currentChatId, currentChatType, msg.id, url);
                                     if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
@@ -1443,7 +1471,7 @@ export function useChat(
                                 }
                             }).catch(e => {
                                 console.warn('AI image gen failed, using text fallback:', e);
-                                const fbUrl = generateFallbackTextImage(imageDesc);
+                                const fbUrl = generateFallbackTextImage(extracted.fbText);
                                 if (fbUrl) {
                                     updateMessageImageUrl(currentChatId, currentChatType, msg.id, fbUrl);
                                     if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
@@ -1451,7 +1479,7 @@ export function useChat(
                                 }
                             });
                         } else {
-                            const fbUrl = generateFallbackTextImage(imageDesc);
+                            const fbUrl = generateFallbackTextImage(extracted.fbText);
                             if (fbUrl) {
                                 updateMessageImageUrl(currentChatId, currentChatType, msg.id, fbUrl);
                                 if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
@@ -1550,13 +1578,19 @@ export function useChat(
                                     sender: 'ai',
                                     messageType: 'image',
                                     imageUrl: null,
-                                    text: formatAiImageText(segment.content, chatSettings.getActiveChatPronoun ? chatSettings.getActiveChatPronoun() : 'TA'),
+                                    originalPrompt: segment.fbText || segment.content,
+                                    optimizedPrompt: segment.content,
+                                    text: formatAiImageText(segment.fbText || segment.content, chatSettings.getActiveChatPronoun ? chatSettings.getActiveChatPronoun() : 'TA'),
                                     osContent: (offset === segments.length - 1) ? (osContent || undefined) : undefined,
                                     timestamp: Date.now()
                                 };
                         pushMessageToTargetChat(currentChatId, currentChatType, msg);
                         if (externalTrigger.generateImage) {
-                            externalTrigger.generateImage({ prompt: segment.content }).then(url => {
+                            const charObj = currentChatType === 'character' ? characters.value.find(c => String(c.id) === String(currentChatId)) : null;
+                            externalTrigger.generateImage({ 
+                                prompt: segment.content,
+                                appearance: charObj?.appearance
+                            }).then(url => {
                                 if (url) {
                                     updateMessageImageUrl(currentChatId, currentChatType, msg.id, url);
                                     if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
@@ -1564,7 +1598,7 @@ export function useChat(
                                 }
                             }).catch(e => {
                                 console.warn('AI image gen failed, using text fallback:', e);
-                                const fbUrl = generateFallbackTextImage(segment.content);
+                                const fbUrl = generateFallbackTextImage(segment.fbText || segment.content);
                                 if (fbUrl) {
                                     updateMessageImageUrl(currentChatId, currentChatType, msg.id, fbUrl);
                                     if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
@@ -1572,7 +1606,7 @@ export function useChat(
                                 }
                             });
                         } else {
-                            const fbUrl = generateFallbackTextImage(segment.content);
+                            const fbUrl = generateFallbackTextImage(segment.fbText || segment.content);
                             if (fbUrl) {
                                 updateMessageImageUrl(currentChatId, currentChatType, msg.id, fbUrl);
                                 if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
@@ -1591,20 +1625,26 @@ export function useChat(
                         });
                         return;
                     }
-                    const imageDesc = extractAiImageDescription(trimmedText);
-                    if (imageDesc) {
+                    const extracted = extractAiImageDescription(trimmedText);
+                    if (extracted) {
                         const msg = {
                             id: Date.now() + index,
                             sender: 'ai',
                             messageType: 'image',
                             imageUrl: null,
-                            text: formatAiImageText(imageDesc, chatSettings.getActiveChatPronoun ? chatSettings.getActiveChatPronoun() : 'TA'),
+                            originalPrompt: extracted.fbText,
+                            optimizedPrompt: extracted.genPrompt,
+                            text: formatAiImageText(extracted.fbText, chatSettings.getActiveChatPronoun ? chatSettings.getActiveChatPronoun() : 'TA'),
                             osContent: osContent || undefined,
                             timestamp: Date.now()
                         };
                         pushMessageToTargetChat(currentChatId, currentChatType, msg);
                         if (externalTrigger.generateImage) {
-                            externalTrigger.generateImage({ prompt: imageDesc }).then(url => {
+                            const charObj = currentChatType === 'character' ? characters.value.find(c => String(c.id) === String(currentChatId)) : null;
+                            externalTrigger.generateImage({ 
+                                prompt: extracted.genPrompt,
+                                appearance: charObj?.appearance
+                            }).then(url => {
                                 if (url) {
                                     updateMessageImageUrl(currentChatId, currentChatType, msg.id, url);
                                     if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
@@ -1612,7 +1652,7 @@ export function useChat(
                                 }
                             }).catch(e => {
                                 console.warn('AI image gen failed, using text fallback:', e);
-                                const fbUrl = generateFallbackTextImage(imageDesc);
+                                const fbUrl = generateFallbackTextImage(extracted.fbText);
                                 if (fbUrl) {
                                     updateMessageImageUrl(currentChatId, currentChatType, msg.id, fbUrl);
                                     if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
@@ -1620,7 +1660,7 @@ export function useChat(
                                 }
                             });
                         } else {
-                            const fbUrl = generateFallbackTextImage(imageDesc);
+                            const fbUrl = generateFallbackTextImage(extracted.fbText);
                             if (fbUrl) {
                                 updateMessageImageUrl(currentChatId, currentChatType, msg.id, fbUrl);
                                 if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();

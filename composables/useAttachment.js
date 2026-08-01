@@ -1010,7 +1010,12 @@ export function useAttachment(opts) {
                 }
             }
 
-            const imageUrl = await generateImage({ prompt: finalPrompt });
+            const charObj = soulLinkActiveChatType.value === 'character' ? characters.value.find(c => String(c.id) === String(soulLinkActiveChat.value)) : null;
+            const imageUrl = await generateImage({ 
+                prompt: finalPrompt,
+                appearance: charObj?.appearance,
+                userAppearance: charObj?.userAppearance
+            });
             if (imageUrl) {
                 // Delete old message
                 if (oldMsgId && soulLinkActiveChat.value) {
@@ -1222,7 +1227,12 @@ function sanitizePrompt(rawText) {
                 }
             }
 
-            const imageUrl = await generateImage({ prompt: finalPrompt });
+            const charObj = soulLinkActiveChatType.value === 'character' ? characters.value.find(c => String(c.id) === String(soulLinkActiveChat.value)) : null;
+            const imageUrl = await generateImage({ 
+                prompt: finalPrompt,
+                appearance: charObj?.appearance,
+                userAppearance: charObj?.userAppearance
+            });
             if (imageUrl) {
                 const msgId = Date.now();
                 chatImageHighResCache.set(msgId, imageUrl);

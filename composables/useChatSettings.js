@@ -271,7 +271,7 @@ export function useChatSettings(
     };
 
     const BUBBLE_COLOR_PRESETS = {
-        default: { userBg: '#000000', userColor: '#FFFFFF', aiBg: '#F2F2F2', aiColor: '#000000' },
+        default: { userBg: 'rgba(0, 0, 0, 0.65)', userColor: '#FFFFFF', aiBg: 'rgba(255, 255, 255, 0.6)', aiColor: '#333333' },
         blue: { userBg: '#000000', userColor: '#FFFFFF', aiBg: '#DBEAFE', aiColor: '#000000' },
         orange: { userBg: '#000000', userColor: '#FFFFFF', aiBg: '#FFEDD5', aiColor: '#000000' },
         plum: { userBg: '#000000', userColor: '#FFFFFF', aiBg: '#E9D5FF', aiColor: '#000000' },
@@ -286,12 +286,8 @@ export function useChatSettings(
             styleTag.id = 'custom-bubble-style';
             document.head.appendChild(styleTag);
         }
-        const css = customBubbleCSS.value.trim();
-        styleTag.textContent = css
-            ? `#app.bubble-style-custom .message.user .bubble,
-               #app.bubble-style-custom .message.ai .bubble,
-               #app.bubble-style-custom .voice-message-bubble { ${css} }`
-            : '';
+        const css = customBubbleCSS.value ? String(customBubbleCSS.value).trim() : '';
+        styleTag.textContent = css;
     };
 
     const applyBubbleStyle = () => {

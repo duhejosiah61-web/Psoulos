@@ -1,24 +1,26 @@
-@import url('./css/common.css');
-@import url('./css/homescreen.css');
-@import url('./css/lockscreen.css');
-@import url('./css/reset.css');
-@import url('./css/unfind.css');
-@import url('./css/variables.css');
+@import url('./css/common.css?v=20260801_v3');
+@import url('./css/homescreen.css?v=20260801_v3');
+@import url('./css/lockscreen.css?v=20260801_v3');
+@import url('./css/reset.css?v=20260801_v3');
+@import url('./css/unfind.css?v=20260801_v3');
+@import url('./css/variables.css?v=20260801_v3');
 
 
-@import url('./css/apps/chat.css?v=20260729_v5');
-@import url('./css/apps/console.css');
-@import url('./css/apps/ember.css');
-@import url('./css/apps/feed.css');
-@import url('./css/apps/games.css');
-@import url('./css/apps/live.css');
-@import url('./css/apps/mate.css');
-@import url('./css/apps/music.css');
-@import url('./css/apps/notice.css');
-@import url('./css/apps/peek.css');
-@import url('./css/apps/read.css');
-@import url('./css/apps/theme.css');
-@import url('./css/apps/workshop.css');
+@import url('./css/apps/chat.css?v=20260801_v3');
+@import url('./css/apps/console.css?v=20260801_v3');
+@import url('./css/apps/ember.css?v=20260801_v3');
+@import url('./css/apps/feed.css?v=20260801_v3');
+@import url('./css/apps/games.css?v=20260801_v3');
+@import url('./css/apps/live.css?v=20260801_v3');
+@import url('./css/apps/mate.css?v=20260801_v3');
+@import url('./css/apps/music.css?v=20260801_v3');
+@import url('./css/apps/notice.css?v=20260801_v3');
+@import url('./css/apps/peek.css?v=20260801_v3');
+@import url('./css/apps/read.css?v=20260801_v3');
+@import url('./css/apps/theme.css?v=20260801_v3');
+@import url('./css/apps/workshop.css?v=20260801_v3');
+@import url('./css/apps/nest.css?v=20260801_v3');
+@import url('./css/apps/rightnow.css?v=20260801_v3');
 
 /* ===== Nest 便签墙 ===== */
 .nest-note-wall {

@@ -142,22 +142,34 @@ export function useImageGen({ addConsoleLog } = {}) {
   async function handleVibeFileUpload(file) {
     if (!file) return;
     try {
-      const arrayBuffer = await file.arrayBuffer();
-      const bytes = new Uint8Array(arrayBuffer);
-      let extractedData = new TextDecoder().decode(bytes).trim();
-      
-      try {
-        const json = JSON.parse(extractedData);
-        if (json.vibe_image) extractedData = json.vibe_image;
-        else if (json.image) extractedData = json.image;
-        else if (json.data) extractedData = json.data;
-      } catch (e) {
-        // ignore, just use raw text
+      if (file.name.endsWith('.naiv4vibe') || file.type === 'application/json' || file.name.endsWith('.json')) {
+        let text = await file.text();
+        try {
+          const json = JSON.parse(text);
+          if (json.vibe_image) text = json.vibe_image;
+          else if (json.image) text = json.image;
+          else if (json.data) text = json.data;
+        } catch (e) {}
+        imageGenConfig.novelai.vibeTransfer.data = text.trim();
+        imageGenConfig.novelai.vibeTransfer.enabled = true;
+        log('成功解析并导入 NovelAI Vibe 预设字符串！', 'success');
+      } else if (file.type.startsWith('image/')) {
+        const base64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target.result);
+          reader.onerror = () => reject(new Error('读取图片失败'));
+          reader.readAsDataURL(file);
+        });
+        const cleanBase64 = base64.includes(',') ? base64.split(',')[1] : base64;
+        imageGenConfig.novelai.vibeTransfer.data = cleanBase64;
+        imageGenConfig.novelai.vibeTransfer.enabled = true;
+        log('成功导入 Vibe 参考图！', 'success');
+      } else {
+        const text = await file.text();
+        imageGenConfig.novelai.vibeTransfer.data = text.trim();
+        imageGenConfig.novelai.vibeTransfer.enabled = true;
+        log('成功导入 Vibe 数据！', 'success');
       }
-      
-      imageGenConfig.novelai.vibeTransfer.data = extractedData;
-      imageGenConfig.novelai.vibeTransfer.enabled = true;
-      log('成功解析并导入 NovelAI Vibe 预设字符串！', 'success');
     } catch (err) {
       log('解析 Vibe 文件失败: ' + err.message, 'error');
       alert('解析 Vibe 文件失败：' + err.message);
@@ -173,26 +185,31 @@ export function useImageGen({ addConsoleLog } = {}) {
   /**
    * 核心生图入口函数
    */
-  async function generateImage({ prompt, negativePrompt = '' } = {}) {
+  async function generateImage({ prompt, negativePrompt = '', appearance = '', userAppearance = '' } = {}) {
     if (!imageGenConfig.enabled) {
       throw new Error('生图功能未启用，请在控制台中开启。');
     }
+
+    const finalPrompt = [appearance, userAppearance, prompt]
+        .map(p => p ? p.trim() : '')
+        .filter(p => p !== '')
+        .join(', ');
 
     const channel = imageGenConfig.activeChannel;
     log(`开始使用 [${channel.toUpperCase()}] 渠道生成图片...`, 'info');
 
     if (channel === 'pollinations') {
-      return await generateViaPollinations(prompt, negativePrompt);
+      return await generateViaPollinations(finalPrompt, negativePrompt);
     } else if (channel === 'novelai') {
-      return await generateViaNovelAI(prompt, negativePrompt);
+      return await generateViaNovelAI(finalPrompt, negativePrompt);
     } else if (channel === 'openai') {
-      return await generateViaOpenAI(prompt);
+      return await generateViaOpenAI(finalPrompt);
     } else if (channel === 'gemini') {
-      return await generateViaGemini(prompt);
+      return await generateViaGemini(finalPrompt);
     } else if (channel === 'custom') {
-      return await generateViaCustom(prompt, negativePrompt);
+      return await generateViaCustom(finalPrompt, negativePrompt);
     } else {
-      return await generateViaPollinations(prompt, negativePrompt);
+      return await generateViaPollinations(finalPrompt, negativePrompt);
     }
   }
 
@@ -276,9 +293,48 @@ export function useImageGen({ addConsoleLog } = {}) {
         cfg.vibeTransfer.enabled &&
         cfg.vibeTransfer.data
       ) {
-        parametersObj.reference_image_multiple = [cfg.vibeTransfer.data];
+        let vibeData = cfg.vibeTransfer.data;
+        let isBundle = false;
+        
+        if (vibeData.startsWith('{')) {
+          try {
+            const bundle = JSON.parse(vibeData);
+            if (bundle.identifier === 'novelai-vibe-transfer-bundle' && bundle.vibes && bundle.vibes[0]) {
+              isBundle = true;
+              const vibe = bundle.vibes[0];
+              const encodings = vibe.encodings || {};
+              let encodingStr = '';
+              for (const mod of Object.values(encodings)) {
+                if (mod.unknown && mod.unknown.encoding) {
+                  encodingStr = mod.unknown.encoding;
+                  break;
+                }
+              }
+              if (encodingStr) {
+                parametersObj.reference_image_multiple = [""];
+                parametersObj.reference_information_extracted_multiple = [{
+                  reference_id: vibe.id || "vibe_bundle",
+                  reference_information_extracted: encodingStr,
+                  reference_strength: 0.6
+                }];
+              } else {
+                parametersObj.reference_image_multiple = [vibeData];
+              }
+            }
+          } catch(e) {}
+        }
+        
+        if (!isBundle) {
+          parametersObj.reference_image_multiple = [vibeData];
+          parametersObj.reference_information_extracted_multiple = [{
+            reference_id: "image_vibe",
+            reference_information_extracted: null,
+            reference_strength: 0.6
+          }];
+        }
         
         console.log("VIBE ATTACHED", {
+          isBundle: isBundle,
           length: cfg.vibeTransfer.data.length
         });
       }
@@ -366,8 +422,8 @@ export function useImageGen({ addConsoleLog } = {}) {
         throw new Error('NAI ZIP 中没有找到 PNG: ' + Object.keys(zip.files).join(','));
       }
 
-      const blob = await zip.files[pngName].async('blob');
-      return URL.createObjectURL(blob);
+      const base64 = await zip.files[pngName].async('base64');
+      return `data:image/png;base64,${base64}`;
     } catch (err) {
       throw new Error(`解压ZIP失败: ${err.message}`);
     }

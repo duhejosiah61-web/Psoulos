@@ -22,7 +22,7 @@
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Long+Cang&family=ZCOOL+XiaoWei&family=Playfair+Display:wght@400;600;700;800&family=Inter:wght@400;500;600&family=Caveat:wght@400;500;600&display=swap">
-    <link rel="stylesheet" href="style.css?v=20260729_v5">
+    <link rel="stylesheet" href="style.css?v=20260801_v2.0.0.0.3">
     
     <script type="importmap">
         {
@@ -524,11 +524,11 @@
                                         </div>
                                         <div class="app-label">Chat</div>
                                     </div>
-                                    <div class="app-icon" @click="openApp('games')">
+                                    <div class="app-icon" @click="openApp('rightnow')">
                                         <div class="app-icon-wrapper">
-                                            <i class="fa fa-gamepad app-icon-font"></i>
+                                            <i class="fas fa-feather-alt app-icon-font"></i>
                                         </div>
-                                        <div class="app-label">Games</div>
+                                        <div class="app-label">Rightnow</div>
                                     </div>
                                     <div class="app-icon" @click="openApp('live')">
                                         <div class="app-icon-wrapper">
@@ -642,12 +642,7 @@
                         <!-- 第5-6行：app和胶囊框 (2行×4格) -->
                         <div class="grid-cell grid-row-5-6">
                             <div class="app-grid-bottom-left">
-                                <div class="app-icon" @click="openApp('rightnow')">
-                                    <div class="app-icon-wrapper" style="background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); color: #333;">
-                                        <i class="fas fa-feather-alt app-icon-font"></i>
-                                    </div>
-                                    <div class="app-label">Rightnow</div>
-                                </div>
+
                                 <div class="app-icon" @click="openApp('mate')">
                                     <div class="app-icon-wrapper">
                                         <i class="fa fa-user app-icon-font"></i>
@@ -1845,7 +1840,49 @@
                 </div>
 
 
+                <div class="art-settings-section">
+                    <h2 class="art-section-title">聊天美化</h2>
+                    <div class="art-settings-input-item">
+                        <div class="art-settings-icon-wrapper">
+                            <div class="art-settings-blob blob-color-1"></div>
+                            <svg class="art-settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                <polyline points="21 15 16 10 5 21"></polyline>
+                            </svg>
+                        </div>
+                        <div class="art-input-wrapper">
+                            <label class="art-input-label">聊天背景</label>
+                            <div style="display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap;">
+                                <input type="text" v-model="chatSettings.chatBackgroundImageInput" class="art-settings-input" style="flex: 1; min-width: 150px;" placeholder="输入图片链接...">
+                                <button class="btn-small" @click="chatSettings.applyBackgroundImageLink()">保存</button>
+                                <input type="file" accept="image/*" @change="uploadChatBackgroundImage" style="display: none;" ref="chatBgFile">
+                                <button class="btn-small" style="background: #f2f2f7; color: #333; border: 1px solid #ddd;" @click="$refs.chatBgFile.click()">上传</button>
+                                <button class="btn-small" style="background: transparent; color: #d9534f; border: 1px solid #d9534f;" @click="chatSettings.clearBackgroundImage()">清除</button>
+                            </div>
+                        </div>
+                    </div>
 
+                    <div class="art-settings-input-item" style="align-items: flex-start;">
+                        <div class="art-settings-icon-wrapper">
+                            <div class="art-settings-blob blob-color-5"></div>
+                            <svg class="art-settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
+                            </svg>
+                        </div>
+                        <div class="art-input-wrapper" style="width: 100%;">
+                            <label class="art-input-label">自定义主题与气泡 (CSS)</label>
+                            <textarea v-model="chatSettings.customBubbleCSS" class="art-settings-input" style="height: 100px; resize: vertical; margin-top: 6px; font-family: monospace; font-size: 12px;" placeholder="在此粘贴 AI 生成的 CSS 代码..."></textarea>
+                            <div style="display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap;">
+                                <button class="btn-small" @click="chatSettings.applyCustomCSS()">应用</button>
+                                <input type="file" accept=".css" @change="uploadChatThemeCSS" style="display: none;" ref="chatThemeFile">
+                                <button class="btn-small" style="background: #f2f2f7; color: #333; border: 1px solid #ddd;" @click="$refs.chatThemeFile.click()">上传 CSS 文件</button>
+                                <button class="btn-small" style="background: #e3f2fd; color: #0275d8; border: 1px solid #0275d8;" @click="downloadChatBeautifyGuide" title="下载给 AI 看的提示词模版">获取 AI 指南</button>
+                                <button class="btn-small" style="background: transparent; color: #d9534f; border: 1px solid #d9534f;" @click="chatSettings.customBubbleCSS = ''; chatSettings.applyCustomCSS()">清除</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 <div class="art-settings-section">
                     <h2 class="art-section-title">聊天总结</h2>
@@ -5143,6 +5180,8 @@
                         <button class="btn-small" @click="triggerAvatarUpload"><i class="fas fa-image"></i> 相册</button>
                     </div>
                     
+                    <label class="mt-2">角色外貌</label>
+                    <textarea v-model="editingCharacter.appearance" rows="2" placeholder="角色的外貌描述标签 (例如: 1girl, blonde hair, blue eyes)..."></textarea>
                     <label class="mt-2">开场白</label>
                     <div v-for="(line, index) in editingCharacter.openingLines" :key="index" class="flex mt-1" style="gap: 8px;">
                         <input name="sp_field_123" id="sp-field-123" v-model="editingCharacter.openingLines[index]" placeholder="输入开场白内容..." style="flex: 1;">
@@ -5180,6 +5219,9 @@
 
                     <label class="mt-2">用户人设</label>
                     <textarea name="sp_field_127" id="sp-field-127" v-model="editingCharacter.userPersona" rows="2" placeholder="用户在此角色面前的人设..."></textarea>
+                    
+                    <label class="mt-2">用户外貌</label>
+                    <textarea v-model="editingCharacter.userAppearance" rows="2" placeholder="用户的外貌描述标签 (例如: 1boy, black hair, glasses)..."></textarea>
                     
                     <div class="flex mt-2" style="justify-content: flex-end; gap: 12px;">
                         <button class="btn btn-danger" @click="deleteCharacter">删除</button>
@@ -5710,9 +5752,11 @@
                                 <div class="setting-label">锁屏壁纸</div>
                                 <div class="setting-desc">设置锁屏界面的背景图片</div>
                             </div>
-                            <div class="lock-wallpaper-setting">
+                            <div class="lock-wallpaper-setting" style="display: flex; gap: 8px;">
                                 <input name="sp_field_151" id="sp-field-151" type="text" class="lock-wallpaper-input" v-model="lockWallpaperInput" placeholder="输入图片URL">
                                 <button class="lock-wallpaper-save-btn" @click="saveLockWallpaper">保存</button>
+                                <input type="file" accept="image/*" @change="uploadLockWallpaper" style="display: none;" ref="lockWallpaperFile">
+                                <button class="lock-wallpaper-save-btn" style="background: #f2f2f7; color: #333; border: 1px solid #ddd;" @click="$refs.lockWallpaperFile.click()">上传</button>
                             </div>
                         </div>
                         <div class="setting-item">
@@ -5815,7 +5859,7 @@
                                 <div class="setting-label">主界面壁纸</div>
                                 <div class="setting-desc">设置主界面背景图片</div>
                             </div>
-                            <div class="lock-wallpaper-setting">
+                            <div class="lock-wallpaper-setting" style="display: flex; gap: 8px;">
                                 <input name="sp_field_154" id="sp-field-154"
                                     type="text"
                                     class="lock-wallpaper-input"
@@ -5823,6 +5867,8 @@
                                     placeholder="输入图片URL"
                                 >
                                 <button class="lock-wallpaper-save-btn" @click="saveHomeWallpaper">保存</button>
+                                <input type="file" accept="image/*" @change="uploadHomeWallpaper" style="display: none;" ref="homeWallpaperFile">
+                                <button class="lock-wallpaper-save-btn" style="background: #f2f2f7; color: #333; border: 1px solid #ddd;" @click="$refs.homeWallpaperFile.click()">上传</button>
                             </div>
                         </div>
 
@@ -7224,8 +7270,21 @@
                 </div>
             </div>
         </div>
+        <!-- 系统更新提示弹窗 -->
+        <div class="update-notice-overlay" v-if="showUpdateNotice" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 99999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px);">
+            <div style="background: #fff; width: 85%; max-width: 400px; border-radius: 20px; padding: 30px 24px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.2);">
+                <i class="fa fa-rocket" style="font-size: 48px; color: #000; margin-bottom: 20px;"></i>
+                <h2 style="font-family: 'Playfair Display', serif; font-size: 24px; font-weight: 700; margin-bottom: 12px; color: #000;">更新成功</h2>
+                <p style="font-family: 'Inter', sans-serif; font-size: 15px; color: #666; margin-bottom: 30px; line-height: 1.5;">
+                    {{ updateNoticeVersion }}
+                </p>
+                <button @click="closeUpdateNotice" style="background: #000; color: #fff; border: none; border-radius: 12px; padding: 14px 40px; font-size: 16px; font-weight: 600; cursor: pointer; width: 100%;">
+                    我知道了，开启体验
+                </button>
+            </div>
+        </div>
     </div>
-    <script type="module" src="main.js?v=uno20260728_v11"></script>
+    <script type="module" src="main.js?v=20260801_v2.0.0.0.7"></script>
 
 </body>
 </html>
