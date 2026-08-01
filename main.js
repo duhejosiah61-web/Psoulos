@@ -1,5 +1,5 @@
 import { createApp } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
-import { setupApp } from './script.js?v=20260801_v2.0.0.0.7';
+import { setupApp } from './script.js?v=20260801_v2.0.0.0.8';
 
 const SubPlaylist = {
     props: {

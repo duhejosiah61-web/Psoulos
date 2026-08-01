@@ -4205,7 +4205,7 @@ ${styleGuide}
         const musicPlayNext = () => musicState.playNext();
 
         const showUpdateNotice = ref(true);
-        const updateNoticeVersion = ref('最新版本：v2.0.0.0.7 - 增加了直接在界面上点击“获取 AI 指南”一键下载模板的功能！');
+        const updateNoticeVersion = ref('最新版本：v2.0.0.0.8 - 修复了部分手机下载 AI 指南 txt 文件时出现乱码的问题！现在默认添加了 UTF-8 BOM，再也不会乱码了！');
         const closeUpdateNotice = () => { showUpdateNotice.value = false; };
 
         const uploadLockWallpaper = (e) => {
@@ -4320,7 +4320,7 @@ ${styleGuide}
 - 完全模仿 iOS iMessage，我的气泡是经典蓝色渐变，对方是浅灰色。
 - 梦幻粉色玻璃质感，气泡半透明，带有浅粉色发光阴影。】
 `;
-            const blob = new Blob([guideText], { type: 'text/plain;charset=utf-8' });
+            const blob = new Blob(['\uFEFF' + guideText], { type: 'text/plain;charset=utf-8' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
