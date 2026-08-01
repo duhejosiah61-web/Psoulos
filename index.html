@@ -33,6 +33,46 @@
     </script>
 </head>
 <body>
+    <div id="global-loading-screen" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #0a0a1a; z-index: 9999999; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white;">
+        <style>
+            .pixel-spinner {
+                display: flex;
+                gap: 8px;
+            }
+            .pixel-spinner .dot {
+                width: 14px;
+                height: 14px;
+                background: #00e5ff;
+                image-rendering: pixelated;
+                animation: pixel-bounce 1.2s infinite;
+                box-shadow: 2px 2px 0 #000;
+            }
+            .pixel-spinner .dot:nth-child(2) { animation-delay: 0.2s; background: #b388ff; }
+            .pixel-spinner .dot:nth-child(3) { animation-delay: 0.4s; background: #ff007f; }
+            @keyframes pixel-bounce {
+                0%, 60%, 100% { transform: translateY(0); }
+                30% { transform: translateY(-15px); }
+            }
+            .pixel-text {
+                margin-top: 40px;
+                font-family: 'Press Start 2P', 'Courier New', monospace;
+                font-size: 16px;
+                color: #fff;
+                text-shadow: 2px 2px 0 #000;
+                animation: pixel-blink 1s infinite step-end;
+            }
+            @keyframes pixel-blink {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0; }
+            }
+        </style>
+        <div class="pixel-spinner">
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+        </div>
+        <div class="pixel-text">LOADING...</div>
+    </div>
     <div
         id="app"
         v-cloak
@@ -7284,7 +7324,7 @@
             </div>
         </div>
     </div>
-    <script type="module" src="main.js?v=20260801_v2.0.0.0.8"></script>
+    <script type="module" src="main.js?v=20260801_v2.0.0.0.9"></script>
 
 </body>
 </html>

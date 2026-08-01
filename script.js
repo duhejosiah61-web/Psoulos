@@ -1581,6 +1581,15 @@ export function setupApp() {
 
         // --- Lifecycle Hook ---
         onMounted(() => {
+            setTimeout(() => {
+                const loader = document.getElementById('global-loading-screen');
+                if (loader) {
+                    loader.style.opacity = '0';
+                    loader.style.transition = 'opacity 0.4s ease';
+                    setTimeout(() => loader.remove(), 400);
+                }
+            }, 800);
+
             if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.register('./sw.js')
                   .then(registration => console.log('ServiceWorker 注册成功:', registration.scope))
@@ -4205,7 +4214,7 @@ ${styleGuide}
         const musicPlayNext = () => musicState.playNext();
 
         const showUpdateNotice = ref(true);
-        const updateNoticeVersion = ref('最新版本：v2.0.0.0.8 - 修复了部分手机下载 AI 指南 txt 文件时出现乱码的问题！现在默认添加了 UTF-8 BOM，再也不会乱码了！');
+        const updateNoticeVersion = ref('最新版本：v2.0.0.0.9 - 增加了像素风加载动画！现在打开应用再也不会看到短暂的页面空白或穿帮了，满满的复古仪式感！');
         const closeUpdateNotice = () => { showUpdateNotice.value = false; };
 
         const uploadLockWallpaper = (e) => {
