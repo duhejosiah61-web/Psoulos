@@ -1043,6 +1043,7 @@ export function useChat(
                     const presetSummary = typeof member !== 'string' ? getMemberPresetSummary(member) : '';
                     systemPrompt += `${idx + 1}. ${memberName} (本地时间: ${localTime})`;
                     if (memberPersona) systemPrompt += `\n   性格：${memberPersona}`;
+                    if (typeof member !== 'string' && member.userPersona) systemPrompt += `\n   对用户的认知：${member.userPersona}`;
                     if (memberRelation) systemPrompt += `\n   与用户关系：${memberRelation}`;
                     if (wbSummary) systemPrompt += `\n   ${wbSummary}`;
                     if (presetSummary) systemPrompt += `\n   ${presetSummary}`;
@@ -1119,6 +1120,9 @@ export function useChat(
             }
 
             systemPrompt += `# 你是谁\n你的名字是【${charName}】。\n${char.persona}\n\n`;
+            if (char.userPersona) {
+                systemPrompt += `# 关于用户\n${char.userPersona}\n\n`;
+            }
 
             let availableStickers = [];
             if (stickerPacks.value) {
