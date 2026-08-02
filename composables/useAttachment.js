@@ -951,6 +951,10 @@ export function useAttachment(opts) {
         if (!finalPrompt) return;
 
         const oldMsgId = chatViewingMsg.value ? chatViewingMsg.value.id : null;
+        const targetChatId = soulLinkActiveChat.value;
+        const targetChatType = soulLinkActiveChatType.value;
+        const originalSender = chatViewingMsg.value ? chatViewingMsg.value.sender : 'user';
+        const originalSenderName = chatViewingMsg.value ? chatViewingMsg.value.senderName : (targetChatType === 'group' ? '我' : undefined);
         
         closeRerollModal();
         closeChatImageViewer();
@@ -1010,7 +1014,7 @@ export function useAttachment(opts) {
                 }
             }
 
-            const charObj = soulLinkActiveChatType.value === 'character' ? characters.value.find(c => String(c.id) === String(soulLinkActiveChat.value)) : null;
+            const charObj = targetChatType === 'character' ? characters.value.find(c => String(c.id) === String(targetChatId)) : null;
             const imageUrl = await generateImage({ 
                 prompt: finalPrompt,
                 appearance: charObj?.appearance,
@@ -1018,8 +1022,8 @@ export function useAttachment(opts) {
             });
             if (imageUrl) {
                 // Delete old message
-                if (oldMsgId && soulLinkActiveChat.value) {
-                    const currentChatMsgs = soulLinkMessages.value[soulLinkActiveChat.value];
+                if (oldMsgId && targetChatId) {
+                    const currentChatMsgs = soulLinkMessages.value[targetChatId];
                     if (currentChatMsgs) {
                         const idx = currentChatMsgs.findIndex(m => m.id === oldMsgId);
                         if (idx !== -1) currentChatMsgs.splice(idx, 1);
@@ -1034,7 +1038,7 @@ export function useAttachment(opts) {
 
                 const msg = {
                     id: msgId,
-                    sender: 'user',
+                    sender: originalSender,
                     messageType: 'image',
                     imageUrl: compressedDataUrl,
                     originalPrompt: rerollUseAI.value ? rerollOriginalPrompt.value.trim() : '',
@@ -1043,12 +1047,20 @@ export function useAttachment(opts) {
                     isReplied: false,
                     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                 };
-                if (soulLinkActiveChatType.value === 'group') {
-                    msg.senderName = '我';
+                if (targetChatType === 'group' && originalSenderName) {
+                    msg.senderName = originalSenderName;
                 }
-                pushMessageToActiveChat(msg);
+                
+                if (soulLinkMessages.value[targetChatId]) {
+                    soulLinkMessages.value[targetChatId].push(msg);
+                } else {
+                    soulLinkMessages.value[targetChatId] = [msg];
+                }
+                
                 saveSoulLinkMessages();
-                scrollToBottom();
+                if (soulLinkActiveChat.value === targetChatId) {
+                    scrollToBottom();
+                }
             }
         } catch (error) {
             console.error('重新生成失败:', error);
