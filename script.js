@@ -4214,7 +4214,7 @@ ${styleGuide}
         const musicPlayNext = () => musicState.playNext();
 
         const showUpdateNotice = ref(true);
-        const updateNoticeVersion = ref('最新版本：v2.0.0.0.9 - 增加了像素风加载动画！现在打开应用再也不会看到短暂的页面空白或穿帮了，满满的复古仪式感！');
+        const updateNoticeVersion = ref('最新版本：v2.0.0.0.10 - 替换了黑白复古像素风的进度条加载动画！');
         const closeUpdateNotice = () => { showUpdateNotice.value = false; };
 
         const uploadLockWallpaper = (e) => {
