@@ -4214,7 +4214,7 @@ ${styleGuide}
         const musicPlayNext = () => musicState.playNext();
 
         const showUpdateNotice = ref(true);
-        const updateNoticeVersion = ref('最新版本：v2.0.0.0.10 - 替换了黑白复古像素风的进度条加载动画！');
+        const updateNoticeVersion = ref('最新版本：v2.0.0.1.0 - 新增ember相关内容！');
         const closeUpdateNotice = () => { showUpdateNotice.value = false; };
 
         const uploadLockWallpaper = (e) => {

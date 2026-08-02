@@ -1,9 +1,9 @@
 // ember.js
 // Threads-like microblog where "netizens" are AI roles.
-import { ref, computed } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
+import { ref, computed, watch } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
 import { callAI } from './api.js';
 
-const CURRENT_USER_NAME = '我';
+const CURRENT_USER_NAME = '我'; // legacy, keeping just in case
 
 // ---------------------------------------------------------------------
 // IndexedDB (local-first timeline)
@@ -126,14 +126,124 @@ function activeProfileSnapshot(activeProfile) {
 // Composable
 // ---------------------------------------------------------------------
 export function useEmber(characters, activeProfile) {
-  const loading = ref(false);
+  const loading = ref(true);
   const error = ref(null);
+
+  const activeNavTab = ref('home'); // home, search, messages, profile
+  const activeMsgTab = ref('mentions'); // mentions, notifications, dms
+  const viewingPostId = ref(null);
+  const loadCustomSections = () => {
+    try {
+        const stored = localStorage.getItem('ember_custom_sections');
+        if (stored) return JSON.parse(stored);
+    } catch(e) {}
+    return [];
+  };
+
+  const customSections = ref(loadCustomSections());
+  watch(customSections, (newVal) => {
+    try {
+        localStorage.setItem('ember_custom_sections', JSON.stringify(newVal));
+    } catch(e) {}
+  }, { deep: true });
+  
+  const hotSections = ref([
+      { id: 'hot_retro', name: '复古硬件交流', desc: '回到那个充满机械美感的年代...', image: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=100&q=80' },
+      { id: 'hot_indie', name: '独立开发者', desc: '分享你的独立产品与心路历程。', image: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=100&q=80' }
+  ]);
+
+  const activeSectionId = ref('default');
+  const currentSectionName = computed(() => {
+      if (activeSectionId.value === 'default') return '闲聊八卦';
+      const cSec = customSections.value.find(s => String(s.id) === String(activeSectionId.value));
+      if (cSec) return cSec.name;
+      const hSec = hotSections.value.find(s => String(s.id) === String(activeSectionId.value));
+      if (hSec) return hSec.name;
+      return '未知圈子';
+  });
+  
+  const currentSectionImage = computed(() => {
+      if (activeSectionId.value === 'default') return 'https://placehold.co/400x400/222/666?text=MAIN';
+      const cSec = customSections.value.find(s => String(s.id) === String(activeSectionId.value));
+      if (cSec) return cSec.image;
+      const hSec = hotSections.value.find(s => String(s.id) === String(activeSectionId.value));
+      if (hSec) return hSec.image;
+      return 'https://placehold.co/400x400/222/666?text=Circle';
+  });
+
+  const currentSectionDesc = computed(() => {
+      if (activeSectionId.value === 'default') return '欢迎来到大厅，探索全站动态。';
+      const cSec = customSections.value.find(s => String(s.id) === String(activeSectionId.value));
+      if (cSec) return cSec.desc;
+      const hSec = hotSections.value.find(s => String(s.id) === String(activeSectionId.value));
+      if (hSec) return hSec.desc;
+      return '探索未知领域...';
+  });
+
+  const enterSection = (id) => {
+      activeSectionId.value = String(id);
+      activeNavTab.value = 'home';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const timeline = ref([]);
   const showComposer = ref(false);
+  const composerTitle = ref('');
   const composerText = ref('');
+  const composerFiles = ref([]);
+  const composerSectionId = ref('default');
   const replyingTo = ref(null); // post object
   const autoMode = ref(true);
+
+  // Current User Profile State
+  const defaultCurrentUser = {
+    name: '探索者',
+    bio: '在赛博荒原中寻找共鸣的幽灵。',
+    avatar: 'https://i.pravatar.cc/300?u=me',
+    bg: 'https://placehold.co/800x400/222/666?text=Image'
+  };
+  
+  const storedUser = localStorage.getItem('ember_currentUser');
+  const currentUser = ref(storedUser ? JSON.parse(storedUser) : { ...defaultCurrentUser });
+
+  const showEditProfile = ref(false);
+  const editProfileForm = ref({ name: '', bio: '', avatar: '', bg: '' });
+
+  function openEditProfile() {
+      editProfileForm.value = { ...currentUser.value };
+      showEditProfile.value = true;
+  }
+
+  function saveProfile() {
+      currentUser.value = { ...editProfileForm.value };
+      localStorage.setItem('ember_currentUser', JSON.stringify(currentUser.value));
+      showEditProfile.value = false;
+  }
+
+  function handleProfileImageUpload(field, event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+          editProfileForm.value[field] = e.target.result;
+      };
+      reader.readAsDataURL(file);
+  }
+
+  // Profile Tabs State
+  const activeProfileTab = ref('posts');
+  
+  const myPosts = computed(() => {
+      return timeline.value.filter(p => p.authorId === 'me' && !p.replyTo).sort((a, b) => b.createdAt - a.createdAt);
+  });
+
+  const myLikedPosts = computed(() => {
+      return timeline.value.filter(p => p.likedByMe && !p.replyTo).sort((a, b) => b.createdAt - a.createdAt);
+  });
+
+  const myLikedReplies = computed(() => {
+      return timeline.value.filter(p => p.likedByMe && p.replyTo).sort((a, b) => b.createdAt - a.createdAt);
+  });
 
   // For simple "Threads-like" behavior: show root posts, and for each root post show its replies count.
   const postsById = computed(() => {
@@ -145,6 +255,10 @@ export function useEmber(characters, activeProfile) {
   const rootPosts = computed(() => {
     return timeline.value
       .filter(p => !p.replyTo)
+      .filter(p => {
+          const sid = String(p.sectionId || 'default');
+          return sid === String(activeSectionId.value);
+      })
       .sort((a, b) => (b.createdAt || b.id || 0) - (a.createdAt || a.id || 0));
   });
 
@@ -153,6 +267,12 @@ export function useEmber(characters, activeProfile) {
     return timeline.value
       .filter(p => String(p.replyTo || '') === id)
       .sort((a, b) => (a.createdAt || a.id || 0) - (b.createdAt || b.id || 0));
+  }
+
+  const viewingPost = computed(() => timeline.value.find(p => p.id === viewingPostId.value));
+  function viewPost(post) {
+    viewingPostId.value = post.id;
+    activeNavTab.value = 'post';
   }
 
   async function ensureDb() {
@@ -202,28 +322,55 @@ export function useEmber(characters, activeProfile) {
   function openComposer(targetPost = null) {
     replyingTo.value = targetPost;
     showComposer.value = true;
+    composerTitle.value = '';
     composerText.value = '';
+    composerFiles.value = [];
+    composerSectionId.value = activeSectionId.value || 'default';
   }
 
   function closeComposer() {
     showComposer.value = false;
+    composerTitle.value = '';
     composerText.value = '';
+    composerFiles.value = [];
+    composerSectionId.value = 'default';
     replyingTo.value = null;
+  }
+
+  function handleComposerFiles(event) {
+    if (event.target.files) {
+      composerFiles.value = Array.from(event.target.files);
+    }
+  }
+
+  function formatPostContent(content) {
+    if (!content) return '';
+    const escapeHtml = (unsafe) => {
+        return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    };
+    let html = escapeHtml(content);
+    // Replace hashtags (letters, numbers, underscores, and Chinese characters)
+    html = html.replace(/#([\w\u4e00-\u9fa5]+)/g, '<span style="color: #F48FB1; font-weight: 600;">#$1</span>');
+    return html;
   }
 
   async function publishMyPost() {
     const text = String(composerText.value || '').trim();
-    if (!text) return;
+    const title = String(composerTitle.value || '').trim();
+    if (!text && !title) return; // need at least some content
 
     const id = nowId();
     const post = {
       id,
       createdAt: id,
       authorId: 'me',
-      authorName: CURRENT_USER_NAME,
-      avatar: 'https://placehold.co/96x96/111/fff?text=Me',
+      authorName: currentUser.value.name,
+      avatar: currentUser.value.avatar,
+      title: title,
       content: text,
+      files: composerFiles.value.map(f => f.name),
       replyTo: replyingTo.value ? String(replyingTo.value.id) : '',
+      sectionId: composerSectionId.value || activeSectionId.value || 'default',
       likedByMe: false,
       likeCount: 0,
       repostCount: 0,
@@ -261,7 +408,7 @@ export function useEmber(characters, activeProfile) {
     const idx = timeline.value.findIndex(p => p.id === postId);
     if (idx < 0) return;
     const p = timeline.value[idx];
-    if (p.authorName !== CURRENT_USER_NAME) return;
+    if (p.authorId !== 'me') return;
 
     timeline.value.splice(idx, 1);
     await removePost(postId);
@@ -313,6 +460,7 @@ export function useEmber(characters, activeProfile) {
       avatar: author.avatar,
       content,
       replyTo: '',
+      sectionId: activeSectionId.value,
       likedByMe: false,
       likeCount: 0,
       repostCount: 0,
@@ -366,6 +514,7 @@ export function useEmber(characters, activeProfile) {
       avatar: author.avatar,
       content,
       replyTo: String(targetPost.id),
+      sectionId: activeSectionId.value,
       likedByMe: false,
       likeCount: 0,
       repostCount: 0,
@@ -431,18 +580,283 @@ export function useEmber(characters, activeProfile) {
   // (real refresh is done via onEnter from script.js watcher)
   ensureDb().then(() => loadTimeline()).catch(() => {});
 
+  const showCreateSectionModal = ref(false);
+  const newSectionForm = ref({ name: '', desc: '', image: '', moderatorId: null, includedCharIds: [] });
+
+  const handleCreateSection = () => {
+    newSectionForm.value = { name: '', desc: '', image: '', moderatorId: null, includedCharIds: [] };
+    showCreateSectionModal.value = true;
+  };
+
+  const handleSectionImageUpload = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        newSectionForm.value.image = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const triggerSectionImageUpload = () => {
+    const el = document.getElementById('ember-section-image-input');
+    if (el) el.click();
+  };
+
+  const followHotSection = (hSec) => {
+    if (customSections.value.some(s => s.id === hSec.id)) {
+        alert("已经关注过该圈子啦！");
+        return;
+    }
+    customSections.value.unshift({
+        id: hSec.id,
+        name: hSec.name,
+        desc: hSec.desc,
+        image: hSec.image,
+        moderatorId: null,
+        includedCharIds: []
+    });
+    alert(`成功关注圈子: ${hSec.name}`);
+  };
+
+  const toggleIncludedChar = (id) => {
+    const idx = newSectionForm.value.includedCharIds.indexOf(id);
+    if (idx >= 0) newSectionForm.value.includedCharIds.splice(idx, 1);
+    else newSectionForm.value.includedCharIds.push(id);
+  };
+
+  const submitCustomSection = () => {
+    if (!newSectionForm.value.name.trim()) return;
+    const defaultImage = `https://placehold.co/100x100/121212/888?text=${encodeURIComponent(newSectionForm.value.name.substring(0,2))}`;
+    customSections.value.unshift({
+        id: Date.now(),
+        name: newSectionForm.value.name,
+        desc: newSectionForm.value.desc || '探索未知领域...',
+        image: newSectionForm.value.image.trim() || defaultImage,
+        moderatorId: newSectionForm.value.moderatorId,
+        includedCharIds: [...newSectionForm.value.includedCharIds]
+    });
+    showCreateSectionModal.value = false;
+  };
+
+  const deleteCustomSection = (id) => {
+    if (confirm('确定要删除这个圈子吗？')) {
+      customSections.value = customSections.value.filter(s => s.id !== id);
+      if (activeSectionId.value === String(id)) {
+        activeSectionId.value = 'default';
+      }
+    }
+  };
+
+  const generatingSection = ref(false);
+  const generateAiSection = async () => {
+    if (!isAiProfileReady(activeProfile)) {
+        alert("请先配置 AI 秘钥！");
+        return;
+    }
+    generatingSection.value = true;
+    try {
+        const ap = activeProfileSnapshot(activeProfile);
+        const sys = `你是一个充满创意的赛博朋克社区管理员。请随机想一个前卫、极客或脑洞大开的圈子（比如讨论旧时代硬件、仿生人心理学、电子失灵症候群等）。
+要求只返回两行文本：
+第一行：圈子名称（不超过8个字）
+第二行：圈子一句话简介（不超过20个字）
+不要输出多余解释或标点符号。`;
+
+        const out = await callAI(
+          { ...ap, model: ap.model },
+          [{ role: 'user', content: sys }],
+          { temperature: 1.0 }
+        );
+        const lines = String(out || '').split('\n').map(l => l.trim()).filter(Boolean);
+        if (lines.length >= 2) {
+            const name = lines[0].replace(/^["']|["']$/g, '');
+            const desc = lines[1].replace(/^["']|["']$/g, '');
+            customSections.value.unshift({
+                id: Date.now(),
+                name,
+                desc,
+                moderatorId: null,
+                includedCharIds: [],
+                image: `https://images.unsplash.com/photo-${Math.floor(Math.random() * 1000000)}?auto=format&fit=crop&w=100&q=80`,
+            });
+            enterSection(customSections.value[0].id);
+        } else {
+            alert("AI 生成失败，请重试");
+        }
+    } catch (e) {
+        console.warn('Ember AI section generation failed:', e);
+        alert("AI 请求失败，请重试");
+    } finally {
+        generatingSection.value = false;
+    }
+  };
+
+  // Mock Messages Data
+  const mentionsList = ref([
+      { id: 1, avatar: 'https://i.pravatar.cc/150?u=12', name: 'Mia', time: '10 分钟前', text: '@了你：快来看看这个！', unread: true },
+      { id: 2, avatar: 'https://i.pravatar.cc/150?u=33', name: 'Kael', time: '2 小时前', text: '回复了你：完全同意你的看法，这太棒了。', unread: false }
+  ]);
+
+  function handleMentionClick(msg) {
+      msg.unread = false;
+      // Navigate to the first available post as a mock
+      if (timeline.value.length > 0) {
+          viewPost(timeline.value[0]);
+      }
+  }
+
+  const notificationsList = ref([
+      { id: 1, avatar: 'https://i.pravatar.cc/150?u=99', name: 'System', time: '1 小时前', text: '你的帖子《欢迎来到...》收到了 15 个赞', unread: true },
+      { id: 2, avatar: 'https://i.pravatar.cc/150?u=44', name: 'Zoe', time: '昨天', text: '关注了你，去打个招呼吧！', unread: false }
+  ]);
+
+  const dmsList = ref([
+      { id: 1, avatar: 'https://i.pravatar.cc/150?u=55', name: 'Lily', time: '刚刚', text: '嗨，昨天你提到的那本书叫什么名字？', unread: true },
+      { id: 2, avatar: 'https://i.pravatar.cc/150?u=77', name: 'Alex', time: '3 天前', text: '下次聚会见！', unread: false }
+  ]);
+
+  // Chat UI State
+  const showChatView = ref(false);
+  const currentChatUser = ref(null);
+  const chatInput = ref('');
+  const chatMessages = ref([]);
+
+  function openChat(msg) {
+      msg.unread = false;
+      currentChatUser.value = { name: msg.name, avatar: msg.avatar };
+      showChatView.value = true;
+      chatMessages.value = [
+          { id: 1, isMe: false, text: msg.text, time: msg.time }
+      ];
+  }
+
+  function closeChat() {
+      showChatView.value = false;
+      currentChatUser.value = null;
+      chatInput.value = '';
+  }
+
+  function sendChatMessage() {
+      const text = chatInput.value.trim();
+      if (!text) return;
+      chatMessages.value.push({
+          id: Date.now(),
+          isMe: true,
+          text: text,
+          time: '刚刚'
+      });
+      chatInput.value = '';
+  }
+
+  // User Profile State
+  const showUserProfileView = ref(false);
+  const viewingProfileUser = ref(null);
+  const profileUserPosts = ref([]);
+  
+  const storedFollowing = localStorage.getItem('ember_following');
+  const followingMap = ref(storedFollowing ? JSON.parse(storedFollowing) : {});
+
+  const isFollowingProfileUser = computed(() => {
+      if (!viewingProfileUser.value) return false;
+      return !!followingMap.value[viewingProfileUser.value.name];
+  });
+
+  const followingList = computed(() => {
+      return Object.entries(followingMap.value).map(([name, data]) => ({ name, ...data }));
+  });
+
+  const showFollowingListOverlay = ref(false);
+  function openFollowingList() {
+      showFollowingListOverlay.value = true;
+  }
+  function closeFollowingList() {
+      showFollowingListOverlay.value = false;
+  }
+
+  function viewUserProfile(user) {
+      viewingProfileUser.value = user;
+      
+      // Mock posts for this user
+      profileUserPosts.value = [
+          {
+              id: Date.now(),
+              authorName: user.name,
+              avatar: user.avatar,
+              content: '今天真是个好天气！分享一张刚刚拍的照片。',
+              timeLabel: '2小时前'
+          },
+          {
+              id: Date.now() - 100000,
+              authorName: user.name,
+              avatar: user.avatar,
+              content: '有没有什么好看的电影推荐？周末想在家看电影。',
+              timeLabel: '1天前'
+          }
+      ];
+
+      showUserProfileView.value = true;
+  }
+
+  function closeUserProfile() {
+      showUserProfileView.value = false;
+      viewingProfileUser.value = null;
+  }
+
+  function toggleFollowProfileUser() {
+      if (!viewingProfileUser.value) return;
+      const user = viewingProfileUser.value;
+      if (followingMap.value[user.name]) {
+          delete followingMap.value[user.name];
+      } else {
+          followingMap.value[user.name] = { 
+              avatar: user.avatar, 
+              bio: user.bio || '在这个宇宙中寻找同频共振的人。' 
+          };
+      }
+      localStorage.setItem('ember_following', JSON.stringify(followingMap.value));
+  }
+
   return {
     loading,
     error,
+    activeNavTab,
+    activeMsgTab,
+    viewingPostId,
+    viewingPost,
+    viewPost,
+    customSections,
+    hotSections,
+    activeSectionId,
+    currentSectionName,
+    currentSectionImage,
+    currentSectionDesc,
+    enterSection,
+    showCreateSectionModal,
+    newSectionForm,
+    handleCreateSection,
+    handleSectionImageUpload,
+    triggerSectionImageUpload,
+    followHotSection,
+    toggleIncludedChar,
+    submitCustomSection,
+    deleteCustomSection,
+    generatingSection,
+    generateAiSection,
     timeline,
     rootPosts,
     repliesFor,
     showComposer,
+    composerTitle,
     composerText,
+    composerFiles,
+    composerSectionId,
     replyingTo,
     autoMode,
     openComposer,
     closeComposer,
+    handleComposerFiles,
+    formatPostContent,
     publishMyPost,
     toggleLike,
     deleteMyPost,
@@ -451,6 +865,38 @@ export function useEmber(characters, activeProfile) {
     onEnter,
     onLeave,
     cleanup,
-    initEmberDB
+    initEmberDB,
+    mentionsList,
+    notificationsList,
+    dmsList,
+    handleMentionClick,
+    showChatView,
+    currentChatUser,
+    chatInput,
+    chatMessages,
+    openChat,
+    closeChat,
+    sendChatMessage,
+    showUserProfileView,
+    viewingProfileUser,
+    profileUserPosts,
+    isFollowingProfileUser,
+    followingList,
+    showFollowingListOverlay,
+    openFollowingList,
+    closeFollowingList,
+    viewUserProfile,
+    closeUserProfile,
+    toggleFollowProfileUser,
+    currentUser,
+    showEditProfile,
+    editProfileForm,
+    openEditProfile,
+    saveProfile,
+    handleProfileImageUpload,
+    activeProfileTab,
+    myPosts,
+    myLikedPosts,
+    myLikedReplies
   };
 }

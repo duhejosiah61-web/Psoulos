@@ -257,6 +257,7 @@ export function useLive(characters, activeProfile, profiles, availableModels, wo
     const searchNeteaseBgmSongs = async (query) => {
         const name = String(query || '').replace(/\s/g, '').trim();
         if (!name) return [];
+        if (LIVE_MUSIC_API_BASE.includes('webcontainer.io')) return [];
         try {
             const apiUrl = `${LIVE_MUSIC_API_BASE}/v2/music/netease?word=${encodeURIComponent(name)}`;
             const resp = await fetch(apiUrl);
@@ -280,6 +281,7 @@ export function useLive(characters, activeProfile, profiles, availableModels, wo
     const searchTencentBgmSongs = async (query) => {
         const name = String(query || '').replace(/\s/g, '').trim();
         if (!name) return [];
+        if (LIVE_MUSIC_API_BASE.includes('webcontainer.io')) return [];
         try {
             const apiUrl = `${LIVE_MUSIC_API_BASE}/v2/music/tencent?word=${encodeURIComponent(name)}`;
             const resp = await fetch(apiUrl);
@@ -304,6 +306,7 @@ export function useLive(characters, activeProfile, profiles, availableModels, wo
         if (!song) return null;
         if (typeof song.src === 'string' && song.src) return song.src;
         if (!song.id || !song.source) return null;
+        if (LIVE_MUSIC_API_BASE.includes('webcontainer.io')) return null;
         const apiUrl =
             song.source === 'netease'
                 ? `${LIVE_MUSIC_API_BASE}/v2/music/netease?id=${encodeURIComponent(song.id)}`
@@ -350,6 +353,7 @@ export function useLive(characters, activeProfile, profiles, availableModels, wo
     const getLiveBgmLyricsForSong = async (song) => {
         if (!song || !song.id || !song.source) return '';
         if (song.source !== 'netease' && song.source !== 'tencent') return '';
+        if (LIVE_MUSIC_API_BASE.includes('webcontainer.io')) return '';
         const url =
             song.source === 'netease'
                 ? `${LIVE_MUSIC_API_BASE}/v2/music/netease/lyric?id=${encodeURIComponent(song.id)}`

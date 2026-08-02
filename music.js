@@ -7,7 +7,7 @@ const safeLocalStorageSet = (key, value) => {
   try { localStorage.setItem(key, value); } catch {}
 };
 
-const MUSIC_COVER_PLACEHOLDER = '404.png';
+const MUSIC_COVER_PLACEHOLDER = 'https://placehold.co/400x400/222/666?text=Music';
 const MUSIC_COOKIE_KEY = 'soulpocket_netease_cookie';
 // 彻底清空，不再把 VIP 凭证暴露在前端
 const HARDCODED_NETEASE_COOKIE = ''; 

@@ -41,10 +41,10 @@ export function useHome({
     line2: localStorage.getItem('photoWidgetText2') || 'COMING'
   });
   const photoWidgetPhotos = ref([
-    { url: localStorage.getItem('photoWidgetPhoto0') || '404.png' },
-    { url: localStorage.getItem('photoWidgetPhoto1') || '404.png' },
-    { url: localStorage.getItem('photoWidgetPhoto2') || '404.png' },
-    { url: localStorage.getItem('photoWidgetPhoto3') || '404.png' }
+    { url: localStorage.getItem('photoWidgetPhoto0') || 'https://placehold.co/400x400/222/666?text=Photo' },
+    { url: localStorage.getItem('photoWidgetPhoto1') || 'https://placehold.co/400x400/222/666?text=Photo' },
+    { url: localStorage.getItem('photoWidgetPhoto2') || 'https://placehold.co/400x400/222/666?text=Photo' },
+    { url: localStorage.getItem('photoWidgetPhoto3') || 'https://placehold.co/400x400/222/666?text=Photo' }
   ]);
 
   const updatePhotoWidgetDate = () => {
@@ -103,7 +103,7 @@ export function useHome({
     closePhotoWidgetEditDialog();
   };
 
-  const stickerWidgetUrl = ref(localStorage.getItem('stickerWidgetUrl') || '404.png');
+  const stickerWidgetUrl = ref(localStorage.getItem('stickerWidgetUrl') || 'https://placehold.co/400x400/222/666?text=Sticker');
   const changeStickerWidgetImage = () => {
     const input = document.createElement('input');
     input.type = 'file';

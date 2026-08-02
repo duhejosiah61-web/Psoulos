@@ -343,7 +343,7 @@
   z-index: 2;
   position: relative;
 }
-.feed-action-btn { border:0; background:transparent; color: rgba(255, 255, 255, 0.6); font-size: 21px; padding: 4px; transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); cursor: pointer; }
+.feed-action-btn { border:0; background:transparent; color: rgba(255, 255, 255, 0.6); font-size: 21px; padding: 4px; transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .feed-action-btn:hover {
   transform: scale(1.15);
   color: rgba(255, 255, 255, 0.85);
