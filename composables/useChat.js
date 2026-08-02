@@ -428,7 +428,7 @@ export function useChat(
         });
     };
 
-    const pushMessageToTargetChat = (chatId, chatType, msg) => {
+    const pushMessageToTargetChat = (chatId, chatType, msg, forceRightnow = null) => {
         if (!chatId) return;
         if (msg && msg.sender === 'ai' && msg.isSystem !== true && typeof msg.isReadByUser === 'undefined') {
             const isViewingThisChat = externalTrigger.openedApp?.value === 'chat' && String(soulLinkActiveChat.value) === String(chatId) && soulLinkActiveChatType.value === chatType;
@@ -444,7 +444,8 @@ export function useChat(
             group.lastTime = new Date(msg.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
         } else {
-            if (isRightnowMode.value) {
+            const isTargetRightnow = forceRightnow !== null ? forceRightnow : isRightnowMode.value;
+            if (isTargetRightnow) {
                 const slotSuffix = rightnowActiveSlot.value ? `_${rightnowActiveSlot.value}` : '';
                 const key = `${chatId}${slotSuffix}`;
                 rightnowMessages.value[key] = [...(rightnowMessages.value[key] || []), msg];
@@ -1196,6 +1197,13 @@ export function useChat(
         scrollToBottom();
         const currentChatId = soulLinkActiveChat.value;
         const currentChatType = soulLinkActiveChatType.value;
+        const currentIsRightnow = isRightnowMode.value;
+
+        // Shadow pushMessageToTargetChat locally to force the correct target mode
+        const _originalPushMessageToTargetChat = pushMessageToTargetChat;
+        const pushMessageToTargetChat = (cid, ctype, msg) => {
+            _originalPushMessageToTargetChat(cid, ctype, msg, currentIsRightnow);
+        };
 
         try {
             const response = await fetch(endpoint.replace(/\/+$/, '') + '/chat/completions', {
