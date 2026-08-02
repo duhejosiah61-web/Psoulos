@@ -788,8 +788,12 @@ export function useChat(
 
     const buildSoulLinkReplyContext = (msg) => {
         let text = '';
+        let imageUrl = null;
         if (msg.messageType === 'image') {
             text = msg.originalPrompt || msg.text || '[图片]';
+            if (msg.imageUrl && !msg.imageUrl.startsWith('mock:')) {
+                imageUrl = msg.imageUrl;
+            }
         } else if (msg.messageType === 'voice') {
             text = msg.transcription ? `[语音消息] "${msg.transcription}"` : (msg.text ? `[语音消息] "${msg.text}"` : '[语音消息]');
         } else if (msg.messageType === 'sticker') {
@@ -818,7 +822,7 @@ export function useChat(
         } else {
             text = msg.text || '';
         }
-        return { id: msg.id, sender: msg.sender, text };
+        return { id: msg.id, sender: msg.sender, text, imageUrl };
     };
 
     // ==================== 核心聊天发送 ====================
@@ -1155,8 +1159,15 @@ export function useChat(
         modelHistory.forEach(m => {
             const ctx = buildSoulLinkReplyContext(m);
             const raw = ctx.text || (m.text || '');
-            if (m.sender === 'user') messagesPayload.push({ role: 'user', content: raw });
-            else if (m.sender === 'ai') messagesPayload.push({ role: 'assistant', content: raw });
+            let contentPayload = raw;
+            if (ctx.imageUrl) {
+                contentPayload = [
+                    { type: 'text', text: raw },
+                    { type: 'image_url', image_url: { url: ctx.imageUrl } }
+                ];
+            }
+            if (m.sender === 'user') messagesPayload.push({ role: 'user', content: contentPayload });
+            else if (m.sender === 'ai') messagesPayload.push({ role: 'assistant', content: contentPayload });
         });
 
         if (options.isProactive) {

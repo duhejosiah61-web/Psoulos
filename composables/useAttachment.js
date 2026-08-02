@@ -238,10 +238,17 @@ export function useAttachment(opts) {
         historyForPrompt.forEach(m => {
             const ctx = buildSoulLinkReplyContext(m);
             const raw = ctx.text || (m.text || '');
+            let contentPayload = raw;
+            if (ctx.imageUrl) {
+                contentPayload = [
+                    { type: 'text', text: raw },
+                    { type: 'image_url', image_url: { url: ctx.imageUrl } }
+                ];
+            }
             if (m.sender === 'user') {
-                messagesPayload.push({ role: 'user', content: raw });
+                messagesPayload.push({ role: 'user', content: contentPayload });
             } else if (m.sender === 'ai') {
-                messagesPayload.push({ role: 'assistant', content: raw });
+                messagesPayload.push({ role: 'assistant', content: contentPayload });
             }
         });
         messagesPayload.push({ role: 'user', content: '请只输出地点名称。' });
