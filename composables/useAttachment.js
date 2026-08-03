@@ -1028,15 +1028,6 @@ export function useAttachment(opts) {
                 userAppearance: charObj?.userAppearance
             });
             if (imageUrl) {
-                // Delete old message
-                if (oldMsgId && targetChatId) {
-                    const currentChatMsgs = soulLinkMessages.value[targetChatId];
-                    if (currentChatMsgs) {
-                        const idx = currentChatMsgs.findIndex(m => m.id === oldMsgId);
-                        if (idx !== -1) currentChatMsgs.splice(idx, 1);
-                    }
-                }
-
                 const msgId = Date.now();
                 chatImageHighResCache.set(msgId, imageUrl);
 
@@ -1057,13 +1048,22 @@ export function useAttachment(opts) {
                 if (targetChatType === 'group' && originalSenderName) {
                     msg.senderName = originalSenderName;
                 }
-                
-                if (soulLinkMessages.value[targetChatId]) {
-                    soulLinkMessages.value[targetChatId].push(msg);
+
+                // Replace old message in-place so new image appears at the same position
+                const chatMsgs = soulLinkMessages.value[targetChatId];
+                if (chatMsgs && oldMsgId) {
+                    const idx = chatMsgs.findIndex(m => m.id === oldMsgId);
+                    if (idx !== -1) {
+                        chatMsgs.splice(idx, 1, msg); // replace in-place
+                    } else {
+                        chatMsgs.push(msg);
+                    }
+                } else if (chatMsgs) {
+                    chatMsgs.push(msg);
                 } else {
                     soulLinkMessages.value[targetChatId] = [msg];
                 }
-                
+
                 saveSoulLinkMessages();
                 if (soulLinkActiveChat.value === targetChatId) {
                     scrollToBottom();

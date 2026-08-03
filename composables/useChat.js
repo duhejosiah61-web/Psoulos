@@ -1199,10 +1199,9 @@ export function useChat(
         const currentChatType = soulLinkActiveChatType.value;
         const currentIsRightnow = isRightnowMode.value;
 
-        // Shadow pushMessageToTargetChat locally to force the correct target mode
-        const _originalPushMessageToTargetChat = pushMessageToTargetChat;
-        const pushMessageToTargetChat = (cid, ctype, msg) => {
-            _originalPushMessageToTargetChat(cid, ctype, msg, currentIsRightnow);
+        // Wrap pushMessageToTargetChat locally to force the correct target mode
+        const _pushMessage = (cid, ctype, msg) => {
+            pushMessageToTargetChat(cid, ctype, msg, currentIsRightnow);
         };
 
         try {
@@ -1363,7 +1362,7 @@ export function useChat(
                     if (transferSegments) {
                         transferSegments.forEach((segment, offset) => {
                             if (segment.type === 'transfer') {
-                                pushMessageToTargetChat(currentChatId, currentChatType, {
+                                _pushMessage(currentChatId, currentChatType, {
                                     id: Date.now() + index + offset,
                                     sender: 'ai',
                                     senderName: parsed.senderName,
@@ -1376,7 +1375,7 @@ export function useChat(
                                     timestamp: Date.now()
                                 });
                             } else {
-                                pushMessageToTargetChat(currentChatId, currentChatType, {
+                                _pushMessage(currentChatId, currentChatType, {
                                     id: Date.now() + index + offset,
                                     sender: 'ai',
                                     senderName: parsed.senderName,
@@ -1391,7 +1390,7 @@ export function useChat(
                     }
                     const transfer = extractAiTransfer(parsed.content);
                     if (transfer) {
-                        pushMessageToTargetChat(currentChatId, currentChatType, {
+                        _pushMessage(currentChatId, currentChatType, {
                             id: Date.now() + index,
                             sender: 'ai',
                             senderName: parsed.senderName,
@@ -1422,7 +1421,7 @@ export function useChat(
                                     osContent: (offset === segments.length - 1) ? (osContent || undefined) : undefined,
                                     timestamp: Date.now()
                                 };
-                        pushMessageToTargetChat(currentChatId, currentChatType, msg);
+                        _pushMessage(currentChatId, currentChatType, msg);
                         if (externalTrigger.generateImage) {
                             const charObj = currentChatType === 'character' ? characters.value.find(c => String(c.id) === String(currentChatId)) : null;
                             externalTrigger.generateImage({ 
@@ -1452,7 +1451,7 @@ export function useChat(
                             }
                         }
                             } else {
-                                pushMessageToTargetChat(currentChatId, currentChatType, {
+                                _pushMessage(currentChatId, currentChatType, {
                                     id: Date.now() + index + offset,
                                     sender: 'ai',
                                     senderName: parsed.senderName,
@@ -1480,7 +1479,7 @@ export function useChat(
                             osContent: osContent || undefined,
                             timestamp: Date.now()
                         };
-                        pushMessageToTargetChat(currentChatId, currentChatType, msg);
+                        _pushMessage(currentChatId, currentChatType, msg);
                         if (externalTrigger.generateImage) {
                             const charObj = currentChatType === 'character' ? characters.value.find(c => String(c.id) === String(currentChatId)) : null;
                             externalTrigger.generateImage({ 
@@ -1515,7 +1514,7 @@ export function useChat(
                     if (stickerSegments) {
                         stickerSegments.forEach((segment, offset) => {
                             if (segment.type === 'sticker') {
-                                pushMessageToTargetChat(currentChatId, currentChatType, {
+                                _pushMessage(currentChatId, currentChatType, {
                                     id: Date.now() + index + offset,
                                     sender: 'ai',
                                     senderName: parsed.senderName,
@@ -1528,7 +1527,7 @@ export function useChat(
                                     timestamp: Date.now()
                                 });
                             } else {
-                                pushMessageToTargetChat(currentChatId, currentChatType, {
+                                _pushMessage(currentChatId, currentChatType, {
                                     id: Date.now() + index + offset,
                                     sender: 'ai',
                                     senderName: parsed.senderName,
@@ -1541,7 +1540,7 @@ export function useChat(
                         });
                         return;
                     }
-                    pushMessageToTargetChat(currentChatId, currentChatType, {
+                    _pushMessage(currentChatId, currentChatType, {
                         id: Date.now() + index,
                         sender: 'ai',
                         senderName: parsed.senderName,
@@ -1556,7 +1555,7 @@ export function useChat(
                     if (transferSegments) {
                         transferSegments.forEach((segment, offset) => {
                             if (segment.type === 'transfer') {
-                                pushMessageToTargetChat(currentChatId, currentChatType, {
+                                _pushMessage(currentChatId, currentChatType, {
                                     id: Date.now() + index + offset,
                                     sender: 'ai',
                                     messageType: 'transfer',
@@ -1567,7 +1566,7 @@ export function useChat(
                                     timestamp: Date.now()
                                 });
                             } else {
-                                pushMessageToTargetChat(currentChatId, currentChatType, {
+                                _pushMessage(currentChatId, currentChatType, {
                                     id: Date.now() + index + offset,
                                     sender: 'ai',
                                     text: segment.content,
@@ -1580,7 +1579,7 @@ export function useChat(
                     }
                     const transfer = extractAiTransfer(trimmedText);
                     if (transfer) {
-                        pushMessageToTargetChat(currentChatId, currentChatType, {
+                        _pushMessage(currentChatId, currentChatType, {
                             id: Date.now() + index,
                             sender: 'ai',
                             messageType: 'transfer',
@@ -1607,7 +1606,7 @@ export function useChat(
                                     osContent: (offset === segments.length - 1) ? (osContent || undefined) : undefined,
                                     timestamp: Date.now()
                                 };
-                        pushMessageToTargetChat(currentChatId, currentChatType, msg);
+                        _pushMessage(currentChatId, currentChatType, msg);
                         if (externalTrigger.generateImage) {
                             const charObj = currentChatType === 'character' ? characters.value.find(c => String(c.id) === String(currentChatId)) : null;
                             externalTrigger.generateImage({ 
@@ -1637,7 +1636,7 @@ export function useChat(
                             }
                         }
                             } else {
-                                pushMessageToTargetChat(currentChatId, currentChatType, {
+                                _pushMessage(currentChatId, currentChatType, {
                                     id: Date.now() + index + offset,
                                     sender: 'ai',
                                     text: segment.content,
@@ -1661,7 +1660,7 @@ export function useChat(
                             osContent: osContent || undefined,
                             timestamp: Date.now()
                         };
-                        pushMessageToTargetChat(currentChatId, currentChatType, msg);
+                        _pushMessage(currentChatId, currentChatType, msg);
                         if (externalTrigger.generateImage) {
                             const charObj = currentChatType === 'character' ? characters.value.find(c => String(c.id) === String(currentChatId)) : null;
                             externalTrigger.generateImage({ 
@@ -1695,7 +1694,7 @@ export function useChat(
                     const shoppingCard = extractAiShoppingCard(trimmedText);
                     if (shoppingCard) {
                         if (shoppingCard.type === 'buy') {
-                            pushMessageToTargetChat(currentChatId, currentChatType, {
+                            _pushMessage(currentChatId, currentChatType, {
                                 id: Date.now() + index,
                                 sender: 'ai',
                                 messageType: 'order',
@@ -1707,7 +1706,7 @@ export function useChat(
                                 timestamp: Date.now()
                             });
                         } else if (shoppingCard.type === 'helpBuy') {
-                            pushMessageToTargetChat(currentChatId, currentChatType, {
+                            _pushMessage(currentChatId, currentChatType, {
                                 id: Date.now() + index,
                                 sender: 'ai',
                                 messageType: 'helpBuy',
@@ -1719,7 +1718,7 @@ export function useChat(
                         }
                         const remainingText = trimmedText.replace(/\[\s*(?:购买|帮买请求)\s*[:：]\s*[^:：\]]+\s*[:：]\s*(?:[¥￥])?\s*[\d.]+\s*\]/g, '').trim();
                         if (remainingText) {
-                            pushMessageToTargetChat(currentChatId, currentChatType, {
+                            _pushMessage(currentChatId, currentChatType, {
                                 id: Date.now() + index + 1,
                                 sender: 'ai',
                                 text: remainingText,
@@ -1727,7 +1726,7 @@ export function useChat(
                                 timestamp: Date.now()
                             });
                         } else if (osContent) {
-                            pushMessageToTargetChat(currentChatId, currentChatType, {
+                            _pushMessage(currentChatId, currentChatType, {
                                 id: Date.now() + index + 1,
                                 sender: 'ai',
                                 text: '\u200b',
@@ -1741,7 +1740,7 @@ export function useChat(
                     if (stickerSegments) {
                         stickerSegments.forEach((segment, offset) => {
                             if (segment.type === 'sticker') {
-                                pushMessageToTargetChat(currentChatId, currentChatType, {
+                                _pushMessage(currentChatId, currentChatType, {
                                     id: Date.now() + index + offset,
                                     sender: 'ai',
                                     messageType: 'sticker',
@@ -1752,7 +1751,7 @@ export function useChat(
                                     timestamp: Date.now()
                                 });
                             } else {
-                                pushMessageToTargetChat(currentChatId, currentChatType, {
+                                _pushMessage(currentChatId, currentChatType, {
                                     id: Date.now() + index + offset,
                                     sender: 'ai',
                                     text: segment.content,
@@ -1768,7 +1767,7 @@ export function useChat(
                         voiceSegments.forEach((segment, offset) => {
                             if (segment.type === 'voice') {
                                 const voiceDuration = Math.max(1, Math.ceil(segment.transcription.length / 4));
-                                pushMessageToTargetChat(currentChatId, currentChatType, {
+                                _pushMessage(currentChatId, currentChatType, {
                                     id: Date.now() + index + offset,
                                     sender: 'ai',
                                     messageType: 'voice',
@@ -1779,7 +1778,7 @@ export function useChat(
                                     timestamp: Date.now()
                                 });
                             } else {
-                                pushMessageToTargetChat(currentChatId, currentChatType, {
+                                _pushMessage(currentChatId, currentChatType, {
                                     id: Date.now() + index + offset,
                                     sender: 'ai',
                                     text: segment.content,
@@ -1793,7 +1792,7 @@ export function useChat(
                     const voice = extractAiVoice(trimmedText);
                     if (voice) {
                         const voiceDuration = Math.max(1, Math.ceil(voice.transcription.length / 4));
-                        pushMessageToTargetChat(currentChatId, currentChatType, {
+                        _pushMessage(currentChatId, currentChatType, {
                             id: Date.now() + index,
                             sender: 'ai',
                             messageType: 'voice',
@@ -1805,7 +1804,7 @@ export function useChat(
                         });
                         return;
                     }
-                    pushMessageToTargetChat(currentChatId, currentChatType, {
+                    _pushMessage(currentChatId, currentChatType, {
                         id: Date.now() + index,
                         sender: 'ai',
                         text: trimmedText,
@@ -1840,7 +1839,7 @@ export function useChat(
             }
         } catch (error) {
             isAiTyping.value = false;
-            pushMessageToTargetChat(currentChatId, currentChatType, {
+            _pushMessage(currentChatId, currentChatType, {
                 id: Date.now() + 5,
                 sender: 'system',
                 text: `请求模型时出错：${error.message}`,
