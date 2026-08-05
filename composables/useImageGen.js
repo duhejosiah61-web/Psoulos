@@ -103,6 +103,7 @@ export function useImageGen({ addConsoleLog } = {}) {
   async function fetchOpenAiModels() {
     const cfg = imageGenConfig.openai;
     if (!cfg.endpoint || !cfg.apiKey) {
+      alert('请先填写生图 API 的 Endpoint 和 API Key！');
       log('请先在上方填写 Endpoint 和 API Key。', 'warn');
       return;
     }
@@ -118,13 +119,16 @@ export function useImageGen({ addConsoleLog } = {}) {
       availableOpenAiModels.value = data.data || [];
       if (availableOpenAiModels.value.length > 0) {
         log(`获取成功，共 ${availableOpenAiModels.value.length} 个模型。`, 'success');
+        alert(`成功拉取 ${availableOpenAiModels.value.length} 个模型！`);
         if (!availableOpenAiModels.value.find(m => m.id === cfg.model)) {
           cfg.model = availableOpenAiModels.value[0].id;
         }
       } else {
+        alert('该接口未返回任何可用模型。');
         log('该接口未返回任何可用模型。', 'warn');
       }
     } catch (err) {
+      alert(`获取模型失败：${err.message}`);
       log(`获取模型失败：${err.message}`, 'error');
     } finally {
       fetchingOpenAiModels.value = false;

@@ -6105,7 +6105,7 @@
                                         <select class="console-select" v-model="imageGenConfig.openai.model" style="flex: 1;">
                                             <option v-for="model in availableOpenAiModels" :key="model.id" :value="model.id">{{ model.id }}</option>
                                         </select>
-                                        <button class="console-btn console-btn-secondary" @click="fetchOpenAiModels" :disabled="fetchingOpenAiModels">
+                                        <button class="console-btn console-btn-secondary" @click.stop.prevent="fetchOpenAiModels" :disabled="fetchingOpenAiModels">
                                             <i class="fas" :class="fetchingOpenAiModels ? 'fa-spinner fa-spin' : 'fa-sync'"></i>
                                         </button>
                                     </div>
@@ -7669,7 +7669,7 @@
                                 <select class="console-select" v-model="imageGenConfig.openai.model" style="flex: 1;">
                                     <option v-for="model in availableOpenAiModels" :key="model.id" :value="model.id">{{ model.id }}</option>
                                 </select>
-                                <button class="console-btn console-btn-secondary" @click="fetchOpenAiModels" :disabled="fetchingOpenAiModels">
+                                <button class="console-btn console-btn-secondary" @click.stop.prevent="fetchOpenAiModels" :disabled="fetchingOpenAiModels">
                                     <i class="fas" :class="fetchingOpenAiModels ? 'fa-spinner fa-spin' : 'fa-sync'"></i>
                                     {{ fetchingOpenAiModels ? '拉取中' : '拉取' }}
                                 </button>
