@@ -207,7 +207,7 @@ export function useChat(
             for (const entry of wb.entries) {
                 if (budget <= 0) break;
                 const kwStr = String(entry.keyword || entry.keywords || entry.key || '').trim();
-                const content = String(entry.content || '').trim();
+                let content = String(entry.content || '').trim();
                 if (!content) continue;
                 
                 // 根据种类设置前缀和注入特定规则
