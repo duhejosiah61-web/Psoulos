@@ -50,6 +50,14 @@ console.log = (...args) => { originalLog.apply(console, args); appendToRealLogs(
 console.warn = (...args) => { originalWarn.apply(console, args); appendToRealLogs('WARN', ...args); };
 console.error = (...args) => { originalError.apply(console, args); appendToRealLogs('ERR', ...args); };
 
+window.addEventListener('error', (event) => {
+    appendToRealLogs('UNCAUGHT', event.message, event.filename, event.lineno, event.colno, event.error);
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+    appendToRealLogs('UNHANDLED_PROMISE', event.reason);
+});
+
 export function setupApp() {
     console.log('setup start'); 
     
