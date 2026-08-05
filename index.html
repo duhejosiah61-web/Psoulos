@@ -1536,20 +1536,21 @@
                             </div>
                         </div>
                         </template>
-                        <!-- 流式输出实时气泡 -->
-                        <div v-if="isAiTyping" class="message ai" style="pointer-events:none;">
-                            <img class="avatar" :src="currentChatAvatar" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0;">
-                            <div class="message-content-wrapper">
-                                <div v-if="streamingText" class="message-bubble ai streaming-bubble" style="white-space:pre-wrap;word-break:break-word;max-width:75%;line-height:1.6;">{{ streamingText }}</div>
-                                <div v-else class="message-bubble ai" style="padding:10px 14px;">
-                                    <div class="typing-dots" style="display:flex;gap:4px;align-items:center;">
-                                        <span style="width:6px;height:6px;background:#999;border-radius:50%;animation:typing-bounce 1.4s infinite ease-in-out both;animation-delay:-0.32s;"></span>
-                                        <span style="width:6px;height:6px;background:#999;border-radius:50%;animation:typing-bounce 1.4s infinite ease-in-out both;animation-delay:-0.16s;"></span>
-                                        <span style="width:6px;height:6px;background:#999;border-radius:50%;animation:typing-bounce 1.4s infinite ease-in-out both;"></span>
+                        <!-- 流式输出实时气泡（数据已合并进 currentChatMessages 自动复用正常气泡渲染） -->
+                        <template v-if="isAiTyping && (!streamingBubbles || streamingBubbles.length === 0)">
+                            <div class="message ai" style="pointer-events:none;">
+                                <img class="avatar" :src="currentChatAvatar" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0;">
+                                <div class="message-content-wrapper">
+                                    <div class="message-bubble ai" style="padding:10px 14px;">
+                                        <div class="typing-dots" style="display:flex;gap:4px;align-items:center;">
+                                            <span style="width:6px;height:6px;background:#999;border-radius:50%;animation:typing-bounce 1.4s infinite ease-in-out both;animation-delay:-0.32s;"></span>
+                                            <span style="width:6px;height:6px;background:#999;border-radius:50%;animation:typing-bounce 1.4s infinite ease-in-out both;animation-delay:-0.16s;"></span>
+                                            <span style="width:6px;height:6px;background:#999;border-radius:50%;animation:typing-bounce 1.4s infinite ease-in-out both;"></span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        </template>
                     </div>
 
                     
@@ -6103,7 +6104,7 @@
                                     <label class="console-label">模型</label>
                                     <div style="display: flex; gap: 8px;">
                                         <select class="console-select" v-model="imageGenConfig.openai.model" style="flex: 1;">
-                                            <option v-for="model in availableOpenAiModels" :key="model.id" :value="model.id">{{ model.id }}</option>
+                                            <option v-for="model in imageGenConfig.openai.availableModels" :key="model.id" :value="model.id">{{ model.id }}</option>
                                         </select>
                                         <button class="console-btn console-btn-secondary" @click.stop.prevent="fetchOpenAiModels" :disabled="fetchingOpenAiModels">
                                             <i class="fas" :class="fetchingOpenAiModels ? 'fa-spinner fa-spin' : 'fa-sync'"></i>
@@ -7667,7 +7668,7 @@
                             <label class="console-label">生图模型 (Model)</label>
                             <div style="display: flex; gap: 8px;">
                                 <select class="console-select" v-model="imageGenConfig.openai.model" style="flex: 1;">
-                                    <option v-for="model in availableOpenAiModels" :key="model.id" :value="model.id">{{ model.id }}</option>
+                                    <option v-for="model in imageGenConfig.openai.availableModels" :key="model.id" :value="model.id">{{ model.id }}</option>
                                 </select>
                                 <button class="console-btn console-btn-secondary" @click.stop.prevent="fetchOpenAiModels" :disabled="fetchingOpenAiModels">
                                     <i class="fas" :class="fetchingOpenAiModels ? 'fa-spinner fa-spin' : 'fa-sync'"></i>

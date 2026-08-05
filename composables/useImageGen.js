@@ -56,7 +56,8 @@ const DEFAULT_CONFIG = {
     width: 1024,
     height: 1024,
     positivePrompt: 'masterpiece, high quality',
-    negativePrompt: ''
+    negativePrompt: '',
+    availableModels: []
   },
 
   gemini: {
@@ -109,7 +110,7 @@ export function useImageGen({ addConsoleLog } = {}) {
       return;
     }
     fetchingOpenAiModels.value = true;
-    availableOpenAiModels.value = [];
+    cfg.availableModels = [];
     log('开始拉取 OpenAI 图像模型...', 'info');
     try {
       const response = await fetch(`${cfg.endpoint.replace(/\/+$/, '')}/models`, {
@@ -117,13 +118,14 @@ export function useImageGen({ addConsoleLog } = {}) {
       });
       if (!response.ok) throw new Error(`状态码: ${response.status}`);
       const data = await response.json();
-      availableOpenAiModels.value = data.data || [];
-      if (availableOpenAiModels.value.length > 0) {
-        log(`获取成功，共 ${availableOpenAiModels.value.length} 个模型。`, 'success');
-        alert(`成功拉取 ${availableOpenAiModels.value.length} 个模型！`);
-        if (!availableOpenAiModels.value.find(m => m.id === cfg.model)) {
-          cfg.model = availableOpenAiModels.value[0].id;
+      cfg.availableModels = data.data || [];
+      if (cfg.availableModels.length > 0) {
+        log(`获取成功，共 ${cfg.availableModels.length} 个模型。`, 'success');
+        alert(`成功拉取 ${cfg.availableModels.length} 个模型！`);
+        if (!cfg.availableModels.find(m => m.id === cfg.model)) {
+          cfg.model = cfg.availableModels[0].id;
         }
+        saveConfig(); // 持久化拉取到的模型列表
       } else {
         alert('该接口未返回任何可用模型。');
         log('该接口未返回任何可用模型。', 'warn');

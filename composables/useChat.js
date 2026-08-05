@@ -53,10 +53,19 @@ export function useChat(
     const soulLinkMessages = ref({});
     const soulLinkGroups = ref([]);
     const isAiTyping = ref(false);
-    const streamingText = ref(''); // 流式输出实时内容
+    const streamingText = ref(''); // 废弃，但为了不报错暂时保留
+    const streamingBubbles = ref([]); // 实时的气泡数组
+    let streamCharQueue = []; // 打字机等待队列
+    let rawStreamingText = ''; // 真实累加的网络流
+    let isAiStreaming = false;
+    let typewriterLoopHandle = null;
+
     watch(soulLinkActiveChat, () => {
         isAiTyping.value = false;
         streamingText.value = '';
+        streamingBubbles.value = [];
+        streamCharQueue = [];
+        rawStreamingText = '';
     });
     const focusedOsMessageId = ref(null);
     const editingMessageId = ref(null);
@@ -964,6 +973,177 @@ export function useChat(
     };
 
     // ==================== AI 回复 ====================
+    const updateStreamingBubbles = (rawText) => {
+        const blocks = rawText.split('---');
+        const bubbles = [];
+        
+        let senderName = 'AI';
+        let senderAvatar = '';
+        if (soulLinkActiveChatType.value === 'group') {
+            const group = soulLinkGroups.value.find(g => String(g.id) === String(soulLinkActiveChat.value));
+            if (group && Array.isArray(group.members) && group.members.length > 0) {
+                const randomMember = group.members[0];
+                senderName = typeof randomMember === 'string' ? randomMember : (randomMember.name || '成员');
+                if (typeof randomMember === 'object' && randomMember.avatarUrl) senderAvatar = randomMember.avatarUrl;
+            } else {
+                senderName = '成员';
+            }
+        }
+        
+        for (let i = 0; i < blocks.length; i++) {
+            const contentToParse = blocks[i].trim();
+            if (!contentToParse && i === blocks.length - 1 && blocks.length > 1) continue; // skip trailing empty
+            
+            let { content: parsedContent, osContent } = parseReplyAndOs(contentToParse);
+            let voteMatch = extractAiVote(parsedContent);
+            if (voteMatch) parsedContent = voteMatch.cleaned;
+            else if (osContent) {
+                voteMatch = extractAiVote(osContent);
+                if (voteMatch) osContent = voteMatch.cleaned;
+            }
+            
+            let trimmedText = parsedContent.trim();
+            
+            const createBubble = (type, payload) => ({
+                id: `stream_bubble_${i}_${bubbles.length}`,
+                sender: 'ai',
+                timestamp: Date.now(),
+                isStreaming: true,
+                name: soulLinkActiveChatType.value === 'group' ? senderName : undefined,
+                senderName: soulLinkActiveChatType.value === 'group' ? senderName : undefined,
+                avatar: soulLinkActiveChatType.value === 'group' ? senderAvatar : undefined,
+                messageType: type,
+                ...payload
+            });
+            
+            let segments = splitAiTransferSegments(trimmedText);
+            if (segments) {
+                segments.forEach((segment, offset) => {
+                    if (segment.type === 'transfer') {
+                        bubbles.push(createBubble('transfer', { amount: segment.amount, note: segment.note, transferStatus: 'received', osContent: (offset === segments.length - 1) ? (osContent || undefined) : undefined }));
+                    } else {
+                        bubbles.push(createBubble(undefined, { text: segment.content, osContent: (offset === segments.length - 1) ? (osContent || undefined) : undefined }));
+                    }
+                });
+                continue;
+            }
+            const transfer = extractAiTransfer(trimmedText);
+            if (transfer) {
+                bubbles.push(createBubble('transfer', { amount: transfer.amount, note: transfer.note, transferStatus: 'received', osContent: osContent || undefined }));
+                continue;
+            }
+            
+            segments = splitAiImageSegments(trimmedText);
+            if (segments) {
+                segments.forEach((segment, offset) => {
+                    if (segment.type === 'image') {
+                        bubbles.push(createBubble('image', { imageUrl: null, text: formatAiImageText(segment.fbText || segment.content, 'TA'), osContent: (offset === segments.length - 1) ? (osContent || undefined) : undefined }));
+                    } else {
+                        bubbles.push(createBubble(undefined, { text: segment.content, osContent: (offset === segments.length - 1) ? (osContent || undefined) : undefined }));
+                    }
+                });
+                continue;
+            }
+            const imageExtracted = extractAiImageDescription(trimmedText);
+            if (imageExtracted) {
+                bubbles.push(createBubble('image', { imageUrl: null, text: formatAiImageText(imageExtracted.fbText || imageExtracted.content, 'TA'), osContent: osContent || undefined }));
+                continue;
+            }
+            
+            const shoppingMatch = extractAiShoppingCard(trimmedText);
+            if (shoppingMatch) {
+                if (shoppingMatch.cleaned.trim()) bubbles.push(createBubble(undefined, { text: shoppingMatch.cleaned.trim() }));
+                bubbles.push(createBubble(shoppingMatch.type === 'buy' ? 'order' : 'helpBuy', { item: shoppingMatch.item, price: shoppingMatch.price, osContent: osContent || undefined }));
+                continue;
+            }
+            
+            segments = splitAiVoiceSegments(trimmedText);
+            if (segments) {
+                segments.forEach((segment, offset) => {
+                    if (segment.type === 'voice') {
+                        bubbles.push(createBubble('voice', { text: segment.content, voiceText: segment.content, osContent: (offset === segments.length - 1) ? (osContent || undefined) : undefined }));
+                    } else {
+                        bubbles.push(createBubble(undefined, { text: segment.content, osContent: (offset === segments.length - 1) ? (osContent || undefined) : undefined }));
+                    }
+                });
+                continue;
+            }
+            const voiceExtracted = extractAiVoice(trimmedText);
+            if (voiceExtracted) {
+                bubbles.push(createBubble('voice', { text: voiceExtracted.content, voiceText: voiceExtracted.content, osContent: osContent || undefined }));
+                continue;
+            }
+            
+            const stickerExtracted = extractStickersFromText(trimmedText);
+            if (stickerExtracted && stickerExtracted.stickers.length > 0) {
+                if (stickerExtracted.cleanedText.trim()) {
+                    bubbles.push(createBubble(undefined, { text: stickerExtracted.cleanedText.trim() }));
+                }
+                stickerExtracted.stickers.forEach((sticker, offset) => {
+                    bubbles.push(createBubble('sticker', { stickerName: sticker.name, stickerUrl: sticker.url, osContent: (offset === stickerExtracted.stickers.length - 1) ? (osContent || undefined) : undefined }));
+                });
+                continue;
+            }
+            
+            if (trimmedText || osContent || i === blocks.length - 1) { // always push the last one even if empty to show typing
+                bubbles.push(createBubble(undefined, { text: trimmedText, osContent: osContent }));
+            }
+        }
+        streamingBubbles.value = bubbles;
+        scrollToBottom();
+    };
+
+    const startTypewriterLoop = () => {
+        if (typewriterLoopHandle) return;
+        
+        isAiStreaming = true;
+        let lastTime = performance.now();
+        let imeBuffer = null;
+        const letters = ['q','w','e','r','t','y','u','i','o','p','a','s','d','f','g','h','j','k','l','z','x','c','v','b','n','m'];
+        
+        const tick = (now) => {
+            if (!isAiStreaming && streamCharQueue.length === 0 && !imeBuffer) {
+                typewriterLoopHandle = null;
+                return;
+            }
+            
+            if (now - lastTime > 25) {
+                if (imeBuffer) {
+                    if (now > imeBuffer.expire) {
+                        rawStreamingText += imeBuffer.char;
+                        imeBuffer = null;
+                        updateStreamingBubbles(rawStreamingText);
+                    } else {
+                        updateStreamingBubbles(rawStreamingText + imeBuffer.fakeLetter);
+                    }
+                } else if (streamCharQueue.length > 0) {
+                    const char = streamCharQueue.shift();
+                    const isChinese = /[\u4e00-\u9fa5]/.test(char);
+                    if (isChinese) {
+                        const randomLetter = letters[Math.floor(Math.random() * letters.length)];
+                        imeBuffer = {
+                            char,
+                            fakeLetter: randomLetter,
+                            expire: now + (30 + Math.random() * 30) // show fake letter for 30-60ms
+                        };
+                        updateStreamingBubbles(rawStreamingText + imeBuffer.fakeLetter);
+                    } else {
+                        rawStreamingText += char;
+                        updateStreamingBubbles(rawStreamingText);
+                    }
+                }
+                lastTime = now;
+            }
+            
+            typewriterLoopHandle = requestAnimationFrame(tick);
+        };
+        typewriterLoopHandle = requestAnimationFrame(tick);
+    };
+
+    const stopTypewriterLoop = () => {
+        isAiStreaming = false;
+    };
+
     const triggerSoulLinkAiReply = async (options = {}) => {
         const skipBusySimulation = !!options.skipBusySimulation;
         const busyLaterDepth = Number(options.busyLaterDepth) || 0;
@@ -1279,6 +1459,12 @@ export function useChat(
             // 读取 SSE 流
             let reply = '';
             streamingText.value = '';
+            streamingBubbles.value = [];
+            streamCharQueue = [];
+            rawStreamingText = '';
+            
+            startTypewriterLoop();
+
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let buffer = '';
@@ -1302,13 +1488,22 @@ export function useChat(
                                 ?? '';
                             if (delta) {
                                 reply += delta;
-                                streamingText.value = reply; // 实时更新显示
+                                for (const char of delta) {
+                                    streamCharQueue.push(char);
+                                }
                             }
                         } catch { /* 忽略格式异常 chunk */ }
                     }
                 }
             }
-            streamingText.value = ''; // 流结束，清空实时显示
+            stopTypewriterLoop();
+            
+            // 等待打字机把队列和残影耗尽
+            while(streamCharQueue.length > 0 || typewriterLoopHandle) {
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+            streamingBubbles.value = []; // 流结束，清空气泡以便正式写入
+            streamingText.value = '';
             // ─────────────────────────────────────────────────────────────────
 
             // 兜底：如果 stream 返回空（少数网关不支持 stream），fallback 到 callAI
@@ -3258,7 +3453,7 @@ ${charPersona ? `你的设定：${charPersona}\n` : ''}
     return {
         // 状态
         soulLinkTab, soulLinkActiveChat, soulLinkActiveChatType, soulLinkInput, soulLinkReplyTarget,
-        soulLinkMessages, soulLinkGroups, isAiTyping, streamingText, focusedOsMessageId, editingMessageId, novelMode,
+        soulLinkMessages, soulLinkGroups, isAiTyping, streamingText, streamingBubbles, focusedOsMessageId, editingMessageId, novelMode,
         showChatSettings, showGreetingSelect, availableGreetings,
         selectedGreeting, archivedChats, showCreateGroupDialog,
         activeVote, newGroupName, newGroupMembers,

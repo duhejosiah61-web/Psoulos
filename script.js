@@ -1783,6 +1783,8 @@ export function setupApp() {
             scrollToBottom,
             activeGroupChat,
             isAiTyping,
+            streamingText,
+            streamingBubbles,
             editingMessageId,
             contextMenu,
             longPressTimer,
@@ -2509,7 +2511,12 @@ export function setupApp() {
             const messages = isRightnowMode.value ? (rightnowMessages.value[key] || []) : (soulLinkMessages.value[soulLinkActiveChat.value] || []);
             return messages.filter((m) => m && !m.isHidden && (m.isSystem || m.isCallMessage || m.messageType || String(m.text || '').replace(/\u200b/g, '').trim() || String(m.osContent || '').trim()));
         });
-        const currentChatMessages = computed(() => activeChatMessages.value);
+        const currentChatMessages = computed(() => {
+            return [
+                ...(activeChatMessages.value || []),
+                ...(chat.streamingBubbles.value || [])
+            ];
+        });
 
         const recentChats = computed(() => {
             const chats = [];
@@ -4439,6 +4446,8 @@ ${styleGuide}
             chatInput: soulLinkInput,
             chatCharacters: characters,
             isChatAiTyping: isAiTyping,
+            streamingText,
+            streamingBubbles,
             startChat: startSoulLinkChat,
             sendChatMessage: onSendOrCall,
             goBackInChat: exitSoulLinkChat,
