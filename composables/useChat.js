@@ -214,7 +214,7 @@ export function useChat(
                 let prefix = "背景设定";
                 if (wb.worldbookType === 'image_gen') {
                     prefix = "生图规则";
-                    content = `${content}\n\n[CRITICAL RULE FOR AI]: You MUST strictly follow the image generation rules above. Whenever an image generation is triggered, you MUST wrap the final generated image tags/prompts EXACTLY inside ****<NAI_FORCE_IMAGE>**** and ****</NAI_FORCE_IMAGE>****. Do NOT use any other format.`;
+                    content = `${content}\n\n[CRITICAL RULE FOR AI]: You MUST strictly follow the image generation rules above. DO NOT add generic quality or art style tags (e.g. masterpiece, high quality, anime style) unless specified. You may use any aspect ratio or size. ALWAYS generate the prompt in ENGLISH. If negative prompts are needed, append them at the end using the format "Avoid: [negative tags]". Whenever an image generation is triggered, you MUST wrap the final generated image tags/prompts EXACTLY inside ****<NAI_FORCE_IMAGE>**** and ****</NAI_FORCE_IMAGE>****. Do NOT use any other format.`;
                 } else if (wb.worldbookType === 'worldview') {
                     prefix = "世界观";
                 } else if (wb.worldbookType === 'npc') {
@@ -903,7 +903,7 @@ export function useChat(
         } else {
             text = msg.text || '';
         }
-        return { id: msg.id, sender: msg.sender, text, imageUrl };
+        return { id: msg.id, sender: msg.sender, text, imageUrl, messageType: msg.messageType };
     };
 
     // ==================== 核心聊天发送 ====================
