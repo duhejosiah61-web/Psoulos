@@ -668,6 +668,21 @@ export function useChat(
         const text = (rawText || '').trim();
         if (!text) return null;
         
+        // 优先识别生图世界书的 NAI_FORCE_IMAGE 标签
+        const naiPattern = /(?:\*+)?<NAI_FORCE_IMAGE>(?:\*+)?([\s\S]*?)(?:\*+)?<\/NAI_FORCE_IMAGE>(?:\*+)?/i;
+        const matchNai = text.match(naiPattern);
+        if (matchNai && matchNai.index != null) {
+            const before = text.slice(0, matchNai.index).trim();
+            const after = text.slice(matchNai.index + matchNai[0].length).trim();
+            const imageDesc = matchNai[1].trim();
+            
+            const segments = [];
+            if (before) segments.push({ type: 'text', content: before });
+            segments.push({ type: 'image', content: imageDesc, fbText: '一张照片' });
+            if (after) segments.push({ type: 'text', content: after });
+            return segments.length ? segments : null;
+        }
+        
         // 同时识别英文 [IMAGE: prompt] 格式（线下扮演模式）和中文格式
         const tagPattern = /\[\s*IMAGE\s*[:：]\s*([^\]]+)\]|\[\s*图片\s*[:：]\s*([^\]]+)\]|【\s*图片\s*[:：]\s*([^】]+)】|\[\s*图片\s*\]|【\s*图片\s*】|图片[:：]|照片[:：]/i;
         const match = text.match(tagPattern);
@@ -717,6 +732,7 @@ export function useChat(
         const text = (rawText || '').trim();
         if (!text) return null;
         const patterns = [
+            /^(?:\*+)?<NAI_FORCE_IMAGE>(?:\*+)?([\s\S]*?)(?:\*+)?<\/NAI_FORCE_IMAGE>(?:\*+)?$/i, // 生图世界书
             /^\[\s*IMAGE\s*[:：]\s*([^\]]*?)\]/i,          // [IMAGE: prompt] 英文格式（线下扮演）
             /^\[\s*图片\s*[:：]\s*(.*?)\]/i,
             /^【\s*图片\s*[:：]\s*(.*?)】/i,
