@@ -1150,7 +1150,9 @@ export function useChat(
                 return;
             }
             
-            if (now - lastTime > 25) {
+            if (now - lastTime > 16) {
+                const batchSize = Math.max(1, Math.floor(streamCharQueue.length / 5));
+
                 if (imeBuffer) {
                     if (now > imeBuffer.expire) {
                         rawStreamingText += imeBuffer.char;
@@ -1160,19 +1162,24 @@ export function useChat(
                         updateStreamingBubbles(rawStreamingText + imeBuffer.fakeLetter);
                     }
                 } else if (streamCharQueue.length > 0) {
-                    const char = streamCharQueue.shift();
-                    const isChinese = /[\u4e00-\u9fa5]/.test(char);
-                    if (isChinese) {
-                        const randomLetter = letters[Math.floor(Math.random() * letters.length)];
-                        imeBuffer = {
-                            char,
-                            fakeLetter: randomLetter,
-                            expire: now + (30 + Math.random() * 30) // show fake letter for 30-60ms
-                        };
-                        updateStreamingBubbles(rawStreamingText + imeBuffer.fakeLetter);
-                    } else {
-                        rawStreamingText += char;
+                    if (batchSize > 1) {
+                        rawStreamingText += streamCharQueue.splice(0, batchSize).join('');
                         updateStreamingBubbles(rawStreamingText);
+                    } else {
+                        const char = streamCharQueue.shift();
+                        const isChinese = /[\u4e00-\u9fa5]/.test(char);
+                        if (isChinese) {
+                            const randomLetter = letters[Math.floor(Math.random() * letters.length)];
+                            imeBuffer = {
+                                char,
+                                fakeLetter: randomLetter,
+                                expire: now + (15 + Math.random() * 15) // show fake letter for 15-30ms
+                            };
+                            updateStreamingBubbles(rawStreamingText + imeBuffer.fakeLetter);
+                        } else {
+                            rawStreamingText += char;
+                            updateStreamingBubbles(rawStreamingText);
+                        }
                     }
                 }
                 lastTime = now;
