@@ -1328,7 +1328,14 @@
                                         <div v-if="msg.replyTo" class="reply-quote">
                                             <div class="reply-quote-content">
                                                 <div class="reply-quote-sender">{{ msg.replyTo.sender === 'user' ? '我' : (msg.replyTo.senderName || currentChatName) }}</div>
-                                                <div class="reply-quote-text">{{ msg.replyTo.text }}</div>
+                                                <div class="reply-quote-text">
+                                                    <template v-if="msg.replyTo.messageType === 'image'">
+                                                        <img :src="msg.replyTo.imageUrl" style="max-height: 80px; max-width: 120px; border-radius: 6px; object-fit: cover; margin-top: 4px;">
+                                                    </template>
+                                                    <template v-else>
+                                                        {{ msg.replyTo.text }}
+                                                    </template>
+                                                </div>
                                             </div>
                                         </div>
                                         <div v-if="msg.isCallMessage" class="call-content" :class="{ 'clickable': !!msg.callDiaryId }" @click.stop="openCallDiary(msg)">

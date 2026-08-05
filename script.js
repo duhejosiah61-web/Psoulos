@@ -688,7 +688,7 @@ export function setupApp() {
                 const presetMap = {
                     avatar: { maxWidth: 400, maxHeight: 400, ratio: 1 },          // 头像/群头像
                     background: { maxWidth: 1080, maxHeight: 1920, ratio: 9 / 16 }, // 聊天背景（竖屏）
-                    chatImage: { maxWidth: 960, maxHeight: 960, ratio: 4 / 3 },    // 聊天图片
+                    chatImage: { maxWidth: 960, maxHeight: 960, ratio: null },    // 聊天图片 (不裁剪比例)
                     widgetPhoto: { maxWidth: 560, maxHeight: 840, ratio: 2 / 3 },   // 桌面照片小组件
                     widgetSticker: { maxWidth: 520, maxHeight: 520, ratio: 1 },     // 桌面贴纸小组件
                     free: { maxWidth: 960, maxHeight: 960, ratio: null }           // 不裁剪
