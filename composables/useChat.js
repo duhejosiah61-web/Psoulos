@@ -1117,13 +1117,15 @@ export function useChat(
                 continue;
             }
             
-            const stickerExtracted = extractStickersFromText(trimmedText);
-            if (stickerExtracted && stickerExtracted.stickers.length > 0) {
-                if (stickerExtracted.cleanedText.trim()) {
-                    bubbles.push(createBubble(undefined, { text: stickerExtracted.cleanedText.trim() }));
-                }
-                stickerExtracted.stickers.forEach((sticker, offset) => {
-                    bubbles.push(createBubble('sticker', { stickerName: sticker.name, stickerUrl: sticker.url, osContent: (offset === stickerExtracted.stickers.length - 1) ? (osContent || undefined) : undefined }));
+            const stickerSegments = extractStickersFromText(trimmedText);
+            if (stickerSegments && stickerSegments.length > 0) {
+                stickerSegments.forEach((seg, offset) => {
+                    const isLast = (offset === stickerSegments.length - 1);
+                    if (seg.type === 'text' && seg.content.trim()) {
+                        bubbles.push(createBubble(undefined, { text: seg.content.trim(), osContent: isLast ? (osContent || undefined) : undefined }));
+                    } else if (seg.type === 'sticker') {
+                        bubbles.push(createBubble('sticker', { stickerName: seg.sticker.name, stickerUrl: seg.sticker.url, osContent: isLast ? (osContent || undefined) : undefined }));
+                    }
                 });
                 continue;
             }

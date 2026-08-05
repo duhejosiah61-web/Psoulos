@@ -179,12 +179,20 @@ export function useTheme() {
 
   const saveHomeWallpaper = () => {
     homeWallpaper.value = homeWallpaperInput.value;
-    localStorage.setItem('homeWallpaper', homeWallpaperInput.value);
+    try {
+      localStorage.setItem('homeWallpaper', homeWallpaperInput.value);
+    } catch (e) {
+      alert('保存主屏幕壁纸失败，可能是图片太大导致存储配额超限。请尝试清理本地缓存或使用更小的图片。');
+    }
   };
 
   const saveHomeTextColor = () => {
     homeTextColor.value = homeTextColorInput.value;
-    localStorage.setItem('homeTextColor', homeTextColorInput.value);
+    try {
+      localStorage.setItem('homeTextColor', homeTextColorInput.value);
+    } catch (e) {
+      console.warn('保存主屏幕字体颜色失败', e);
+    }
   };
 
   // ==================== 毛玻璃开关 ====================

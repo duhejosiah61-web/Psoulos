@@ -97,7 +97,11 @@ export function useLockScreen() {
     const saveLockWallpaper = () => {
         const v = lockWallpaperInput.value.trim();
         lockWallpaper.value = v || 'https://img.heliar.top/file/1773753630799_1773753603638.png';
-        localStorage.setItem('lockWallpaper', lockWallpaper.value);
+        try {
+            localStorage.setItem('lockWallpaper', lockWallpaper.value);
+        } catch (e) {
+            alert('保存锁屏壁纸失败，可能是图片太大导致存储配额超限。请尝试清理本地缓存或使用更小的图片。');
+        }
     };
 
     const saveLockDateTimeColor = () => {
