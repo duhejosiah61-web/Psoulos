@@ -1536,7 +1536,22 @@
                             </div>
                         </div>
                         </template>
+                        <!-- 流式输出实时气泡 -->
+                        <div v-if="isAiTyping" class="message ai" style="pointer-events:none;">
+                            <img class="avatar" :src="currentChatAvatar" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0;">
+                            <div class="message-content-wrapper">
+                                <div v-if="streamingText" class="message-bubble ai streaming-bubble" style="white-space:pre-wrap;word-break:break-word;max-width:75%;line-height:1.6;">{{ streamingText }}</div>
+                                <div v-else class="message-bubble ai" style="padding:10px 14px;">
+                                    <div class="typing-dots" style="display:flex;gap:4px;align-items:center;">
+                                        <span style="width:6px;height:6px;background:#999;border-radius:50%;animation:typing-bounce 1.4s infinite ease-in-out both;animation-delay:-0.32s;"></span>
+                                        <span style="width:6px;height:6px;background:#999;border-radius:50%;animation:typing-bounce 1.4s infinite ease-in-out both;animation-delay:-0.16s;"></span>
+                                        <span style="width:6px;height:6px;background:#999;border-radius:50%;animation:typing-bounce 1.4s infinite ease-in-out both;"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
+
                     
                     <div class="chat-input-container">
                         <!-- Rightnow Narrations Panel -->
@@ -6234,6 +6249,17 @@
                         </button>
                     </div>
                 </div>
+                
+                <div class="card console-card" style="margin-top: 16px;">
+                    <div class="card-header console-card-header">
+                        <i class="fas fa-bug"></i>
+                        <span>全局运行日志 (用于给AI查Bug)</span>
+                        <button class="sys-btn sys-btn-outline" style="margin-left: auto; padding: 4px 12px; font-size: 12px;" @click="copyRealConsoleLogs">复制全部</button>
+                    </div>
+                    <div class="console-card-body" style="padding: 0;">
+                        <textarea readonly style="width: 100%; height: 200px; background: rgba(0,0,0,0.4); border: none; color: #00ff00; font-family: monospace; font-size: 11px; padding: 12px; resize: vertical; box-sizing: border-box;" :value="realConsoleLogs"></textarea>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -7871,6 +7897,7 @@
             </div>
         </div>
     </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
     <script type="module" src="main.js?v=20260801_v2.0.0.1.0"></script>
 
 </body>

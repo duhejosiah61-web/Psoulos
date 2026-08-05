@@ -474,7 +474,20 @@ export function useChatSettings(
         if (!soulLinkForeignTranslationEnabled.value) return '';
         const aValue = String(soulLinkForeignPrimaryLang.value || '').trim() || 'zh-CN';
         const aLabel = getTargetLangLabel(aValue);
-        return `# 语言输出（极度严格，最高优先级）\n无论用户使用什么语言和你对话，你的所有回复（包括 [REPLY] 和 [OS]）**必须且只能**使用 ${aLabel}！\n绝对禁止为了迎合用户而切换语言，绝对禁止输出双语或自带翻译（系统的翻译功能会在后台独立运行）。\n记住：你只会说 ${aLabel}！\n\n`;
+        return `# 语言输出（极度严格，最高优先级）
+无论用户使用什么语言和你对话，你的主体回复（包括 [REPLY] 和 [OS] 标签内的内容）**必须且只能**使用 ${aLabel}！
+记住：你只会说 ${aLabel}！
+
+此外，为了方便用户理解，请在生成 ${aLabel} 回复后，立刻提供对应的中文翻译，使用以下专属标签（请跟在各自内容之后）：
+- 你的回复的中文翻译请放在 [TRANS_REPLY]中文翻译[/TRANS_REPLY] 中。
+- 你的内心独白的中文翻译请放在 [TRANS_OS]中文翻译[/TRANS_OS] 中。
+
+示例格式：
+[REPLY]Your reply in ${aLabel}[/REPLY]
+[TRANS_REPLY]你的回复的中文翻译[/TRANS_REPLY]
+[OS]Your inner thoughts in ${aLabel}[/OS]
+[TRANS_OS]你的内心独白的中文翻译[/TRANS_OS]
+`;
     };
 
     const buildAiBusyDecisionPromptBlock = () => {

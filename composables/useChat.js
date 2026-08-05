@@ -1,6 +1,6 @@
 // composables/useChat.js
 import { ref, computed, watch, nextTick } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
-import { callAI } from '../api.js';
+import { callAI, buildChatCompletionUrlCandidates } from '../api.js';
 
 export function useChat(
     characters,
@@ -53,8 +53,10 @@ export function useChat(
     const soulLinkMessages = ref({});
     const soulLinkGroups = ref([]);
     const isAiTyping = ref(false);
+    const streamingText = ref(''); // 流式输出实时内容
     watch(soulLinkActiveChat, () => {
         isAiTyping.value = false;
+        streamingText.value = '';
     });
     const focusedOsMessageId = ref(null);
     const editingMessageId = ref(null);
@@ -428,18 +430,27 @@ export function useChat(
         });
     };
 
-    const pushMessageToTargetChat = (chatId, chatType, msg, forceRightnow = null) => {
+    const pushMessageToTargetChat = (chatId, chatType, msg, forceRightnow = null, insertAtIndex = undefined) => {
         if (!chatId) return;
         if (msg && msg.sender === 'ai' && msg.isSystem !== true && typeof msg.isReadByUser === 'undefined') {
             const isViewingThisChat = externalTrigger.openedApp?.value === 'chat' && String(soulLinkActiveChat.value) === String(chatId) && soulLinkActiveChatType.value === chatType;
             msg.isReadByUser = !!isViewingThisChat;
         }
+
+        const doInsert = (arr) => {
+            if (insertAtIndex !== undefined && insertAtIndex >= 0 && insertAtIndex <= arr.length) {
+                arr.splice(insertAtIndex, 0, msg);
+            } else {
+                arr.push(msg);
+            }
+        };
+
         if (chatType === 'group') {
             const group = soulLinkGroups.value.find(g => String(g.id) === String(chatId));
             if (!group) return;
             attachGroupAiSenderIdIfNeeded(group, msg);
             if (!Array.isArray(group.history)) group.history = [];
-            group.history.push(msg);
+            doInsert(group.history);
             group.lastMessage = msg.text || '';
             group.lastTime = new Date(msg.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             if (externalTrigger.saveSoulLinkGroups) externalTrigger.saveSoulLinkGroups();
@@ -448,11 +459,18 @@ export function useChat(
             if (isTargetRightnow) {
                 const slotSuffix = rightnowActiveSlot.value ? `_${rightnowActiveSlot.value}` : '';
                 const key = `${chatId}${slotSuffix}`;
-                rightnowMessages.value[key] = [...(rightnowMessages.value[key] || []), msg];
+                const arr = rightnowMessages.value[key] || [];
+                if (insertAtIndex !== undefined && insertAtIndex >= 0 && insertAtIndex <= arr.length) {
+                    const newArr = [...arr];
+                    newArr.splice(insertAtIndex, 0, msg);
+                    rightnowMessages.value[key] = newArr;
+                } else {
+                    rightnowMessages.value[key] = [...arr, msg];
+                }
                 saveRightnowMessages();
             } else {
                 if (!soulLinkMessages.value[chatId]) soulLinkMessages.value[chatId] = [];
-                soulLinkMessages.value[chatId].push(msg);
+                doInsert(soulLinkMessages.value[chatId]);
                 if (externalTrigger.saveSoulLinkMessages) externalTrigger.saveSoulLinkMessages();
             }
         }
@@ -501,7 +519,7 @@ export function useChat(
 
     // ==================== 消息解析工具 ====================
     const parseReplyAndOs = (raw) => {
-        if (!raw || typeof raw !== 'string') return { content: '', osContent: null };
+        if (!raw || typeof raw !== 'string') return { content: '', osContent: null, replyTranslation: null, osTranslation: null };
         const extractTaggedContent = (text, tags) => {
             for (const tag of tags) {
                 const pattern = new RegExp(`\\[\\s*${tag}\\s*\\]([\\s\\S]*?)\\[\\s*\\/\\s*${tag}\\s*\\]`, 'i');
@@ -527,34 +545,53 @@ export function useChat(
             });
             return result;
         };
+        
         const replyTags = ['REPLY'];
         const osTags = ['OS', 'INNER_LOG', 'INNERLOG'];
+        const transReplyTags = ['TRANS_REPLY'];
+        const transOsTags = ['TRANS_OS'];
+        
         const taggedReply = extractTaggedContent(raw, replyTags);
         let taggedOs = extractTaggedContent(raw, osTags);
+        let replyTranslation = extractTaggedContent(raw, transReplyTags);
+        let osTranslation = extractTaggedContent(raw, transOsTags);
+        
         if (!taggedOs) {
             const osAlt = '(?:OS|INNER_LOG|INNERLOG)';
-            const stopLookahead = `(?=\\[\\s*REPLY\\s*\\]|\\[\\s*${osAlt}\\s*\\]|\\[\\s*\\/\\s*${osAlt}\\s*\\]|$)`;
+            const stopLookahead = `(?=\\[\\s*REPLY\\s*\\]|\\[\\s*${osAlt}\\s*\\]|\\[\\s*\\/\\s*${osAlt}\\s*\\]|\\[\\s*TRANS_REPLY\\s*\\]|\\[\\s*TRANS_OS\\s*\\]|$)`;
             const looseOsRe = new RegExp(`\\[\\s*${osAlt}\\s*\\]([\\s\\S]*?)${stopLookahead}`, 'i');
             const looseOsMatch = raw.match(looseOsRe);
             if (looseOsMatch && looseOsMatch[1] != null) {
                 taggedOs = looseOsMatch[1].trim();
             }
         }
+        
         let content = taggedReply ?? raw;
         content = removeTaggedBlocks(content, osTags);
-        const looseOsBlockRe = new RegExp(`\\[\\s*(?:OS|INNER_LOG|INNERLOG)\\s*\\][\\s\\S]*?(?=\\[\\s*REPLY\\s*\\]|\\[\\s*(?:OS|INNER_LOG|INNERLOG)\\s*\\]|\\[\\s*\\/\\s*(?:OS|INNER_LOG|INNERLOG)\\s*\\]|$)`, 'gi');
+        content = removeTaggedBlocks(content, transReplyTags);
+        content = removeTaggedBlocks(content, transOsTags);
+        
+        const osAlt = '(?:OS|INNER_LOG|INNERLOG)';
+        const looseOsBlockRe = new RegExp(`\\[\\s*${osAlt}\\s*\\][\\s\\S]*?(?=\\[\\s*REPLY\\s*\\]|\\[\\s*${osAlt}\\s*\\]|\\[\\s*\\/\\s*${osAlt}\\s*\\]|\\[\\s*TRANS_REPLY\\s*\\]|\\[\\s*TRANS_OS\\s*\\]|$)`, 'gi');
         content = content.replace(looseOsBlockRe, ' ');
-        content = removeStandaloneTags(content, [...replyTags, ...osTags]);
+        content = removeStandaloneTags(content, [...replyTags, ...osTags, ...transReplyTags, ...transOsTags]);
         content = content.replace(/\s+/g, ' ').trim();
+        
         if (!content) {
-            content = raw.replace(/\[[^\]]+\]/g, ' ').replace(/\s+/g, ' ').trim();
+            // 降级兜底：只删除不带内容的空标签（如 [REPLY]、[/OS] 等），
+            // 保留 [IMAGE: ...] 这类带内容的功能标签，避免图片格式一起丢失
+            content = raw
+                .replace(/\[\s*\/\s*(?:REPLY|OS|INNER_LOG|INNERLOG|AI_ACTION|TRANS_REPLY|TRANS_OS)\s*\]/gi, ' ')
+                .replace(/\[\s*(?:REPLY|OS|INNER_LOG|INNERLOG|TRANS_REPLY|TRANS_OS)\s*\]/gi, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
         }
         let osContent = taggedOs && taggedOs.trim() ? taggedOs.trim() : null;
         if (osContent) {
             osContent = osContent.replace(/\[\s*AI_ACTION\s*\][\s\S]*?\[\s*\/\s*AI_ACTION\s*\]/gi, '').trim();
             if (!osContent) osContent = null;
         }
-        return { content, osContent };
+        return { content, osContent, replyTranslation, osTranslation };
     };
 
     const parseGroupReply = (raw) => {
@@ -622,7 +659,8 @@ export function useChat(
         const text = (rawText || '').trim();
         if (!text) return null;
         
-        const tagPattern = /\[\s*图片\s*[:：]\s*([^\]]+)\]|【\s*图片\s*[:：]\s*([^】]+)】|\[\s*图片\s*\]|【\s*图片\s*】|图片[:：]|照片[:：]/i;
+        // 同时识别英文 [IMAGE: prompt] 格式（线下扮演模式）和中文格式
+        const tagPattern = /\[\s*IMAGE\s*[:：]\s*([^\]]+)\]|\[\s*图片\s*[:：]\s*([^\]]+)\]|【\s*图片\s*[:：]\s*([^】]+)】|\[\s*图片\s*\]|【\s*图片\s*】|图片[:：]|照片[:：]/i;
         const match = text.match(tagPattern);
         if (!match || match.index == null) return null;
         
@@ -631,9 +669,14 @@ export function useChat(
         let imageDesc = '';
         
         if (match[1]) {
+            // [IMAGE: prompt] 英文格式
             imageDesc = match[1].trim();
         } else if (match[2]) {
+            // [图片: prompt] 中文方括号格式
             imageDesc = match[2].trim();
+        } else if (match[3]) {
+            // 【图片: prompt】 中文全角括号格式
+            imageDesc = match[3].trim();
         } else {
             const lineBreakIndex = after.indexOf('\n');
             if (lineBreakIndex >= 0) {
@@ -665,6 +708,7 @@ export function useChat(
         const text = (rawText || '').trim();
         if (!text) return null;
         const patterns = [
+            /^\[\s*IMAGE\s*[:：]\s*([^\]]*?)\]/i,          // [IMAGE: prompt] 英文格式（线下扮演）
             /^\[\s*图片\s*[:：]\s*(.*?)\]/i,
             /^【\s*图片\s*[:：]\s*(.*?)】/i,
             /^\[\s*图片\s*\]\s*(.*)/i,
@@ -930,7 +974,10 @@ export function useChat(
         const activeGroup = isGroupChat ? soulLinkGroups.value.find(g => String(g.id) === String(soulLinkActiveChat.value)) : null;
         if (isGroupChat && !activeGroup) return;
 
-        const history = getActiveChatHistory();
+        let history = getActiveChatHistory();
+        if (options.insertAtIndex !== undefined && options.insertAtIndex >= 0 && options.insertAtIndex < history.length) {
+            history = history.slice(0, options.insertAtIndex);
+        }
         const pendingUserMessages = getPendingUserMessages(history);
         const profile = activeProfile.value;
         if (!profile || !profile.endpoint || !profile.key) {
@@ -1199,48 +1246,82 @@ export function useChat(
         const currentChatType = soulLinkActiveChatType.value;
         const currentIsRightnow = isRightnowMode.value;
 
+        let sharedReplyTranslation = null;
+        let sharedOsTranslation = null;
+
         // Wrap pushMessageToTargetChat locally to force the correct target mode
         const _pushMessage = (cid, ctype, msg) => {
+            if (msg.text && sharedReplyTranslation) msg.replyTranslation = sharedReplyTranslation;
+            if (msg.osContent && sharedOsTranslation) msg.osTranslation = sharedOsTranslation;
             pushMessageToTargetChat(cid, ctype, msg, currentIsRightnow);
         };
 
         try {
-            const response = await fetch(endpoint.replace(/\/+$/, '') + '/chat/completions', {
+            // ── 流式请求（SSE stream: true）────────────────────────────────────
+            const urls = buildChatCompletionUrlCandidates ? buildChatCompletionUrlCandidates(endpoint) : [endpoint.replace(/\/+$/, '') + '/chat/completions'];
+            const primaryUrl = urls[0] || (endpoint.replace(/\/+$/, '') + '/chat/completions');
+
+            const response = await fetch(primaryUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
                 body: JSON.stringify({
                     model: modelId || '',
                     messages: messagesPayload,
                     temperature: profile.temperature ?? 0.7,
-                    stream: false
+                    stream: true
                 })
             });
-            if (!response.ok) throw new Error(`接口返回状态码 ${response.status}`);
-            const data = await response.json();
+            if (!response.ok) {
+                const errText = await response.text().catch(() => '');
+                throw new Error(`接口返回状态码 ${response.status}: ${errText.slice(0, 200)}`);
+            }
+
+            // 读取 SSE 流
             let reply = '';
-            const extractContent = (obj) => {
-                if (!obj) return '';
-                const raw = obj.choices?.[0]?.message || obj.choices?.[0]?.delta;
-                if (raw?.content != null) {
-                    if (typeof raw.content === 'string') return raw.content;
-                    if (Array.isArray(raw.content)) return raw.content.map(c => (typeof c === 'string' ? c : (c?.text ?? c?.content ?? ''))).join('');
+            streamingText.value = '';
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let done = false;
+            while (!done) {
+                const { value, done: readerDone } = await reader.read();
+                done = readerDone;
+                if (value) {
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop(); // 保留最后一段未完整行
+                    for (const line of lines) {
+                        const trimmed = line.trim();
+                        if (!trimmed.startsWith('data:')) continue;
+                        const payload = trimmed.slice(5).trim();
+                        if (!payload || payload === '[DONE]') continue;
+                        try {
+                            const chunk = JSON.parse(payload);
+                            const delta = chunk.choices?.[0]?.delta?.content
+                                ?? chunk.choices?.[0]?.message?.content
+                                ?? '';
+                            if (delta) {
+                                reply += delta;
+                                streamingText.value = reply; // 实时更新显示
+                            }
+                        } catch { /* 忽略格式异常 chunk */ }
+                    }
                 }
-                if (obj.message?.content != null) return typeof obj.message.content === 'string' ? obj.message.content : '';
-                const parts = obj.candidates?.[0]?.content?.parts;
-                if (Array.isArray(parts) && parts.length) return parts.map(p => p?.text ?? '').join('');
-                if (typeof obj.output_text === 'string') return obj.output_text;
-                if (typeof obj.result === 'string') return obj.result;
-                if (typeof obj.text === 'string') return obj.text;
-                return '';
-            };
-            reply = extractContent(data) || extractContent(data?.data || data?.result) || '';
+            }
+            streamingText.value = ''; // 流结束，清空实时显示
+            // ─────────────────────────────────────────────────────────────────
+
+            // 兜底：如果 stream 返回空（少数网关不支持 stream），fallback 到 callAI
+            if (!reply.trim()) {
+                reply = await callAI(profile, messagesPayload, { temperature: profile.temperature ?? 0.7 });
+            }
             reply = String(reply || '').trim();
-            
+
             // Hide Chain of Thought (e.g. DeepSeek's <think> or Claude's <thought>)
             reply = reply.replace(/<(think|thought)\b[^>]*>[\s\S]*?<\/\1>/gi, '');
             reply = reply.replace(/<(think|thought)\b[^>]*>[\s\S]*$/gi, '');
             reply = reply.trim();
-            
+
             if (!reply) reply = '模型已响应，但未返回可显示的内容。';
 
             // 处理帮买标记
@@ -1329,7 +1410,10 @@ export function useChat(
                     }
                 }
 
-                let { content: parsedContent, osContent } = parseReplyAndOs(contentToParse);
+                let { content: parsedContent, osContent, replyTranslation, osTranslation } = parseReplyAndOs(contentToParse);
+                sharedReplyTranslation = replyTranslation;
+                sharedOsTranslation = osTranslation;
+
                 let voteMatch = extractAiVote(parsedContent);
                 if (voteMatch) {
                     parsedContent = voteMatch.cleaned;
@@ -1969,17 +2053,25 @@ export function useChat(
                 break;
             case 'regenerate':
                 if (index !== -1) {
+                    let targetIndex = -1;
                     if (msg.sender === 'ai' || msg.sender === 'system') {
-                        chatMsgs.splice(index, 1);
+                        targetIndex = index;
                     } else if (msg.sender === 'user') {
                         const nextAiIndex = chatMsgs.findIndex((m, i) => i > index && m.sender === 'ai');
                         if (nextAiIndex !== -1) {
-                            chatMsgs.splice(nextAiIndex, 1);
+                            targetIndex = nextAiIndex;
                         }
                     }
-                    syncActiveChatState();
-                    persistActiveChat();
-                    triggerSoulLinkAiReply({ skipBusySimulation: true });
+                    if (targetIndex !== -1) {
+                        chatMsgs.splice(targetIndex, 1);
+                        syncActiveChatState();
+                        persistActiveChat();
+                        triggerSoulLinkAiReply({ skipBusySimulation: true, insertAtIndex: targetIndex });
+                    } else {
+                        syncActiveChatState();
+                        persistActiveChat();
+                        triggerSoulLinkAiReply({ skipBusySimulation: true });
+                    }
                 }
                 break;
             case 'edit':
@@ -2090,11 +2182,21 @@ export function useChat(
         } catch (e) {}
     };
 
-    const loadRightnowMessages = () => {
+    const loadRightnowMessages = async () => {
         try {
-            const saved = localStorage.getItem('soulos_rightnow_messages');
-            if (saved) {
-                const loaded = JSON.parse(saved);
+            let loaded = null;
+            if (window.dbGet) {
+                const dbEntry = await window.dbGet('settings', 'soulos_rightnow_messages');
+                if (dbEntry && dbEntry.value) loaded = dbEntry.value;
+            }
+            if (!loaded) {
+                const saved = localStorage.getItem('soulos_rightnow_messages');
+                if (saved) {
+                    loaded = JSON.parse(saved);
+                    if (window.dbPut) window.dbPut('settings', { key: 'soulos_rightnow_messages', value: loaded });
+                }
+            }
+            if (loaded) {
                 let migrated = false;
                 // Migration script
                 for (const key in loaded) {
@@ -2117,11 +2219,17 @@ export function useChat(
             rightnowMessages.value = {};
         }
     };
-    loadRightnowMessages();
+    // Delay load to ensure db is ready if possible, but execute immediately as async
+    setTimeout(loadRightnowMessages, 100);
 
     const saveRightnowMessages = () => {
         try {
-            localStorage.setItem('soulos_rightnow_messages', JSON.stringify(rightnowMessages.value));
+            if (window.dbPut) {
+                window.dbPut('settings', { key: 'soulos_rightnow_messages', value: JSON.parse(JSON.stringify(rightnowMessages.value)) });
+                localStorage.removeItem('soulos_rightnow_messages');
+            } else {
+                localStorage.setItem('soulos_rightnow_messages', JSON.stringify(rightnowMessages.value));
+            }
         } catch (e) {}
     };
 
@@ -2426,18 +2534,66 @@ export function useChat(
     };
 
     // ==================== 通话功能 ====================
-    const loadCallDiaryRecords = () => {
+    const saveCallDiaryRecords = () => {
         try {
-            callDiaryRecords.value = JSON.parse(localStorage.getItem(CALL_DIARY_STORAGE_KEY) || '{}') || {};
+            if (window.dbPut) {
+                window.dbPut('settings', { key: CALL_DIARY_STORAGE_KEY, value: JSON.parse(JSON.stringify(callDiaryRecords.value)) });
+                localStorage.removeItem(CALL_DIARY_STORAGE_KEY);
+            } else {
+                localStorage.setItem(CALL_DIARY_STORAGE_KEY, JSON.stringify(callDiaryRecords.value));
+            }
+        } catch {}
+    };
+
+    const saveCallDiaryCounters = () => {
+        try {
+            if (window.dbPut) {
+                window.dbPut('settings', { key: CALL_DIARY_COUNTER_KEY, value: JSON.parse(JSON.stringify(callDiaryCounters.value)) });
+                localStorage.removeItem(CALL_DIARY_COUNTER_KEY);
+            } else {
+                localStorage.setItem(CALL_DIARY_COUNTER_KEY, JSON.stringify(callDiaryCounters.value));
+            }
+        } catch {}
+    };
+
+    const loadCallDiaryRecords = async () => {
+        try {
+            let loaded = null;
+            if (window.dbGet) {
+                const dbEntry = await window.dbGet('settings', CALL_DIARY_STORAGE_KEY);
+                if (dbEntry && dbEntry.value) loaded = dbEntry.value;
+            }
+            if (!loaded) {
+                const saved = localStorage.getItem(CALL_DIARY_STORAGE_KEY);
+                if (saved) {
+                    loaded = JSON.parse(saved);
+                    if (window.dbPut) window.dbPut('settings', { key: CALL_DIARY_STORAGE_KEY, value: loaded });
+                }
+            }
+            callDiaryRecords.value = loaded || {};
         } catch { callDiaryRecords.value = {}; }
     };
-    const loadCallDiaryCounters = () => {
+    
+    const loadCallDiaryCounters = async () => {
         try {
-            callDiaryCounters.value = JSON.parse(localStorage.getItem(CALL_DIARY_COUNTER_KEY) || '{}') || {};
+            let loaded = null;
+            if (window.dbGet) {
+                const dbEntry = await window.dbGet('settings', CALL_DIARY_COUNTER_KEY);
+                if (dbEntry && dbEntry.value) loaded = dbEntry.value;
+            }
+            if (!loaded) {
+                const saved = localStorage.getItem(CALL_DIARY_COUNTER_KEY);
+                if (saved) {
+                    loaded = JSON.parse(saved);
+                    if (window.dbPut) window.dbPut('settings', { key: CALL_DIARY_COUNTER_KEY, value: loaded });
+                }
+            }
+            callDiaryCounters.value = loaded || {};
         } catch { callDiaryCounters.value = {}; }
     };
-    loadCallDiaryRecords();
-    loadCallDiaryCounters();
+    
+    setTimeout(loadCallDiaryRecords, 100);
+    setTimeout(loadCallDiaryCounters, 100);
 
     const getCallDiaryKey = () => {
         if (!soulLinkActiveChat.value) return '';
@@ -2528,7 +2684,7 @@ ${isGroup ? `【参与成员】${JSON.stringify(groupMembers)}` : ''}
         const counterKey = `${key}:${callType.value}`;
         const nextNo = (Number(callDiaryCounters.value[counterKey]) || 0) + 1;
         callDiaryCounters.value[counterKey] = nextNo;
-        localStorage.setItem(CALL_DIARY_COUNTER_KEY, JSON.stringify(callDiaryCounters.value));
+        saveCallDiaryCounters();
         const vol = String(nextNo).padStart(2, '0');
         const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
         const fileNo = `${datePart}-${String(nextNo).padStart(4, '0')}`;
@@ -2549,7 +2705,7 @@ ${isGroup ? `【参与成员】${JSON.stringify(groupMembers)}` : ''}
         };
         if (!Array.isArray(callDiaryRecords.value[key])) callDiaryRecords.value[key] = [];
         callDiaryRecords.value[key].unshift(entry);
-        localStorage.setItem(CALL_DIARY_STORAGE_KEY, JSON.stringify(callDiaryRecords.value));
+        saveCallDiaryRecords();
         // 后台生成
         (async () => {
             try {
@@ -2565,7 +2721,7 @@ ${isGroup ? `【参与成员】${JSON.stringify(groupMembers)}` : ''}
                 const finalDiaryText = diaryText || `这次${entry.callType === 'video' ? '视频' : '语音'}通话结束后，我还在回味刚才的节奏。\n我们聊了大约${entry.duration || '00:00'}，有些话并不长，却很有温度。`;
                 entry.body = finalDiaryText + `\n\n—— ${new Date(entry.createdAt).toLocaleDateString('zh-CN')} · ${charName}`;
                 entry.status = 'ready';
-                localStorage.setItem(CALL_DIARY_STORAGE_KEY, JSON.stringify(callDiaryRecords.value));
+                saveCallDiaryRecords();
             } catch {
                 entry.status = 'failed';
                 entry.body = '总结失败（可稍后再试）。';
@@ -3091,14 +3247,18 @@ ${charPersona ? `你的设定：${charPersona}\n` : ''}
             html = html.replace(`__HTML_${idx}__`, val);
         });
 
-        return `<div style="word-break: break-word; line-height: 1.8;">${html}</div>`;
+        let outputHtml = `<div style="word-break: break-word; line-height: 1.8;">${html}</div>`;
+        if (window.DOMPurify) {
+            outputHtml = window.DOMPurify.sanitize(outputHtml);
+        }
+        return outputHtml;
     };
 
     // ==================== 导出 ====================
     return {
         // 状态
         soulLinkTab, soulLinkActiveChat, soulLinkActiveChatType, soulLinkInput, soulLinkReplyTarget,
-        soulLinkMessages, soulLinkGroups, isAiTyping, focusedOsMessageId, editingMessageId, novelMode,
+        soulLinkMessages, soulLinkGroups, isAiTyping, streamingText, focusedOsMessageId, editingMessageId, novelMode,
         showChatSettings, showGreetingSelect, availableGreetings,
         selectedGreeting, archivedChats, showCreateGroupDialog,
         activeVote, newGroupName, newGroupMembers,

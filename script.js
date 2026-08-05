@@ -25,6 +25,31 @@ import { useHome } from './composables/useHome.js?v=20260801_v3';
 import { callAI } from './api.js?v=20260801_v3';
 
 
+export const realConsoleLogs = ref('');
+
+const originalLog = console.log;
+const originalWarn = console.warn;
+const originalError = console.error;
+
+const appendToRealLogs = (type, ...args) => {
+    try {
+        const text = args.map(a => {
+            if (a instanceof Error) return a.stack || a.message;
+            return typeof a === 'object' ? JSON.stringify(a) : String(a);
+        }).join(' ');
+        realConsoleLogs.value += `[${type}] ${text}\n`;
+        if (realConsoleLogs.value.length > 50000) {
+            realConsoleLogs.value = realConsoleLogs.value.slice(-50000);
+        }
+    } catch(e) {
+        realConsoleLogs.value += `[${type}] (Unserializable Object)\n`;
+    }
+};
+
+console.log = (...args) => { originalLog.apply(console, args); appendToRealLogs('LOG', ...args); };
+console.warn = (...args) => { originalWarn.apply(console, args); appendToRealLogs('WARN', ...args); };
+console.error = (...args) => { originalError.apply(console, args); appendToRealLogs('ERR', ...args); };
+
 export function setupApp() {
     console.log('setup start'); 
     
@@ -325,6 +350,10 @@ export function setupApp() {
         });
     };
     
+    window.dbGet = dbGet;
+    window.dbPut = dbPut;
+    window.dbGetAll = dbGetAll;
+
     try {
         // --- DATA (State) ---
         const deviceBatteryLevel = ref(null);
@@ -2623,10 +2652,14 @@ export function setupApp() {
             }
         };
 
-        // ✅ Watch for auto-save
-        watch(soulLinkMessages, saveSoulLinkMessages, { deep: true });
-        watch(soulLinkGroups, saveSoulLinkGroups, { deep: true });
-        watch(soulLinkPet, saveSoulLinkPet, { deep: true });
+        // ✅ Watch for auto-save（防抖：高频变更合并为一次写入，避免每次 imageUrl 更新都触发全量序列化）
+        const _debounce = (fn, delay) => {
+            let t = null;
+            return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), delay); };
+        };
+        watch(soulLinkMessages, _debounce(saveSoulLinkMessages, 800), { deep: true });
+        watch(soulLinkGroups,   _debounce(saveSoulLinkGroups,   800), { deep: true });
+        watch(soulLinkPet,      _debounce(saveSoulLinkPet,      800), { deep: true });
         
         // 重置创建群聊表单
         watch(showCreateGroupDialog, (val) => {
@@ -4785,6 +4818,15 @@ ${styleGuide}
             newFontName,
             newFontUrl,
             addFontByUrl,
+            realConsoleLogs,
+            copyRealConsoleLogs: async () => {
+                try {
+                    await navigator.clipboard.writeText(realConsoleLogs.value);
+                    alert('运行日志已成功复制到剪贴板，可以粘贴给 AI 看了！');
+                } catch(e) {
+                    alert('复制失败，可能是环境不支持剪贴板API，请手动在框内全选并复制。');
+                }
+            }
         };
 
         // 音乐播放器控制

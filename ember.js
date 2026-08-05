@@ -351,6 +351,9 @@ export function useEmber(characters, activeProfile) {
     let html = escapeHtml(content);
     // Replace hashtags (letters, numbers, underscores, and Chinese characters)
     html = html.replace(/#([\w\u4e00-\u9fa5]+)/g, '<span style="color: #F48FB1; font-weight: 600;">#$1</span>');
+    if (window.DOMPurify) {
+        html = window.DOMPurify.sanitize(html);
+    }
     return html;
   }
 
@@ -414,12 +417,32 @@ export function useEmber(characters, activeProfile) {
     await removePost(postId);
   }
 
-  async function generateAiPost() {
-    const chars = normalizeCharacters(characters);
-    const pick = pickRandom(chars.filter(c => String(c?.id || '').trim()));
-    if (!pick) return;
+  // 当没有配置角色时使用的默认 AI 网友人设池
+  const DEFAULT_PERSONAS = [
+    { id: 'persona_1', name: '晚风小酌', avatar: 'https://i.pravatar.cc/96?u=persona1', bio: '喜欢在深夜刷帖的打工人' },
+    { id: 'persona_2', name: '宇宙尘埃', avatar: 'https://i.pravatar.cc/96?u=persona2', bio: '对所有事物都有点好奇' },
+    { id: 'persona_3', name: '柠檬绿茶', avatar: 'https://i.pravatar.cc/96?u=persona3', bio: '话不多但说到点上' },
+    { id: 'persona_4', name: '深海咸鱼', avatar: 'https://i.pravatar.cc/96?u=persona4', bio: '摸鱼专业户，爱好冲浪' },
+    { id: 'persona_5', name: '雨天窗台', avatar: 'https://i.pravatar.cc/96?u=persona5', bio: '文艺但不做作' },
+    { id: 'persona_6', name: '夜市炒饭', avatar: 'https://i.pravatar.cc/96?u=persona6', bio: '人间烟火气最治愈' },
+  ];
 
-    const author = characterToAuthor(pick);
+  function resolveAuthor() {
+    const chars = normalizeCharacters(characters);
+    const validChars = chars.filter(c => String(c?.id || '').trim());
+    if (validChars.length > 0) {
+      return characterToAuthor(pickRandom(validChars));
+    }
+    // 没有配置角色时，从默认人设里随机挑一个
+    const persona = pickRandom(DEFAULT_PERSONAS);
+    return { authorId: persona.id, authorName: persona.name, avatar: persona.avatar };
+  }
+
+  async function generateAiPost() {
+    // 如果没有 API 也没有角色，则不生成
+    if (!isAiProfileReady(activeProfile) && normalizeCharacters(characters).length === 0) return;
+
+    const author = resolveAuthor();
     const id = nowId();
 
     // fallback content
@@ -433,19 +456,20 @@ export function useEmber(characters, activeProfile) {
     let content = fallback;
     if (isAiProfileReady(activeProfile)) {
       const ap = activeProfileSnapshot(activeProfile);
-      const sys = `你在一个类似 Threads 的中文社交平台发帖。你扮演角色【${author.authorName}】。
+      const sys = `你在一个类似 Threads 的中文女性社区 Ember 发帖。你扮演一个真实的网友，昵称是【${author.authorName}】。
 要求：
-1) 口语化、真实感强，像一个网友随手发的。
-2) 1-3 句，长度不要太长。
-3) 可以有 0-1 个 emoji，但不要堆。
-4) 不要使用话题标签，不要加引号，不要输出解释。`;
+1) 口语化、真实感强，像普通女生随手发的日常或感想。
+2) 1-3 句，不要太长。
+3) 内容可以是日常吐槽、情绪共鸣、生活分享、追剧感受等，贴近女性视角。
+4) 可以有 0-1 个 emoji，但不要堆。
+5) 不要使用话题标签（#），不要加引号，不要输出任何解释或前缀。`;
       try {
         const out = await callAI(
           { ...ap, model: ap.model },
           [{ role: 'system', content: sys }, { role: 'user', content: '发一条动态' }],
-          { temperature: 0.9 }
+          { temperature: 0.95 }
         );
-        const cleaned = String(out || '').replace(/^["']|["']$/g, '').trim();
+        const cleaned = String(out || '').replace(/^["'「」【】]|["'「」【】]$/g, '').trim();
         if (cleaned) content = cleaned;
       } catch (e) {
         console.warn('Ember AI post failed, fallback used:', e);
@@ -474,32 +498,30 @@ export function useEmber(characters, activeProfile) {
 
   async function generateAiReply(targetPost) {
     if (!targetPost) return;
-    const chars = normalizeCharacters(characters);
-    const pick = pickRandom(chars.filter(c => String(c?.id || '').trim()));
-    if (!pick) return;
+    // 如果没有 API 也没有角色，则不生成
+    if (!isAiProfileReady(activeProfile) && normalizeCharacters(characters).length === 0) return;
 
-    const author = characterToAuthor(pick);
+    const author = resolveAuthor();
     const id = nowId();
     const fallback = pickRandom(['同感。', '这点我不同意。', '笑死我了。', '展开说说？', '我觉得关键在于…']);
 
     let content = fallback;
     if (isAiProfileReady(activeProfile)) {
       const ap = activeProfileSnapshot(activeProfile);
-      const sys = `你在一个类似 Threads 的中文社交平台回复帖子。你扮演角色【${author.authorName}】。
+      const sys = `你在一个中文女性社区 Ember 回复帖子。你扮演一个真实网友，昵称是【${author.authorName}】。
 被回复的帖子作者：${targetPost.authorName}
 被回复的帖子内容：${targetPost.content}
 要求：
 1) 1 句话为主，最多 2 句。
-2) 语气自然，像网友回复。
-3) 可以轻微互动、追问或调侃，但不要攻击。
-4) 不要加引号，不要输出解释。`;
+2) 语气自然，像女生网友随口的回复，可以共情、追问或轻松调侃。
+3) 不要攻击性内容，不要加引号，不要输出任何解释或前缀。`;
       try {
         const out = await callAI(
           { ...ap, model: ap.model },
           [{ role: 'system', content: sys }, { role: 'user', content: '写一条回复' }],
-          { temperature: 0.9 }
+          { temperature: 0.95 }
         );
-        const cleaned = String(out || '').replace(/^["']|["']$/g, '').trim();
+        const cleaned = String(out || '').replace(/^["'「」【】]|["'「」【】]$/g, '').trim();
         if (cleaned) content = cleaned;
       } catch (e) {
         console.warn('Ember AI reply failed, fallback used:', e);
