@@ -53,9 +53,10 @@ const DEFAULT_CONFIG = {
     apiKey: '',
     endpoint: 'https://api.openai.com/v1',
     model: 'dall-e-3',
-    quality: 'standard', // 'standard' | 'hd'
-    style: 'vivid', // 'vivid' | 'natural'
-    size: '1024x1024'
+    width: 1024,
+    height: 1024,
+    positivePrompt: 'masterpiece, high quality',
+    negativePrompt: ''
   },
 
   gemini: {
@@ -473,21 +474,29 @@ export function useImageGen({ addConsoleLog } = {}) {
     if (!cfg.apiKey) throw new Error('OpenAI API Key 未填写');
     const endpoint = (cfg.endpoint || 'https://api.openai.com/v1').replace(/\/+$/, '') + '/images/generations';
 
+    let finalPrompt = userPrompt;
+    if (cfg.positivePrompt) {
+      finalPrompt = `${cfg.positivePrompt}, ${userPrompt}`;
+    }
+    if (cfg.negativePrompt) {
+      finalPrompt = `${finalPrompt}\nAvoid: ${cfg.negativePrompt}`;
+    }
+
+    const payload = {
+      model: cfg.model || 'dall-e-3',
+      prompt: finalPrompt,
+      n: 1,
+      size: `${cfg.width || 1024}x${cfg.height || 1024}`,
+      response_format: 'b64_json'
+    };
+
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${cfg.apiKey.trim()}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        model: cfg.model || 'dall-e-3',
-        prompt: userPrompt,
-        n: 1,
-        size: cfg.size || '1024x1024',
-        quality: cfg.quality || 'standard',
-        style: cfg.style || 'vivid',
-        response_format: 'b64_json'
-      })
+      body: JSON.stringify(payload)
     });
 
     if (!res.ok) {

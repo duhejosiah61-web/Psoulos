@@ -6111,7 +6111,7 @@
                                     </div>
                                 </div>
                                 <button class="console-btn console-btn-secondary console-btn-full" @click="openImageGenSettingsModal('openai')">
-                                    <i class="fas fa-sliders-h"></i> 调整 DALL-E 高级生成设定 ({{ imageGenConfig.openai.size }} >)
+                                    <i class="fas fa-sliders-h"></i> 调整 OpenAI 高级生成设定 ({{ imageGenConfig.openai.width }}x{{ imageGenConfig.openai.height }} >)
                                 </button>
                             </div>
 
@@ -7676,26 +7676,20 @@
                             </div>
                         </div>
                         <div class="console-form-group">
-                            <label class="console-label">图像尺寸 (Size)</label>
-                            <select class="console-select" v-model="imageGenConfig.openai.size">
-                                <option value="1024x1024">1024 x 1024 (正方形 1:1)</option>
-                                <option value="1024x1792">1024 x 1792 (竖屏人像 9:16)</option>
-                                <option value="1792x1024">1792 x 1024 (横屏风景 16:9)</option>
-                            </select>
+                            <label class="console-label">图像尺寸 (Width x Height)</label>
+                            <div style="display: flex; gap: 8px;">
+                                <input type="number" class="console-input" placeholder="宽" v-model.number="imageGenConfig.openai.width" style="flex: 1;">
+                                <span style="align-self: center;">x</span>
+                                <input type="number" class="console-input" placeholder="高" v-model.number="imageGenConfig.openai.height" style="flex: 1;">
+                            </div>
                         </div>
                         <div class="console-form-group">
-                            <label class="console-label">生成画质 (Quality)</label>
-                            <select class="console-select" v-model="imageGenConfig.openai.quality">
-                                <option value="standard">Standard (标准)</option>
-                                <option value="hd">HD (超高清细节)</option>
-                            </select>
+                            <label class="console-label">默认正向提示词 (Positive Prompts)</label>
+                            <textarea class="console-input" rows="2" v-model="imageGenConfig.openai.positivePrompt"></textarea>
                         </div>
                         <div class="console-form-group">
-                            <label class="console-label">艺术风格 (Style)</label>
-                            <select class="console-select" v-model="imageGenConfig.openai.style">
-                                <option value="vivid">Vivid (鲜艳戏剧化)</option>
-                                <option value="natural">Natural (自然真实)</option>
-                            </select>
+                            <label class="console-label">默认反向提示词 (Negative Prompts - 以 Avoid: 附加)</label>
+                            <textarea class="console-input" rows="2" v-model="imageGenConfig.openai.negativePrompt"></textarea>
                         </div>
                     </div>
 
