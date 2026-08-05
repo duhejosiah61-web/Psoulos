@@ -292,8 +292,9 @@ export async function callAI(profile, messages, options = {}) {
 
             // 明确报错：方便用户看出网关返回结构
             const hint = summarizeKeys(data);
+            const actualRaw = rawText || (typeof data === 'object' ? JSON.stringify(data) : String(data));
             throw new Error(
-                `API 返回内容为空（已解析 JSON，但未找到可用正文字段）。${hint ? `\n${hint}` : ''}\nraw=${String(rawText || '').slice(0, 420)}`
+                `API 返回内容为空（已解析 JSON，但未找到可用正文字段）。${hint ? `\n${hint}` : ''}\nraw=${String(actualRaw || '').slice(0, 500)}`
             );
         } catch (e) {
             if (e?.name === 'AbortError') throw e;
