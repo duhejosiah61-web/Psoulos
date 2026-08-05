@@ -5850,10 +5850,18 @@
                 <div class="modal-body">
                     <label>名称</label>
                     <input name="sp_field_128" id="sp-field-128" v-model="editingWorldbook.name" placeholder="世界书名称">
-                    <label class="mt-2">类型</label>
+                    <label class="mt-2">适用范围 (Scope)</label>
                     <select name="sp_field_type" id="sp-field-type" v-model="editingWorldbook.category" style="width: 100%; padding: 10px; border: 1px solid rgba(0,0,0,0.1); border-radius: 12px; background: rgba(0,0,0,0.02); color: #000; font-size: 14px; outline: none; transition: border-color 0.2s;">
-                        <option value="global">全局世界书 (所有角色生效)</option>
-                        <option value="character">角色世界书 (仅绑定角色生效)</option>
+                        <option value="global">全局 (所有角色生效)</option>
+                        <option value="character">角色专属 (仅绑定角色生效)</option>
+                    </select>
+                    
+                    <label class="mt-2">种类 (Type)</label>
+                    <select name="sp_field_worldbook_type" id="sp-field-worldbook-type" v-model="editingWorldbook.worldbookType" style="width: 100%; padding: 10px; border: 1px solid rgba(0,0,0,0.1); border-radius: 12px; background: rgba(0,0,0,0.02); color: #000; font-size: 14px; outline: none; transition: border-color 0.2s;">
+                        <option value="setting">设定</option>
+                        <option value="worldview">世界观</option>
+                        <option value="npc">NPC</option>
+                        <option value="image_gen">生图</option>
                     </select>
                     <label class="mt-2">描述</label>
                     <textarea name="sp_field_129" id="sp-field-129" v-model="editingWorldbook.description" rows="2" placeholder="世界书描述..."></textarea>
@@ -7499,42 +7507,12 @@
                     <button class="channel-chip" style="padding: 5px 10px; font-size: 12px;" :class="{ active: imageGenModalTab === 'custom' }" @click="imageGenModalTab = 'custom'">
                         <i class="fas fa-sliders-h"></i> 自定义
                     </button>
-                    <button class="channel-chip" style="padding: 5px 10px; font-size: 12px;" :class="{ active: imageGenModalTab === 'parser' }" @click="imageGenModalTab = 'parser'">
-                        <i class="fas fa-cog"></i> 隐式生图
-                    </button>
                 </div>
 
                 <div style="max-height: 60vh; overflow-y: auto; padding-right: 6px;">
 
-                    <!-- 0. 隐式生图参数 -->
-                    <div v-if="imageGenModalTab === 'parser'">
-                        <div style="margin: 14px 0; background: rgba(0,0,0,0.03); padding: 12px; border-radius: 8px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                                <span style="font-size: 13px; font-weight: 600; color: #4834d4;">启用自定义识别标签</span>
-                                <div class="setting-toggle" @click="imageGenConfig.parser.customTagsEnabled = !imageGenConfig.parser.customTagsEnabled">
-                                    <div class="toggle-slider" :class="{ active: imageGenConfig.parser.customTagsEnabled }">
-                                        <div class="toggle-thumb"></div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div style="font-size: 11px; color: #666; margin-bottom: 10px; line-height: 1.4;">
-                                当 AI 的回复包含这组自定义标签时，系统将自动隐藏标签内的提示词内容，并直接发起图片生成（例如配合特定生图世界书使用）。支持忽略标签周围的星号。
-                            </div>
-                            <div v-if="imageGenConfig.parser.customTagsEnabled">
-                                <div class="console-form-group" style="margin-bottom: 8px;">
-                                    <label class="console-label">开始标签 (Start Tag)</label>
-                                    <input type="text" class="console-input" v-model="imageGenConfig.parser.customStartTag" placeholder="例如：<NAI_FORCE_IMAGE>">
-                                </div>
-                                <div class="console-form-group" style="margin-bottom: 0;">
-                                    <label class="console-label">结束标签 (End Tag)</label>
-                                    <input type="text" class="console-input" v-model="imageGenConfig.parser.customEndTag" placeholder="例如：</NAI_FORCE_IMAGE>">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
                     <!-- 1. Pollinations 参数 -->
-                    <div v-else-if="imageGenModalTab === 'pollinations'">
+                    <div v-if="imageGenModalTab === 'pollinations'">
                         <div class="console-form-group">
                             <label class="console-label">图像尺寸 (Width x Height)</label>
                             <div style="display: flex; gap: 8px;">

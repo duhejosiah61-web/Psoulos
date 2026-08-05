@@ -82,12 +82,6 @@ const DEFAULT_CONFIG = {
     height: 1216,
     positivePrompt: 'masterpiece, high quality',
     negativePrompt: 'lowres, bad quality'
-  },
-
-  parser: {
-    customTagsEnabled: true,
-    customStartTag: '<NAI_FORCE_IMAGE>',
-    customEndTag: '</NAI_FORCE_IMAGE>'
   }
 };
 

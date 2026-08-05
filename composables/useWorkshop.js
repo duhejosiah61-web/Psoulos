@@ -479,7 +479,8 @@ export function useWorkshop({
       id: `wb_${newId}`,
       name: `新世界书 ${worldbooks.value.length + 1}`,
       description: '暂无描述...',
-      category: 'global',
+      category: 'global', // 这是适用范围 (global/character)
+      worldbookType: 'setting', // 这是种类 (setting/worldview/npc/image_gen)
       globalEnabled: true,
       entries: []
     };
