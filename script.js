@@ -4643,6 +4643,9 @@ ${styleGuide}
             resetImageGenConfig: imageGen.resetConfigToDefault,
             generateImage: imageGen.generateImage,
             testGenerateImage: imageGen.testGenerateImage,
+            availableOpenAiModels: imageGen.availableOpenAiModels,
+            fetchingOpenAiModels: imageGen.fetchingOpenAiModels,
+            fetchOpenAiModels: imageGen.fetchOpenAiModels,
             // Workshop App
             activeWorkshopTab,
             switchWorkshopTab,

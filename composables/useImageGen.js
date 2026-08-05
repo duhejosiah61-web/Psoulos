@@ -97,6 +97,40 @@ export function useImageGen({ addConsoleLog } = {}) {
     else console.log(`[ImageGen ${type}]`, msg);
   }
 
+  const availableOpenAiModels = ref([]);
+  const fetchingOpenAiModels = ref(false);
+
+  async function fetchOpenAiModels() {
+    const cfg = imageGenConfig.openai;
+    if (!cfg.endpoint || !cfg.apiKey) {
+      log('请先在上方填写 Endpoint 和 API Key。', 'warn');
+      return;
+    }
+    fetchingOpenAiModels.value = true;
+    availableOpenAiModels.value = [];
+    log('开始拉取 OpenAI 图像模型...', 'info');
+    try {
+      const response = await fetch(`${cfg.endpoint.replace(/\/+$/, '')}/models`, {
+        headers: { 'Authorization': `Bearer ${cfg.apiKey}` }
+      });
+      if (!response.ok) throw new Error(`状态码: ${response.status}`);
+      const data = await response.json();
+      availableOpenAiModels.value = data.data || [];
+      if (availableOpenAiModels.value.length > 0) {
+        log(`获取成功，共 ${availableOpenAiModels.value.length} 个模型。`, 'success');
+        if (!availableOpenAiModels.value.find(m => m.id === cfg.model)) {
+          cfg.model = availableOpenAiModels.value[0].id;
+        }
+      } else {
+        log('该接口未返回任何可用模型。', 'warn');
+      }
+    } catch (err) {
+      log(`获取模型失败：${err.message}`, 'error');
+    } finally {
+      fetchingOpenAiModels.value = false;
+    }
+  }
+
   function openImageGenSettingsModal(channel = null) {
     imageGenModalTab.value = channel || imageGenConfig.activeChannel || 'novelai';
     showImageGenSettingsModal.value = true;
@@ -553,7 +587,10 @@ export function useImageGen({ addConsoleLog } = {}) {
     saveConfig,
     resetConfigToDefault,
     generateImage,
-    testGenerateImage
+    testGenerateImage,
+    availableOpenAiModels,
+    fetchingOpenAiModels,
+    fetchOpenAiModels
   };
 }
 
