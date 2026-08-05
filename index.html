@@ -6101,10 +6101,14 @@
                                 </div>
                                 <div class="console-form-group">
                                     <label class="console-label">模型</label>
-                                    <select class="console-select" v-model="imageGenConfig.openai.model">
-                                        <option value="dall-e-3">DALL-E 3 (推荐)</option>
-                                        <option value="dall-e-2">DALL-E 2</option>
-                                    </select>
+                                    <div style="display: flex; gap: 8px;">
+                                        <select class="console-select" v-model="imageGenConfig.openai.model" style="flex: 1;">
+                                            <option v-for="model in availableOpenAiModels" :key="model.id" :value="model.id">{{ model.id }}</option>
+                                        </select>
+                                        <button class="console-btn console-btn-secondary" @click="fetchOpenAiModels" :disabled="fetchingOpenAiModels">
+                                            <i class="fas" :class="fetchingOpenAiModels ? 'fa-spinner fa-spin' : 'fa-sync'"></i>
+                                        </button>
+                                    </div>
                                 </div>
                                 <button class="console-btn console-btn-secondary console-btn-full" @click="openImageGenSettingsModal('openai')">
                                     <i class="fas fa-sliders-h"></i> 调整 DALL-E 高级生成设定 ({{ imageGenConfig.openai.size }} >)
@@ -7663,13 +7667,7 @@
                             <label class="console-label">生图模型 (Model)</label>
                             <div style="display: flex; gap: 8px;">
                                 <select class="console-select" v-model="imageGenConfig.openai.model" style="flex: 1;">
-                                    <template v-if="availableOpenAiModels && availableOpenAiModels.length > 0">
-                                        <option v-for="model in availableOpenAiModels" :key="model.id" :value="model.id">{{ model.id }}</option>
-                                    </template>
-                                    <template v-else>
-                                        <option value="dall-e-3">DALL-E 3 (推荐 - 高清细节)</option>
-                                        <option value="dall-e-2">DALL-E 2</option>
-                                    </template>
+                                    <option v-for="model in availableOpenAiModels" :key="model.id" :value="model.id">{{ model.id }}</option>
                                 </select>
                                 <button class="console-btn console-btn-secondary" @click="fetchOpenAiModels" :disabled="fetchingOpenAiModels">
                                     <i class="fas" :class="fetchingOpenAiModels ? 'fa-spinner fa-spin' : 'fa-sync'"></i>
