@@ -991,8 +991,24 @@ export function useChat(
         }
         
         for (let i = 0; i < blocks.length; i++) {
-            const contentToParse = blocks[i].trim();
+            let contentToParse = blocks[i].trim();
             if (!contentToParse && i === blocks.length - 1 && blocks.length > 1) continue; // skip trailing empty
+            
+            let currentSenderName = senderName;
+            let currentSenderAvatar = senderAvatar;
+            
+            if (soulLinkActiveChatType.value === 'group') {
+                const match = contentToParse.match(/^\s*[*\[【]*([^:：*\]】]+)[*\]】]*[:：]\s*([\s\S]+)$/);
+                if (match) {
+                    currentSenderName = match[1].trim();
+                    contentToParse = match[2].trim();
+                }
+                const activeGroupChat = soulLinkGroups.value.find(g => String(g.id) === String(soulLinkActiveChat.value));
+                if (activeGroupChat && Array.isArray(activeGroupChat.members)) {
+                    const member = activeGroupChat.members.find(m => m.name === currentSenderName);
+                    if (member && member.avatarUrl) currentSenderAvatar = member.avatarUrl;
+                }
+            }
             
             let { content: parsedContent, osContent } = parseReplyAndOs(contentToParse);
             let voteMatch = extractAiVote(parsedContent);
@@ -1009,9 +1025,9 @@ export function useChat(
                 sender: 'ai',
                 timestamp: Date.now(),
                 isStreaming: true,
-                name: soulLinkActiveChatType.value === 'group' ? senderName : undefined,
-                senderName: soulLinkActiveChatType.value === 'group' ? senderName : undefined,
-                avatar: soulLinkActiveChatType.value === 'group' ? senderAvatar : undefined,
+                name: soulLinkActiveChatType.value === 'group' ? currentSenderName : undefined,
+                senderName: soulLinkActiveChatType.value === 'group' ? currentSenderName : undefined,
+                avatar: soulLinkActiveChatType.value === 'group' ? currentSenderAvatar : undefined,
                 messageType: type,
                 ...payload
             });
@@ -1463,8 +1479,9 @@ export function useChat(
             streamCharQueue = [];
             rawStreamingText = '';
             
-            startTypewriterLoop();
-
+            if (chatSettings.realtimeTypingEnabled) {
+                startTypewriterLoop();
+            }
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let buffer = '';
@@ -1488,8 +1505,13 @@ export function useChat(
                                 ?? '';
                             if (delta) {
                                 reply += delta;
-                                for (const char of delta) {
-                                    streamCharQueue.push(char);
+                                if (chatSettings.realtimeTypingEnabled) {
+                                    for (const char of delta) {
+                                        streamCharQueue.push(char);
+                                    }
+                                } else {
+                                    rawStreamingText += delta;
+                                    updateStreamingBubbles(rawStreamingText);
                                 }
                             }
                         } catch { /* 忽略格式异常 chunk */ }

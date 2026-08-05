@@ -44,6 +44,7 @@ export function useChatSettings(
     const chatSummaryBoard = ref([]);
     const chatSummaryGenerating = ref(false);
     const timeSenseEnabled = ref(true);
+    const realtimeTypingEnabled = ref(true);
     const messageTimeNow = ref(Date.now());
     const userBlockedRole = computed(() => {
         if (!soulLinkActiveChat.value || soulLinkActiveChatType.value !== 'character') return false;
@@ -200,6 +201,7 @@ export function useChatSettings(
             chatSummaryEnabled.value = saved.chatSummaryEnabled !== false;
             chatSummaryEveryN.value = Number(saved.chatSummaryEveryN) > 0 ? Number(saved.chatSummaryEveryN) : 12;
             timeSenseEnabled.value = saved.timeSenseEnabled !== false;
+            realtimeTypingEnabled.value = saved.realtimeTypingEnabled !== false;
         } else {
             userIdentity.value = '';
             userRelation.value = '';
@@ -228,6 +230,7 @@ export function useChatSettings(
             chatSummaryEnabled.value = true;
             chatSummaryEveryN.value = 12;
             timeSenseEnabled.value = true;
+            realtimeTypingEnabled.value = true;
         }
         applyBubbleStyle();
         updateChatBackground();
@@ -266,7 +269,8 @@ export function useChatSettings(
             soulLinkForeignTranslationLang: soulLinkForeignSecondaryLang.value,
             chatSummaryEnabled: chatSummaryEnabled.value,
             chatSummaryEveryN: chatSummaryEveryN.value,
-            timeSenseEnabled: timeSenseEnabled.value
+            timeSenseEnabled: timeSenseEnabled.value,
+            realtimeTypingEnabled: realtimeTypingEnabled.value
         });
     };
 
@@ -535,7 +539,7 @@ export function useChatSettings(
         activeMessageEnabled, activeMessageFrequencyMin, activeReplyDelaySec,
         userBlockedRole,
         chatSummaryEnabled, chatSummaryEveryN, chatSummaryBoard, chatSummaryGenerating,
-        timeSenseEnabled, messageTimeNow,
+        timeSenseEnabled, realtimeTypingEnabled, messageTimeNow,
         loadChatMenuSettings, saveChatMenuSettings,
         applyBubbleStyle, updateChatBackground, setBubbleStyle, applyCustomCSS,
         applyBackgroundImageLink, clearBackgroundImage,

@@ -4241,6 +4241,14 @@ ${styleGuide}
         });
 
         const musicState = useMusic({ characters, currentCharacter: selectedCharacter, activeProfile, chatHistorySource: soulLinkMessages });
+        const wanderChatBox = ref(null);
+        watch(() => musicState.wanderMessages, () => {
+            nextTick(() => {
+                if (wanderChatBox.value) {
+                    wanderChatBox.value.scrollTop = wanderChatBox.value.scrollHeight;
+                }
+            });
+        }, { deep: true });
         const music = musicState.music;
         const currentTrack = musicState.currentTrack;
         const progressPercent = musicState.progressPercent;
@@ -4254,7 +4262,7 @@ ${styleGuide}
         const musicPlayNext = () => musicState.playNext();
 
         const showUpdateNotice = ref(true);
-        const updateNoticeVersion = ref('最新版本：v2.0.0.1.0 - 新增ember相关内容！');
+        const updateNoticeVersion = ref('最新版本：v2.0.0.1.1 - 优化了 Chat 打字效果与 OpenAI 生图体验！');
         const closeUpdateNotice = () => { showUpdateNotice.value = false; };
 
         const uploadLockWallpaper = (e) => {
@@ -4609,6 +4617,7 @@ ${styleGuide}
             musicSeekFromEvent: musicState.seekFromEvent,
             musicSetVolume: musicState.setVolume,
             musicCycleRepeatMode: musicState.cycleRepeatMode,
+            wanderChatBox,
             wanderMessages: musicState.wanderMessages,
             wanderInput: musicState.wanderInput,
             wanderEmojiOpen: musicState.wanderEmojiOpen,
