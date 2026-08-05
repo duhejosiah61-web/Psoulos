@@ -597,6 +597,16 @@ export function useChat(
         content = removeStandaloneTags(content, [...replyTags, ...osTags, ...transReplyTags, ...transOsTags]);
         content = content.replace(/\s+/g, ' ').trim();
         
+        // 降级兜底：清理AI幻觉生成的表情包（不在现有表情包列表中的 [表情: xxx] 转为普通动作 [xxx]）
+        let availableStickers = [];
+        stickerPacks.value.forEach(pack => pack.stickers.forEach(s => availableStickers.push(s)));
+        const explicitStickerPattern = /[\[\uFF3B\u3010]\s*表情\s*[:：]\s*([^\]\uFF3D\u3011]+)[\]\uFF3D\u3011]/g;
+        content = content.replace(explicitStickerPattern, (match, p1) => {
+            const stickerName = p1.trim();
+            const exists = availableStickers.some(s => s.name === stickerName || s.name.includes(stickerName) || stickerName.includes(s.name));
+            return exists ? match : `[${stickerName}]`;
+        });
+        
         if (!content) {
             // 降级兜底：只删除不带内容的空标签（如 [REPLY]、[/OS] 等），
             // 保留 [IMAGE: ...] 这类带内容的功能标签，避免图片格式一起丢失
