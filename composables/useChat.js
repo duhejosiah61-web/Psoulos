@@ -664,23 +664,31 @@ export function useChat(
         return null;
     };
 
+    const escapeRegExp = (string) => {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    };
+
     const splitAiImageSegments = (rawText) => {
         const text = (rawText || '').trim();
         if (!text) return null;
         
-        // 优先识别生图世界书的 NAI_FORCE_IMAGE 标签
-        const naiPattern = /(?:\*+)?<NAI_FORCE_IMAGE>(?:\*+)?([\s\S]*?)(?:\*+)?<\/NAI_FORCE_IMAGE>(?:\*+)?/i;
-        const matchNai = text.match(naiPattern);
-        if (matchNai && matchNai.index != null) {
-            const before = text.slice(0, matchNai.index).trim();
-            const after = text.slice(matchNai.index + matchNai[0].length).trim();
-            const imageDesc = matchNai[1].trim();
-            
-            const segments = [];
-            if (before) segments.push({ type: 'text', content: before });
-            segments.push({ type: 'image', content: imageDesc, fbText: '一张照片' });
-            if (after) segments.push({ type: 'text', content: after });
-            return segments.length ? segments : null;
+        const cfg = imageGenConfig.parser;
+        if (cfg && cfg.customTagsEnabled && cfg.customStartTag && cfg.customEndTag) {
+            const startStr = escapeRegExp(cfg.customStartTag);
+            const endStr = escapeRegExp(cfg.customEndTag);
+            const customPattern = new RegExp(`(?:\\*+)?${startStr}(?:\\*+)?([\\s\\S]*?)(?:\\*+)?${endStr}(?:\\*+)?`, 'i');
+            const matchCustom = text.match(customPattern);
+            if (matchCustom && matchCustom.index != null) {
+                const before = text.slice(0, matchCustom.index).trim();
+                const after = text.slice(matchCustom.index + matchCustom[0].length).trim();
+                const imageDesc = matchCustom[1].trim();
+                
+                const segments = [];
+                if (before) segments.push({ type: 'text', content: before });
+                segments.push({ type: 'image', content: imageDesc, fbText: '一张照片' });
+                if (after) segments.push({ type: 'text', content: after });
+                return segments.length ? segments : null;
+            }
         }
         
         // 同时识别英文 [IMAGE: prompt] 格式（线下扮演模式）和中文格式
@@ -731,8 +739,20 @@ export function useChat(
     const extractAiImageDescription = (rawText) => {
         const text = (rawText || '').trim();
         if (!text) return null;
+
+        const cfg = imageGenConfig.parser;
+        if (cfg && cfg.customTagsEnabled && cfg.customStartTag && cfg.customEndTag) {
+            const startStr = escapeRegExp(cfg.customStartTag);
+            const endStr = escapeRegExp(cfg.customEndTag);
+            const customPattern = new RegExp(`^(?:\\*+)?${startStr}(?:\\*+)?([\\s\\S]*?)(?:\\*+)?${endStr}(?:\\*+)?$`, 'i');
+            const matchCustom = text.match(customPattern);
+            if (matchCustom) {
+                let imageDesc = matchCustom[1].trim() || '一张照片';
+                return { genPrompt: imageDesc, fbText: imageDesc };
+            }
+        }
+
         const patterns = [
-            /^(?:\*+)?<NAI_FORCE_IMAGE>(?:\*+)?([\s\S]*?)(?:\*+)?<\/NAI_FORCE_IMAGE>(?:\*+)?$/i, // 生图世界书
             /^\[\s*IMAGE\s*[:：]\s*([^\]]*?)\]/i,          // [IMAGE: prompt] 英文格式（线下扮演）
             /^\[\s*图片\s*[:：]\s*(.*?)\]/i,
             /^【\s*图片\s*[:：]\s*(.*?)】/i,

@@ -4242,13 +4242,19 @@ ${styleGuide}
 
         const musicState = useMusic({ characters, currentCharacter: selectedCharacter, activeProfile, chatHistorySource: soulLinkMessages });
         const wanderChatBox = ref(null);
-        watch(() => musicState.wanderMessages, () => {
+        const scrollToWanderBottom = () => {
             nextTick(() => {
                 if (wanderChatBox.value) {
                     wanderChatBox.value.scrollTop = wanderChatBox.value.scrollHeight;
                 }
             });
-        }, { deep: true });
+        };
+        watch(() => musicState.wanderMessages, scrollToWanderBottom, { deep: true });
+        watch(() => musicState.music.activeTab, (val) => {
+            if (val === 'wander') {
+                scrollToWanderBottom();
+            }
+        });
         const music = musicState.music;
         const currentTrack = musicState.currentTrack;
         const progressPercent = musicState.progressPercent;

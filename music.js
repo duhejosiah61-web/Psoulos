@@ -406,7 +406,7 @@ watch(myVipCookie, (newVal) => {
     music.myJournalReply = data.myInsightReply || '';
   };
 
-  const getWanderKey = () => `${String(currentCharacter?.value?.id || currentCharacter?.id || currentCharacter?.value?.nickname || currentCharacter?.nickname || currentCharacter?.value?.name || currentCharacter?.name || 'char')}::${songKey(currentTrack.value)}`;
+  const getWanderKey = () => `wander_global::${String(currentCharacter?.value?.id || currentCharacter?.id || currentCharacter?.value?.nickname || currentCharacter?.nickname || currentCharacter?.value?.name || currentCharacter?.name || 'char')}`;
   const persistWanderMessages = () => {
     const key = getWanderKey();
     const saved = safeJsonParse(safeLocalStorageGet(MUSIC_JOURNAL_MAP_KEY + '_wander'), {});
