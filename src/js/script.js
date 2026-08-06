@@ -4366,7 +4366,7 @@ ${styleGuide}
         const musicPlayNext = () => musicState.playNext();
 
         const showUpdateNotice = ref(true);
-        const updateNoticeVersion = ref('最新版本：v2.0.0.1.2 - 全面沉浸式地图上线！纯净的全屏底纹+悬浮散落的大头针设计！');
+        const updateNoticeVersion = ref('最新版本：v2.0.0.1.3 - 优化聊天排版，大幅提升信息密度，聊天气泡与内心独白更紧凑高级；优化地图悬浮大头针体验，修复同名地点重复标记问题。');
         const closeUpdateNotice = () => { showUpdateNotice.value = false; };
 
         const uploadLockWallpaper = (e) => {

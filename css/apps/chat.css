@@ -220,13 +220,13 @@
     gap: 0;
     position: relative;
     z-index: 1;
-    padding: 0 24px;
+    padding: 0 16px;
 }
 
 .wechat-item {
     display: flex;
-    gap: 20px;
-    padding: 20px 0;
+    gap: 12px;
+    padding: 12px 0;
     border-bottom: 1px solid rgba(0,0,0,0.06);
     cursor: pointer;
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
@@ -236,28 +236,29 @@
 
 .wechat-item.pinned {
     background: rgba(0,0,0,0.03);
-    padding-left: 16px;
-    padding-right: 16px;
-    margin: 0 -16px;
-    border-radius: 20px;
+    padding-left: 12px;
+    padding-right: 12px;
+    margin: 0 -12px;
+    border-radius: 16px;
     border-bottom-color: transparent;
 }
 
 .wechat-item:hover {
     background: rgba(0,0,0,0.02);
-    padding-left: 16px;
-    padding-right: 16px;
-    margin: 0 -16px;
-    border-radius: 20px;
+    padding-left: 12px;
+    padding-right: 12px;
+    margin: 0 -12px;
+    border-radius: 16px;
     border-bottom-color: transparent;
 }
 
 .wechat-avatar {
-    width: 64px;
-    height: 64px;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
     object-fit: cover;
     border: none;
+
     flex-shrink: 0;
     transition: transform 0.2s ease;
 }
@@ -438,11 +439,11 @@
 .wechat-messages {
     flex: 1;
     overflow-y: auto;
-    padding: 24px 20px;
+    padding: 16px 12px;
     padding-bottom: calc(200px + env(safe-area-inset-bottom));
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 8px;
     position: relative;
     z-index: 1;
 }
@@ -450,7 +451,7 @@
 /* Message Styles - Card Bubbles */
 .message {
     display: flex;
-    gap: 10px;
+    gap: 6px;
     align-items: flex-end;
     position: relative;
     max-width: 85%;
@@ -467,23 +468,22 @@
 
 .message .bubble {
     max-width: 100%;
-    padding: 10px 16px;
-    border-radius: var(--chat-bubble-radius, 18px);
+    padding: 8px 12px;
+    border-radius: var(--chat-bubble-radius, 16px);
     font-size: 14px;
-    line-height: 1.6;
+    line-height: 1.4;
     position: relative;
     word-wrap: break-word;
     font-family: 'Inter', sans-serif;
     border: 1px solid rgba(0, 0, 0, 0.08);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
 }
 
 /* Chat message avatars */
 .message-avatar {
-    width: 44px;
-    height: 44px;
+    height: 36px;
     border-radius: 50%;
     overflow: hidden;
     flex-shrink: 0;
@@ -623,10 +623,10 @@
 
 /* AI OS (内心独白) - 高级杂志排版 */
 .ai-os-container {
-    margin-top: 12px;
-    padding-top: 10px;
+    margin-top: 6px;
+    padding-top: 6px;
     border-top: 0.5px solid #E0E0E0;
-    margin-left: 15px;
+    margin-left: 10px;
     opacity: 0.5;
     transition: opacity 0.3s ease, filter 0.5s ease;
     animation: osReveal 0.6s 0.5s ease both;
@@ -653,7 +653,7 @@
     font-size: 12px;
     font-style: italic;
     color: #666;
-    line-height: 1.5;
+    line-height: 1.3;
 }
 
 /* Call Message Card - Minimalist High Fashion Style */
@@ -661,14 +661,14 @@
     width: 100%;
     max-width: 100%;
     justify-content: center;
-    margin: 24px 0;
+    margin: 12px 0;
 }
 
 .message.call-message .bubble {
     background: transparent;
     border: none;
     border-radius: 0;
-    padding: 16px 0;
+    padding: 8px 0;
     color: #000000;
     font-weight: 300;
     display: flex;
