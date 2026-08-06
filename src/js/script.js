@@ -4366,7 +4366,7 @@ ${styleGuide}
         const musicPlayNext = () => musicState.playNext();
 
         const showUpdateNotice = ref(true);
-        const updateNoticeVersion = ref('最新版本：v2.0.0.1.1 - 优化了 Chat 打字效果与 OpenAI 生图体验！');
+        const updateNoticeVersion = ref('最新版本：v2.0.0.1.2 - 全面沉浸式地图上线！纯净的全屏底纹+悬浮散落的大头针设计！');
         const closeUpdateNotice = () => { showUpdateNotice.value = false; };
 
         const uploadLockWallpaper = (e) => {

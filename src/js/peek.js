@@ -680,7 +680,7 @@ export function usePeek(charactersRef, activeProfileRef, soulLinkMessagesRef, so
   "mailThreads":[{"id":"e1","from":"...","subject":"...","preview":"...","at":"HH:mm","unread":true,"ts":1710000000000}],
   "diaryEntries":[{"id":"d1","title":"...","mood":"...","content":"..."}],
   "bankAccount":{"balance":1234,"monthlySpend":456,"records":[{"id":"b1","item":"...","amount":-12,"at":"09:00","ts":1710000000000}]},
-  "mapTracks":[{"id":"m1","place":"...","at":"08:30","note":"...","ts":1710000000000}],
+  "mapTracks":[{"id":"m1","place":"...","at":"08:30","note":"...","ts":1710000000000}, {"id":"m2","place":"...","at":"10:00","note":"...","ts":1710000100000}],
   "photos":[{"id":"p1","description":"...","bgColor":"#...","bgColor2":"#..."}],
   "browserHistory":[{"id":"b1","title":"...","url":"..."}]
 }

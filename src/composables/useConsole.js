@@ -286,7 +286,7 @@ export function useConsole({ addGlobalLog, saveProfilesCallback } = {}) {
 
   const writeBackupSlotToIdb = (pkg) => {
     return new Promise((resolve, reject) => {
-      const req = indexedDB.open('SoulOS_Backup_DB', 1);
+      const req = indexedDB.open('SoulOS_Backup_DB', 3);
       req.onupgradeneeded = (e) => {
         const db = e.target.result;
         if (!db.objectStoreNames.contains('backup_slot')) {
@@ -295,6 +295,11 @@ export function useConsole({ addGlobalLog, saveProfilesCallback } = {}) {
       };
       req.onsuccess = () => {
         const db = req.result;
+        if (!db.objectStoreNames.contains('backup_slot')) {
+            // Failsafe
+            db.close();
+            return reject(new Error('Object store backup_slot not found in DB'));
+        }
         const tx = db.transaction('backup_slot', 'readwrite');
         const store = tx.objectStore('backup_slot');
         const putReq = store.put(pkg, 'v1');
@@ -308,7 +313,13 @@ export function useConsole({ addGlobalLog, saveProfilesCallback } = {}) {
 
   const readBackupSlotFromIdb = () => {
     return new Promise((resolve, reject) => {
-      const req = indexedDB.open('SoulOS_Backup_DB', 1);
+      const req = indexedDB.open('SoulOS_Backup_DB', 3);
+      req.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains('backup_slot')) {
+          db.createObjectStore('backup_slot');
+        }
+      };
       req.onsuccess = () => {
         const db = req.result;
         if (!db.objectStoreNames.contains('backup_slot')) {

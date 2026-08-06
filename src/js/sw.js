@@ -1,8 +1,8 @@
 // sw.js: 本地文件走缓存，CDN 请求失败时静默处理
-const SW_VERSION = 'v12_20260803_stable';
+const SW_VERSION = 'v13_20260806_stable';
 
 // 需要预缓存的本地核心文件
-const LOCAL_CACHE = 'psoulos-local-v12';
+const LOCAL_CACHE = 'psoulos-local-v13';
 
 // 1. 安装时，立刻接管
 self.addEventListener('install', event => {

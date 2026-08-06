@@ -111,219 +111,8 @@
                                                         <div class="peek-home-indicator"></div>
                                                     </template>
                                                     <template v-else>
-                                                        <div class="peek-app-nav">
-                                                            <button class="peek-app-back" @click="peek.closePeekInnerApp"><i class="fas fa-chevron-left"></i></button>
-                                                            <span class="peek-app-title">{{ peek.getPeekAppName(peek.peekInnerApp) }}</span>
-                                                        </div>
-                                                        <div class="peek-app-body">
-                                                            <div v-if="peek.peekInnerApp === 'messages'" class="peek-app-im peek-retro-im">
-                                                                <!-- Inbox View -->
-                                                                <div v-if="!peek.peekActiveChatContact" class="peek-retro-inbox">
-                                                                    <div class="peek-retro-header">
-                                                                        <span>MESSAGES</span>
-                                                                    </div>
-                                                                    <div v-if="peek.peekChatInbox.length === 0" class="peek-retro-empty">NO MESSAGES</div>
-                                                                    <div class="peek-retro-inbox-list">
-                                                                        <div v-for="c in peek.peekChatInbox" :key="c.contactName" class="peek-retro-inbox-item" @click="peek.openPeekChat(c.contactName)">
-                                                                            <div class="peek-retro-avatar-box">{{ c.contactName.charAt(0) }}</div>
-                                                                            <div class="peek-retro-inbox-info">
-                                                                                <div class="peek-retro-inbox-top">
-                                                                                    <span class="peek-retro-name">{{ c.contactName }}</span>
-                                                                                    <span class="peek-retro-time">{{ c.lastMessageTime }}</span>
-                                                                                </div>
-                                                                                <div class="peek-retro-inbox-bottom">
-                                                                                    <span class="peek-retro-preview">{{ c.lastMessageText }}</span>
-                                                                                    <span class="peek-retro-unread" v-if="c.unread > 0">!</span>
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                                <!-- Chat Thread View -->
-                                                                <div v-else class="peek-retro-thread">
-                                                                    <div class="peek-retro-header">
-                                                                        <div class="peek-retro-back" @click="peek.closePeekChat()">&lt; BACK</div>
-                                                                        <span>{{ peek.peekActiveChatContact }}</span>
-                                                                    </div>
-                                                                    <div class="peek-retro-thread-body">
-                                                                        <div v-if="peek.peekActiveChatMessages.length === 0" class="peek-retro-empty">NO MESSAGES</div>
-                                                                        <div v-for="m in peek.peekActiveChatMessages" :key="m.id" class="peek-retro-msg-row" :class="m.sender">
-                                                                            <div class="peek-retro-avatar-box" v-if="m.sender === 'other'">{{ m.contactName.charAt(0) }}</div>
-                                                                            <div class="peek-retro-bubble-wrap">
-                                                                                <div class="peek-retro-bubble">{{ m.text }}</div>
-                                                                                <div class="peek-retro-msg-time">{{ m.at }}</div>
-                                                                            </div>
-                                                                            <div class="peek-retro-avatar-box" v-if="m.sender === 'self'">{{ (peek.peekSelectedCharacter?.nickname || 'TA').charAt(0) }}</div>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div v-else-if="peek.peekInnerApp === 'todo'" class="peek-app-todo">
-                                                                <div class="peek-todo-header">提醒事项</div>
-                                                                <div v-if="(peek.peekTodoItems || []).length === 0" class="peek-chat-empty">暂无待办</div>
-                                                                <div class="peek-todo-list">
-                                                                    <div class="peek-todo-item" v-for="t in peek.peekTodoItems" :key="t.id" :class="{ 'done': t.done }">
-                                                                        <div class="peek-todo-checkbox"><i class="far" :class="t.done ? 'fa-check-circle' : 'fa-circle'"></i></div>
-                                                                        <div class="peek-todo-content">
-                                                                            <div class="peek-todo-title">{{ t.text || '待办' }}</div>
-                                                                            <div class="peek-todo-due" v-if="t.due">截止：{{ t.due }} <span v-if="t.at">· {{ t.at }}</span></div>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div v-else-if="peek.peekInnerApp === 'calendar'" class="peek-app-calendar">
-                                                                <div class="peek-calendar-header">即将到来</div>
-                                                                <div v-if="(peek.peekCalendarEvents || []).length === 0" class="peek-chat-empty">暂无日程</div>
-                                                                <div class="peek-calendar-timeline">
-                                                                    <div class="peek-calendar-item" v-for="e in peek.peekCalendarEvents" :key="e.id">
-                                                                        <div class="peek-calendar-time-col">{{ e.at?.split(' ')[1] || e.at || '全天' }}</div>
-                                                                        <div class="peek-calendar-event-card">
-                                                                            <div class="peek-calendar-event-title">{{ e.title || '日程' }}</div>
-                                                                            <div class="peek-calendar-event-loc" v-if="e.location"><i class="fas fa-map-marker-alt"></i> {{ e.location }}</div>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div v-else-if="peek.peekInnerApp === 'wallet'" class="peek-app-bank">
-                                                                <div class="peek-bank-header">
-                                                                    <div class="peek-bank-title">零钱余额</div>
-                                                                    <div class="peek-bank-balance">¥ {{ (peek.peekWallet && peek.peekWallet.balance) || 0 }}</div>
-                                                                </div>
-                                                                <div class="peek-bank-list">
-                                                                    <div class="peek-bank-list-title">账单明细</div>
-                                                                    <div class="peek-bank-item" v-for="r in ((peek.peekWallet && peek.peekWallet.records) || [])" :key="r.id">
-                                                                        <div class="peek-bank-item-left">
-                                                                            <div class="peek-bank-item-icon"><i class="fas fa-wallet"></i></div>
-                                                                            <div class="peek-bank-item-info">
-                                                                                <div class="peek-bank-item-title">{{ r.item || '消费' }}</div>
-                                                                                <div class="peek-bank-item-time">{{ r.at }}<span v-if="r.note"> · {{ r.note }}</span></div>
-                                                                            </div>
-                                                                        </div>
-                                                                        <div class="peek-bank-item-amount" :class="{ 'income': r.amount > 0 }">{{ peek.peekFormatAmount(r.amount) }}</div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div v-else-if="peek.peekInnerApp === 'health'" class="peek-app-health">
-                                                                <div class="peek-health-header">摘要</div>
-                                                                <div class="peek-health-cards">
-                                                                    <div class="peek-health-card steps">
-                                                                        <div class="peek-health-card-header"><i class="fas fa-fire" style="color: #ff3b30;"></i> 活动步数</div>
-                                                                        <div class="peek-health-value">{{ ((peek.peekHealth && peek.peekHealth.steps) || [])[0]?.count || 0 }} <span class="peek-health-unit">步</span></div>
-                                                                    </div>
-                                                                    <div class="peek-health-card sleep">
-                                                                        <div class="peek-health-card-header"><i class="fas fa-bed" style="color: #5856d6;"></i> 睡眠时长</div>
-                                                                        <div class="peek-health-value">{{ ((peek.peekHealth && peek.peekHealth.sleep) || [])[0]?.hours || 0 }} <span class="peek-health-unit">小时</span></div>
-                                                                        <div class="peek-health-sub" v-if="((peek.peekHealth && peek.peekHealth.sleep) || [])[0]?.note">{{ ((peek.peekHealth && peek.peekHealth.sleep) || [])[0].note }}</div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div v-else-if="peek.peekInnerApp === 'mail'" class="peek-app-mail">
-                                                                <div class="peek-mail-header">收件箱</div>
-                                                                <div v-if="(peek.peekMailThreads || []).length === 0" class="peek-chat-empty">暂无邮件</div>
-                                                                <div class="peek-mail-list">
-                                                                    <div class="peek-mail-item" v-for="m in peek.peekMailThreads" :key="m.id">
-                                                                        <div class="peek-mail-dot" :class="{ 'unread': m.unread }"></div>
-                                                                        <div class="peek-mail-content">
-                                                                            <div class="peek-mail-top">
-                                                                                <div class="peek-mail-from">{{ m.from || '发件人' }}</div>
-                                                                                <div class="peek-mail-time">{{ m.at || '' }}</div>
-                                                                            </div>
-                                                                            <div class="peek-mail-subject">{{ m.subject || '无主题' }}</div>
-                                                                            <div class="peek-mail-preview">{{ m.preview || '' }}</div>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div v-else-if="peek.peekInnerApp === 'calls'" class="peek-list">
-                                                                <div class="peek-list-item" v-for="c in peek.peekCalls" :key="c.id"><div><b>{{ c.who }}</b> · {{ c.type === 'missed' ? '未接来电' : '已拨出' }}</div><span>{{ c.at }}</span></div>
-                                                            </div>
-                                                            <div v-else-if="peek.peekInnerApp === 'album'" class="peek-app-album-container">
-                                                                <div class="peek-app-album">
-                                                                    <div v-for="(p, i) in peek.peekPhotos" :key="p.id || i" class="peek-album-item">
-                                                                        <div class="peek-album-glass" :style="{ background: 'linear-gradient(135deg,' + (p.bgColor || '#333') + ',' + (p.bgColor2 || '#111') + ')' }">
-                                                                            <i class="fas fa-image"></i>
-                                                                            <div class="peek-album-desc">{{ p.description }}</div>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                                <div class="peek-album-hidden-section">
-                                                                    <div class="peek-album-hidden-title">更多项目</div>
-                                                                    <div class="peek-album-hidden-item">
-                                                                        <div class="peek-album-hidden-icon"><i class="fas fa-eye-slash"></i></div>
-                                                                        <div class="peek-album-hidden-text">已隐藏</div>
-                                                                        <div class="peek-album-hidden-count"><i class="fas fa-lock"></i></div>
-                                                                    </div>
-                                                                    <div class="peek-album-hidden-item">
-                                                                        <div class="peek-album-hidden-icon"><i class="fas fa-trash-alt"></i></div>
-                                                                        <div class="peek-album-hidden-text">最近删除</div>
-                                                                        <div class="peek-album-hidden-count">{{ peek.peekPhotos.length > 0 ? 3 : 0 }}</div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div v-else-if="peek.peekInnerApp === 'notes' || peek.peekInnerApp === 'diary'" class="peek-app-notes">
-                                                                <div class="peek-note-card" v-for="d in peek.peekDiaryEntries" :key="d.id">
-                                                                    <h4 class="peek-note-title">{{ d.title }}</h4>
-                                                                    <div class="peek-note-mood"><i class="fas fa-tag"></i> {{ d.mood }}</div>
-                                                                    <p class="peek-note-body">{{ d.content }}</p>
-                                                                </div>
-                                                                <div class="peek-note-card" v-for="n in peek.peekNotes" :key="n.id">
-                                                                    <h4 class="peek-note-title">{{ n.title }}</h4>
-                                                                    <p class="peek-note-body">{{ n.content }}</p>
-                                                                </div>
-                                                            </div>
-                                                            <div v-else-if="peek.peekInnerApp === 'browser'" class="peek-app-browser">
-                                                                <div class="peek-browser-searchbar"><i class="fas fa-lock"></i> 搜索或键入网址</div>
-                                                                <div class="peek-browser-history-title">历史记录</div>
-                                                                <div class="peek-browser-item" v-for="b in peek.peekBrowserHistory" :key="b.id">
-                                                                    <div class="peek-browser-icon"><i class="fas fa-search"></i></div>
-                                                                    <div class="peek-browser-content">
-                                                                        <div class="peek-browser-title">{{ b.title }}</div>
-                                                                        <div class="peek-browser-url">{{ b.url }}</div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div v-else-if="peek.peekInnerApp === 'files'" class="peek-list">
-                                                                <div class="peek-list-item" v-for="f in peek.peekFiles" :key="f.id"><div><b>{{ f.name }}</b></div><span>{{ f.size }}</span></div>
-                                                            </div>
-                                                            <div v-else-if="peek.peekInnerApp === 'bank'" class="peek-app-bank">
-                                                                <div class="peek-bank-header">
-                                                                    <div class="peek-bank-title">账户总览</div>
-                                                                    <div class="peek-bank-balance">¥ {{ peek.peekBankAccount.balance }}</div>
-                                                                    <div class="peek-bank-sub">本月支出: ¥ {{ peek.peekBankAccount.monthlySpend }}</div>
-                                                                </div>
-                                                                <div class="peek-bank-list">
-                                                                    <div class="peek-bank-list-title">近期明细</div>
-                                                                    <div class="peek-bank-item" v-for="r in (peek.peekBankAccount.records || [])" :key="r.id">
-                                                                        <div class="peek-bank-item-left">
-                                                                            <div class="peek-bank-item-icon"><i class="fas fa-money-check"></i></div>
-                                                                            <div class="peek-bank-item-info">
-                                                                                <div class="peek-bank-item-title">{{ r.item }}</div>
-                                                                                <div class="peek-bank-item-time">{{ r.at }}</div>
-                                                                            </div>
-                                                                        </div>
-                                                                        <div class="peek-bank-item-amount" :class="{ 'income': r.amount > 0 }">{{ peek.peekFormatAmount(r.amount) }}</div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div v-else-if="peek.peekInnerApp === 'map'" class="peek-app-map">
-                                                                <div class="peek-map-mock-bg">
-                                                                    <i class="fas fa-location-arrow"></i>
-                                                                </div>
-                                                                <div class="peek-map-panel">
-                                                                    <div class="peek-map-panel-title">最近去过</div>
-                                                                    <div class="peek-map-list">
-                                                                        <div class="peek-map-item" v-for="m in peek.peekMapTracks" :key="m.id">
-                                                                            <div class="peek-map-icon"><i class="fas fa-map-pin"></i></div>
-                                                                            <div class="peek-map-info">
-                                                                                <div class="peek-map-place">{{ m.place }}</div>
-                                                                                <div class="peek-map-desc">{{ m.note }} · {{ m.at }}</div>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        <div class="peek-home-indicator"></div>
+                                                        <PeekAppContent />
+
                                                     </template>
                                                 </template>
                                             </div>
@@ -339,10 +128,14 @@
 </template>
 
 <script>
+import PeekAppContent from './PeekAppContent.vue';
 import { inject } from 'vue';
 
 export default {
     name: 'PeekApp',
+    components: {
+        PeekAppContent
+    },
     setup() {
         const state = inject('globalState');
         return state;
