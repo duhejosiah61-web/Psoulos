@@ -278,7 +278,12 @@
           <transition name="slide-up">
               <div v-if="selectedMapNode" class="peek-map-detail-sheet" style="position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(20, 22, 28, 0.85); border-top: 1px solid rgba(255,255,255,0.08); border-top-left-radius: 28px; border-top-right-radius: 28px; box-shadow: 0 -10px 40px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.1); z-index: 1000; padding: 28px 24px; box-sizing: border-box; backdrop-filter: blur(32px) saturate(180%); -webkit-backdrop-filter: blur(32px) saturate(180%); color: #fff;">
                   <div style="width: 48px; height: 5px; background: rgba(255,255,255,0.2); border-radius: 3px; margin: 0 auto 20px; box-shadow: 0 1px 2px rgba(0,0,0,0.2);"></div>
-                  <div style="font-size: 22px; font-weight: 700; margin-bottom: 8px; letter-spacing: 0.5px; text-shadow: 0 2px 10px rgba(255,255,255,0.2);">{{ selectedMapNode.place }}</div>
+                  
+                  <div @click.stop="closeMapDetail" style="position: absolute; top: 24px; right: 24px; width: 32px; height: 32px; border-radius: 16px; background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; cursor: pointer; backdrop-filter: blur(4px);">
+                      <i class="fas fa-times" style="font-size: 14px; color: rgba(255,255,255,0.8);"></i>
+                  </div>
+
+                  <div style="font-size: 22px; font-weight: 700; margin-bottom: 8px; letter-spacing: 0.5px; text-shadow: 0 2px 10px rgba(255,255,255,0.2); max-width: calc(100% - 40px);">{{ selectedMapNode.place }}</div>
                   <div style="font-size: 14px; color: rgba(255,255,255,0.5); margin-bottom: 24px; font-weight: 500; display: flex; align-items: center; gap: 6px;"><i class="far fa-clock"></i> {{ selectedMapNode.at }}</div>
                   
                   <div v-if="selectedMapNode.travelData" style="background: linear-gradient(135deg, rgba(0, 224, 255, 0.12), rgba(0, 114, 255, 0.05)); border: 1px solid rgba(0, 224, 255, 0.2); box-shadow: 0 8px 20px rgba(0, 114, 255, 0.08); border-radius: 16px; padding: 16px; margin-bottom: 24px; display: flex; align-items: center; position: relative; overflow: hidden;">
