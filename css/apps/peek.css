@@ -150,6 +150,11 @@
     display: flex;
     flex-direction: column;
     gap: 16px;
+    overflow-y: auto;
+}
+
+.peek-home-content::-webkit-scrollbar {
+    display: none;
 }
 
 /* 问候语区域 */
