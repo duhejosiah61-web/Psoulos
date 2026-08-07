@@ -3,32 +3,7 @@
 
                 <HomeApp />
 
-        <RightnowApp v-if="openedApp === 'rightnow'" />
-
-        <ChatApp v-else-if="openedApp === 'chat'" />
-
-        <EmberApp v-else-if="openedApp === 'ember'" />
-
-        <FeedApp v-else-if="openedApp === 'feed'" />
-        <LiveApp v-else-if="openedApp === 'live'" />
-        <MateApp v-else-if="openedApp === 'mate'" />
-
-        <ReadApp v-else-if="openedApp === 'read'" />
-
-        <WorkshopApp v-else-if="openedApp === 'workshop'" />
-
-        <ConsoleApp v-else-if="openedApp === 'console'" />
-
-        <ThemeApp v-else-if="openedApp === 'theme'" />
-
-        <MusicApp v-else-if="openedApp === 'music'" />
-
-        <GamesApp v-else-if="openedApp === 'games'" />
-
-        <NoticeApp v-else-if="openedApp === 'notice'" />
-
-        <!-- Nest App -->
-        <NestApp v-else-if="openedApp === 'nest'" />景 -->
+        <!-- 锁屏背景 -->
         <div v-if="isLockScreenVisible" class="lock-screen-background-blur"></div>
         <!-- 锁屏界面 -->
         <div v-if="isLockScreenVisible" class="lockscreen" :style="{ backgroundImage: `url(${lockWallpaper})` }">

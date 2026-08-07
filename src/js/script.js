@@ -2572,6 +2572,7 @@ export function setupApp() {
         const historyDisplayLimit = ref(50);
         watch([soulLinkActiveChat, soulLinkActiveChatType], () => {
             historyDisplayLimit.value = 50;
+            scrollToBottom();
         });
 
         const activeChatFilteredMessages = computed(() => {

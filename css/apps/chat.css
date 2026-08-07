@@ -195,7 +195,7 @@
 }
 
 .group-chat .message {
-    margin-bottom: 16px;
+    margin-bottom: 4px;
 }
 
 .group-chat .message.call-message {
